@@ -1,0 +1,52 @@
+{
+	"name": "obsidian-metadata-validator",
+	"version": "0.1.0",
+	"description": "Manifest-driven metadata validation, auto-fix, and field picker for Obsidian.",
+	"main": "main.js",
+	"type": "module",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"version": "node version-bump.mjs && git add manifest.json versions.json",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"format": "prettier --write \"src/**/*.ts\"",
+		"format:check": "prettier --check \"src/**/*.ts\"",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"knip": "knip",
+		"lint-staged": "lint-staged",
+		"prepare": "husky"
+	},
+	"lint-staged": {
+		"src/**/*.ts": [
+			"prettier --write",
+			"eslint --fix"
+		]
+	},
+	"keywords": [],
+	"license": "MIT",
+	"devDependencies": {
+		"@eslint/js": "9.30.1",
+		"@eslint/json": "^1.2.0",
+		"@types/node": "^16.11.6",
+		"@vitest/coverage-v8": "^4.1.2",
+		"esbuild": "0.25.5",
+		"eslint-plugin-obsidianmd": "0.1.9",
+		"globals": "14.0.0",
+		"husky": "^9.1.7",
+		"jiti": "2.6.1",
+		"knip": "^6.3.0",
+		"lint-staged": "^16.4.0",
+		"obsidian-test-mocks": "^1.0.11",
+		"prettier": "^3.8.1",
+		"tslib": "2.4.0",
+		"typescript": "^5.8.3",
+		"typescript-eslint": "8.35.1",
+		"vitest": "^4.1.2"
+	},
+	"dependencies": {
+		"obsidian": "latest"
+	}
+}
