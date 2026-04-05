@@ -1,0 +1,119 @@
+import type { App, TFile } from "obsidian";
+import type { ManifestField, ResolvedSchema, ValidationResult } from "../types";
+import { applyAutoFix } from "./auto-fix";
+import { checkRequired } from "./rules/required";
+import { checkOptions } from "./rules/options";
+import { checkLinkSource } from "./rules/link-source";
+import { checkLinkExists } from "./rules/link-exists";
+import { checkNumberRange } from "./rules/number-range";
+import { runJsValidator } from "./rules/js-validator";
+import { resolveSource } from "../schema/source-resolver";
+
+export class ValidationEngine {
+  private readonly app: App;
+
+  constructor(app: App) {
+    this.app = app;
+  }
+
+  async validate(
+    file: TFile,
+    frontmatter: Record<string, unknown>,
+    schema: ResolvedSchema
+  ): Promise<ValidationResult[]> {
+    const results: ValidationResult[] = [];
+
+    for (const [fieldName, fieldDef] of Object.entries(schema.fields)) {
+      const fieldResults = await this.validateField(
+        fieldName,
+        fieldDef,
+        frontmatter,
+        file,
+        schema.manifestPath
+      );
+      results.push(...fieldResults);
+    }
+
+    if (schema.formatting.property_order?.length) {
+      this.applyPropertyOrder(frontmatter, schema.formatting.property_order);
+    }
+
+    return results;
+  }
+
+  private async validateField(
+    fieldName: string,
+    field: ManifestField,
+    frontmatter: Record<string, unknown>,
+    file: TFile,
+    manifestPath: string
+  ): Promise<ValidationResult[]> {
+    const results: ValidationResult[] = [];
+
+    const wasFixed = applyAutoFix(fieldName, field, frontmatter);
+    if (wasFixed) {
+      results.push({
+        field: fieldName,
+        severity: "info",
+        message: `"${fieldName}" was auto-corrected.`,
+        rule:
+          field.fixed !== undefined ? "fixed" : field.default !== undefined ? "default" : "sort",
+        manifestPath,
+        autoFixed: true,
+      });
+    }
+
+    const value = frontmatter[fieldName];
+
+    if (field.required) {
+      const r = checkRequired(fieldName, value, manifestPath);
+      if (r) results.push(r);
+    }
+
+    if (field.options && Array.isArray(field.options)) {
+      const r = checkOptions(fieldName, value, field.options, manifestPath);
+      if (r) results.push(r);
+    }
+
+    if (field.type === "number" && (field.min !== undefined || field.max !== undefined)) {
+      const r = checkNumberRange(fieldName, value, field.min, field.max, manifestPath);
+      if (r) results.push(r);
+    }
+
+    if ((field.type === "link" || field.type === "multilink") && field.source) {
+      const allowedOptions = await resolveSource(field.source, this.app, file);
+      const r = checkLinkSource(fieldName, value, allowedOptions, manifestPath);
+      if (r) results.push(r);
+    }
+
+    if ((field.type === "link" || field.type === "multilink") && field.validate_exists) {
+      const r = checkLinkExists(fieldName, value, this.app, manifestPath);
+      if (r) results.push(r);
+    }
+
+    if (field.validate?.js) {
+      const r = await runJsValidator(
+        fieldName,
+        value,
+        field.validate.js,
+        this.app,
+        file,
+        manifestPath
+      );
+      if (r) results.push(r);
+    }
+
+    return results;
+  }
+
+  private applyPropertyOrder(frontmatter: Record<string, unknown>, order: string[]): void {
+    const keys = Object.keys(frontmatter);
+    const orderedKeys = [
+      ...order.filter((k) => keys.includes(k)),
+      ...keys.filter((k) => !order.includes(k)),
+    ];
+    const copy = { ...frontmatter };
+    for (const k of Object.keys(frontmatter)) delete frontmatter[k];
+    for (const k of orderedKeys) frontmatter[k] = copy[k];
+  }
+}
