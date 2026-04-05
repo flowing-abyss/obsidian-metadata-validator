@@ -1,0 +1,146 @@
+import type { App, TFile } from "obsidian";
+import type { ResolvedSchema, ValidationResult } from "../types";
+import type { SchemaResolver } from "../schema/resolver";
+import type { ValidationEngine } from "../validation/engine";
+import type { PluginSettings } from "../settings";
+import type { PickerModal as PickerModalType } from "./picker-modal";
+import type { showValidatorTooltip as showValidatorTooltipType } from "./validator-tooltip";
+
+const PICKER_ATTR = "data-mv-picker";
+const VALIDATOR_ATTR = "data-mv-validator";
+
+export class PropertyDecorator {
+  private observer: MutationObserver | null = null;
+  private readonly app: App;
+  private readonly resolver: SchemaResolver;
+  private readonly engine: ValidationEngine;
+  private readonly settings: PluginSettings;
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(
+    app: App,
+    resolver: SchemaResolver,
+    engine: ValidationEngine,
+    settings: PluginSettings
+  ) {
+    this.app = app;
+    this.resolver = resolver;
+    this.engine = engine;
+    this.settings = settings;
+  }
+
+  attach(): void {
+    this.observer = new MutationObserver(() => this.onMutation());
+    this.observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  detach(): void {
+    this.observer?.disconnect();
+    this.observer = null;
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+  }
+
+  private onMutation(): void {
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => void this.decorateAll(), 300);
+  }
+
+  async decorateAll(): Promise<void> {
+    if (!this.settings.showInlineErrors) return;
+
+    const file = this.app.workspace.getActiveFile();
+    if (!file) return;
+
+    const cache = this.app.metadataCache.getFileCache(file);
+    const frontmatter = (cache?.frontmatter ?? {}) as Record<string, unknown>;
+    const schema = this.resolver.resolveForNote(file, frontmatter);
+    if (!schema) return;
+
+    const results = await this.engine.validate(file, frontmatter, schema);
+    const resultMap = new Map<string, ValidationResult[]>();
+    for (const r of results) {
+      const existing = resultMap.get(r.field) ?? [];
+      existing.push(r);
+      resultMap.set(r.field, existing);
+    }
+
+    const rows = Array.from(document.querySelectorAll<HTMLElement>(".metadata-property"));
+    for (const row of rows) {
+      const key = row.getAttribute("data-property-key");
+      if (!key) continue;
+      const fieldDef = schema.fields[key];
+
+      this.injectPickerIcon(row, key, schema, file, frontmatter);
+      this.injectValidatorIcon(row, key, resultMap.get(key) ?? []);
+
+      if (!fieldDef) {
+        row.querySelector(`[${PICKER_ATTR}]`)?.remove();
+      }
+    }
+  }
+
+  private injectPickerIcon(
+    row: HTMLElement,
+    fieldKey: string,
+    schema: ResolvedSchema,
+    file: TFile,
+    frontmatter: Record<string, unknown>
+  ): void {
+    if (row.querySelector(`[${PICKER_ATTR}]`)) return;
+
+    const fieldDef = schema.fields[fieldKey];
+    if (!fieldDef) return;
+
+    const nameEl = row.querySelector<HTMLElement>(".metadata-property-key");
+    if (!nameEl) return;
+
+    const btn = document.createElement("button");
+    btn.setAttribute(PICKER_ATTR, "true");
+    btn.className = "mv-picker-btn clickable-icon";
+    btn.setAttribute("aria-label", `Edit ${fieldKey}`);
+    btn.textContent = "⊞";
+
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      void import("./picker-modal").then((mod: { PickerModal: typeof PickerModalType }) => {
+        new mod.PickerModal(
+          this.app,
+          fieldKey,
+          fieldDef,
+          frontmatter[fieldKey],
+          schema,
+          file
+        ).open();
+      });
+    });
+
+    nameEl.after(btn);
+  }
+
+  private injectValidatorIcon(
+    row: HTMLElement,
+    _fieldKey: string,
+    results: ValidationResult[]
+  ): void {
+    row.querySelector(`[${VALIDATOR_ATTR}]`)?.remove();
+
+    const errors = results.filter((r) => !r.autoFixed);
+    if (errors.length === 0) return;
+
+    const icon = document.createElement("span");
+    icon.setAttribute(VALIDATOR_ATTR, "true");
+    icon.className = "mv-validator-icon";
+    icon.textContent = "⚠";
+
+    icon.addEventListener("click", (e) => {
+      e.stopPropagation();
+      void import("./validator-tooltip").then(
+        (mod: { showValidatorTooltip: typeof showValidatorTooltipType }) => {
+          mod.showValidatorTooltip(icon, errors);
+        }
+      );
+    });
+
+    row.appendChild(icon);
+  }
+}

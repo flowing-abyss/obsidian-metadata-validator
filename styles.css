@@ -1,8 +1,288 @@
-/*
+/* Metadata Validator plugin styles */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+/* ── Body-level CSS toggles (controlled by CssInjector) ──── */
+body.mv-hide-type-icon .metadata-property-icon {
+  display: none !important;
+}
 
-If your plugin does not need CSS, delete this file.
+body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadata-property-value::after {
+  display: none !important;
+}
 
-*/
+body.mv-hide-validator .metadata-property-invalid-icon {
+  display: none !important;
+}
+
+/* ── Picker Modal ─────────────────────────────────────────── */
+.mv-picker-modal .mv-picker-header {
+  margin-bottom: 8px;
+}
+
+.mv-picker-modal .mv-picker-meta {
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+.mv-picker-modal .mv-picker-search {
+  width: 100%;
+  margin: 8px 0;
+  padding: 6px;
+}
+
+.mv-picker-modal .mv-picker-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.mv-picker-modal .mv-picker-option {
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mv-picker-modal .mv-picker-option:hover {
+  background: var(--background-modifier-hover);
+}
+
+.mv-picker-modal .mv-picker-option.is-selected {
+  background: var(--interactive-accent-hover);
+}
+
+.mv-picker-modal .mv-picker-value-hint {
+  opacity: 0.5;
+  font-size: 11px;
+}
+
+.mv-picker-modal .mv-picker-footer {
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Validator Tooltip ────────────────────────────────────── */
+#mv-validator-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--background-primary);
+  border: 1px solid var(--color-red, #f38ba8);
+  border-radius: 6px;
+  padding: 10px 14px;
+  max-width: 320px;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.mv-tooltip-row {
+  margin-bottom: 6px;
+}
+
+.mv-tooltip-error {
+  color: var(--color-red, #f38ba8);
+}
+
+.mv-tooltip-warning {
+  color: var(--color-yellow, #f9e2af);
+}
+
+.mv-tooltip-meta {
+  font-size: 11px;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+.mv-tooltip-link {
+  font-size: 11px;
+  color: var(--link-color);
+  cursor: pointer;
+  display: block;
+  margin-top: 2px;
+}
+
+/* ── Inline decorator icons ───────────────────────────────── */
+.mv-picker-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 4px;
+  opacity: 0.5;
+  font-size: 14px;
+}
+
+.mv-validator-icon {
+  color: var(--color-red, #f38ba8);
+  cursor: pointer;
+  font-size: 13px;
+  margin-left: 4px;
+}
+
+/* ── Sidebar panel ────────────────────────────────────────── */
+.mv-sidebar-row {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.mv-error {
+  color: var(--color-red, #f38ba8);
+}
+
+.mv-warning {
+  color: var(--color-yellow, #f9e2af);
+}
+
+.mv-sidebar-autofixed {
+  margin-top: 8px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.mv-sidebar-summary {
+  margin-top: 8px;
+  font-size: 11px;
+  opacity: 0.5;
+}
+
+/* ── Context menu modal ───────────────────────────────────── */
+.mv-context-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.mv-context-name {
+  min-width: 120px;
+  color: var(--text-normal);
+}
+
+.mv-context-value {
+  flex: 1;
+  margin: 0 8px;
+  opacity: 0.8;
+  font-size: 12px;
+}
+
+.mv-context-err-icon {
+  color: var(--color-red, #f38ba8);
+}
+
+/* ── Explorer badges ──────────────────────────────────────── */
+.mv-explorer-badge {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.mv-explorer-badge.mv-badge-error {
+  background: var(--color-red, #f38ba8);
+}
+
+.mv-explorer-badge.mv-badge-warning {
+  background: var(--color-yellow, #f9e2af);
+}
+
+.mv-explorer-badge.mv-badge-valid {
+  background: var(--color-green, #a6e3a1);
+}
+
+/* ── Schema tree ──────────────────────────────────────────── */
+.mv-schema-tree ul {
+  list-style: none;
+  padding: 0;
+}
+
+.mv-schema-tree li {
+  margin: 4px 0;
+}
+
+.mv-schema-tree .mv-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mv-schema-tree .mv-tree-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.mv-schema-tree .mv-tree-toggle {
+  font-size: 11px;
+  min-width: 12px;
+  transition: transform 0.15s;
+}
+
+.mv-schema-tree .mv-tree-toggle.is-open {
+  transform: rotate(90deg);
+}
+
+.mv-schema-tree .mv-tree-leaf {
+  opacity: 0.3;
+  min-width: 12px;
+  text-align: center;
+}
+
+.mv-schema-tree .mv-tree-children {
+  list-style: none;
+  padding-left: 16px;
+}
+
+.mv-schema-tree .mv-tree-children.is-collapsed {
+  display: none;
+}
+
+.mv-schema-tree .mv-tree-name {
+  font-weight: bold;
+}
+
+.mv-schema-tree .mv-tree-count {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.mv-schema-tree .mv-tree-folder {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.mv-schema-tree .mv-tree-tag {
+  font-size: 11px;
+  color: var(--tag-color, #89b4fa);
+}
+
+/* ── Validation report modal ──────────────────────────────── */
+.mv-report-section {
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 8px;
+}
+
+.mv-report-file-link {
+  font-weight: bold;
+  cursor: pointer;
+  color: var(--link-color);
+}
+
+.mv-report-row {
+  font-size: 12px;
+  padding: 2px 0;
+}
+
+.mv-report-summary {
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.mv-report-footer {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 8px;
+}
