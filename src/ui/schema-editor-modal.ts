@@ -116,6 +116,43 @@ export class SchemaEditorModal extends Modal {
           this.data.extends = v || undefined;
         });
       });
+
+    const enforceVal = this.data.enforce_folder;
+    let enforceToggleOn = !!enforceVal;
+
+    const enforceSetting = new Setting(el)
+      .setName("Enforce folder")
+      .setDesc("Auto-move notes matching this schema into the target folder.");
+
+    let enforcePathInput: HTMLInputElement | null = null;
+
+    const pathContainer = el.createDiv();
+    if (!enforceToggleOn) pathContainer.addClass("mv-hidden");
+
+    new Setting(pathContainer)
+      .setName("Destination folder")
+      .setDesc("Folder path to move notes into. Leave empty to use target.folder.")
+      .addText((t) => {
+        enforcePathInput = t.inputEl;
+        t.inputEl.setAttribute("placeholder", "Sources/books");
+        t.setValue(typeof enforceVal === "string" ? enforceVal : "");
+        t.onChange((v) => {
+          this.data.enforce_folder = v.trim() || true;
+        });
+      });
+
+    enforceSetting.addToggle((t) =>
+      t.setValue(enforceToggleOn).onChange((v) => {
+        enforceToggleOn = v;
+        if (v) {
+          pathContainer.removeClass("mv-hidden");
+          this.data.enforce_folder = enforcePathInput?.value.trim() || true;
+        } else {
+          pathContainer.addClass("mv-hidden");
+          this.data.enforce_folder = undefined;
+        }
+      })
+    );
   }
 
   private renderTarget(el: HTMLElement): void {
@@ -152,15 +189,6 @@ export class SchemaEditorModal extends Modal {
           .onChange((v) => {
             this.data.target = { ...this.data.target, op: v as "AND" | "OR" };
           })
-      );
-
-    new Setting(el)
-      .setName("Enforce folder")
-      .setDesc("Auto-move notes outside the target folder on validation.")
-      .addToggle((t) =>
-        t.setValue(!!this.data.enforce_folder).onChange((v) => {
-          this.data.enforce_folder = v || undefined;
-        })
       );
   }
 

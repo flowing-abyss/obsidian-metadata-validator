@@ -494,3 +494,6 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 /* ── Utility: number inputs ───────────────────────────────── */
 .mv-input-number-sm { width: 80px; }
 .mv-input-number-md { width: 100px; }
+
+/* ── Utility: visibility toggle ──────────────────────────── */
+.mv-hidden { display: none; }
