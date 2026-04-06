@@ -171,15 +171,14 @@ export class PropertyDecorator {
     } else {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
+        // Read fresh frontmatter at click time — same stale-closure fix as picker/boolean.
+        const fresh = (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<
+          string,
+          unknown
+        >;
         void import("./quick-edit-modal").then(
           (mod: { QuickEditModal: typeof QuickEditModalType }) => {
-            new mod.QuickEditModal(
-              this.app,
-              file,
-              fieldKey,
-              fieldDef,
-              frontmatter[fieldKey]
-            ).open();
+            new mod.QuickEditModal(this.app, file, fieldKey, fieldDef, fresh[fieldKey]).open();
           }
         );
       });

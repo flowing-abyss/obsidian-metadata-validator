@@ -236,7 +236,8 @@ export class ContextMenuModal extends Modal {
       }
 
       case "number": {
-        const input = container.createEl("input", {
+        const numRow = container.createDiv("mv-number-row");
+        const input = numRow.createEl("input", {
           type: "number",
           value:
             typeof currentValue === "number"
@@ -254,7 +255,7 @@ export class ContextMenuModal extends Modal {
         if (fieldDef.min !== undefined || fieldDef.max !== undefined) {
           const minText = fieldDef.min !== undefined ? String(fieldDef.min) : "\u2026";
           const maxText = fieldDef.max !== undefined ? String(fieldDef.max) : "\u2026";
-          container.createEl("span", {
+          numRow.createEl("span", {
             text: `${minText}\u2013${maxText}`,
             cls: "mv-field-range-hint",
           });
@@ -429,9 +430,30 @@ export class ContextMenuModal extends Modal {
     } else {
       this.localFrontmatter[fieldKey] = value;
     }
+    this.applySchemaOrder();
     void this.validateForDisplay().then((results) =>
       this.render(this.localFrontmatter, this.buildResultMap(results))
     );
+  }
+
+  /**
+   * Reorder localFrontmatter keys to match the schema field order so the modal
+   * always shows fields in the correct order — even before validateAndUpdate
+   * writes the file.
+   */
+  private applySchemaOrder(): void {
+    const order = this.schema.formatting.property_order?.length
+      ? this.schema.formatting.property_order
+      : Object.keys(this.schema.fields);
+    if (!order.length) return;
+    const ordered: Record<string, unknown> = {};
+    for (const k of order) {
+      if (k in this.localFrontmatter) ordered[k] = this.localFrontmatter[k];
+    }
+    for (const k of Object.keys(this.localFrontmatter)) {
+      if (!(k in ordered)) ordered[k] = this.localFrontmatter[k];
+    }
+    this.localFrontmatter = ordered;
   }
 
   /**
@@ -472,11 +494,12 @@ export class ContextMenuModal extends Modal {
     } else {
       this.localFrontmatter[fieldKey] = value;
     }
+    this.applySchemaOrder();
 
-    // Re-render from local state
-    void this.engine
-      .validate(this.file, this.localFrontmatter, this.schema)
-      .then((results) => this.render(this.localFrontmatter, this.buildResultMap(results)));
+    // Re-render using a copy so engine auto-fixes don't mutate localFrontmatter
+    void this.validateForDisplay().then((results) =>
+      this.render(this.localFrontmatter, this.buildResultMap(results))
+    );
 
     // Persist to file (fire and forget)
     void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
