@@ -372,13 +372,9 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
 }
 
 /* ── Schema editor modal ──────────────────────────────────── */
-.mv-schema-editor-modal {
+.modal-content.mv-schema-editor-modal {
   width: min(720px, 92vw);
-}
-
-.mv-schema-editor-modal .mv-editor-title {
-  margin: 0 0 16px;
-  font-size: 18px;
+  padding-top: 4px;
 }
 
 /* Field cards */

@@ -123,11 +123,6 @@ export class SchemaEditorModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
 
-    contentEl.createEl("h2", {
-      text: `Schema editor — ${this.data.name ?? this.manifestPath}`,
-      cls: "mv-editor-title",
-    });
-
     this.renderInheritanceNav(contentEl);
 
     this.renderCollapsibleSection(contentEl, "Basic", (body) => this.renderBasic(body));
@@ -379,7 +374,10 @@ export class SchemaEditorModal extends Modal {
     const toggleBody = () => {
       const isHidden = body.hasClass("mv-hidden");
       if (isHidden && !bodyRendered) {
-        this.renderFieldBody(body, key, field);
+        // Always read live from data — avoids stale closure when type was changed
+        // while the body was still collapsed.
+        const currentField = (this.data.fields ?? {})[key] ?? field;
+        this.renderFieldBody(body, key, currentField);
         bodyRendered = true;
       }
       body.toggleClass("mv-hidden", !isHidden);
@@ -431,7 +429,9 @@ export class SchemaEditorModal extends Modal {
       this.data.fields = fields;
       if (bodyRendered) {
         body.empty();
+        bodyRendered = false;
         this.renderFieldBody(body, key, updated);
+        bodyRendered = true;
       }
     });
 
