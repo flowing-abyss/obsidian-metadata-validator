@@ -13,7 +13,10 @@ export function checkLinkExists(
   const missing: string[] = [];
 
   for (const v of values) {
-    const name = String(v);
+    // Obsidian stores internal links in frontmatter as "[[basename]]" — strip the brackets
+    const raw = String(v).trim();
+    const name = raw.replace(/^\[\[/, "").replace(/\]\]$/, "").trim();
+    if (!name) continue;
     const found = app.vault
       .getMarkdownFiles()
       .some((f: TFile) => f.basename === name || f.path === name);

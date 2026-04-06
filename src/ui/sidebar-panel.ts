@@ -6,9 +6,11 @@ export const SIDEBAR_PANEL_TYPE = "mv-sidebar-panel";
 export class SidebarPanel extends ItemView {
   private results: ValidationResult[] = [];
   private fileName = "";
+  private onOpenCallback: (() => void) | null = null;
 
-  constructor(leaf: WorkspaceLeaf) {
+  constructor(leaf: WorkspaceLeaf, onOpenCallback?: () => void) {
     super(leaf);
+    this.onOpenCallback = onOpenCallback ?? null;
   }
 
   getViewType(): string {
@@ -23,6 +25,8 @@ export class SidebarPanel extends ItemView {
 
   async onOpen(): Promise<void> {
     this.render();
+    // Trigger validation of the currently active file so the panel isn't empty on open
+    this.onOpenCallback?.();
   }
 
   update(fileName: string, results: ValidationResult[]): void {
@@ -35,14 +39,26 @@ export class SidebarPanel extends ItemView {
     const { contentEl } = this;
     contentEl.empty();
 
-    contentEl.createEl("h4", { text: this.fileName || "No file open" });
+    if (!this.fileName) {
+      contentEl.createEl("p", {
+        text: "Open a note to see validation results.",
+        cls: "mv-sidebar-empty",
+      });
+      return;
+    }
+
+    contentEl.createEl("h4", { text: this.fileName });
 
     const errors = this.results.filter((r) => !r.autoFixed && r.severity === "error");
     const warnings = this.results.filter((r) => !r.autoFixed && r.severity === "warning");
     const autoFixed = this.results.filter((r) => r.autoFixed);
 
-    if (this.results.length === 0) {
-      contentEl.createEl("p", { text: "✓ all properties valid." });
+    if (errors.length === 0 && warnings.length === 0) {
+      const ok = contentEl.createDiv("mv-sidebar-ok");
+      ok.createEl("span", { text: "✓ " });
+      ok.appendText(
+        autoFixed.length > 0 ? `all valid — ${autoFixed.length} auto-fixed` : "all properties valid"
+      );
       return;
     }
 

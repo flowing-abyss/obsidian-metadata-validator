@@ -1,4 +1,4 @@
-import type { App, TFile } from "obsidian";
+import { setIcon, type App, type TFile } from "obsidian";
 import type { ResolvedSchema, ValidationResult } from "../types";
 import type { SchemaResolver } from "../schema/resolver";
 import type { ValidationEngine } from "../validation/engine";
@@ -97,8 +97,8 @@ export class PropertyDecorator {
     const btn = document.createElement("button");
     btn.setAttribute(PICKER_ATTR, "true");
     btn.className = "mv-picker-btn clickable-icon";
-    btn.setAttribute("aria-label", `Edit ${fieldKey}`);
-    btn.textContent = "⊞";
+    btn.setAttribute("aria-label", `Pick value for ${fieldKey}`);
+    setIcon(btn, "chevron-down");
 
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -129,8 +129,8 @@ export class PropertyDecorator {
 
     const icon = document.createElement("span");
     icon.setAttribute(VALIDATOR_ATTR, "true");
-    icon.className = "mv-validator-icon";
-    icon.textContent = "⚠";
+    icon.className = "mv-validator-icon clickable-icon";
+    setIcon(icon, "triangle-alert");
 
     icon.addEventListener("click", (e) => {
       e.stopPropagation();

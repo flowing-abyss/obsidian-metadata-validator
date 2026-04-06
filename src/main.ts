@@ -38,8 +38,15 @@ export default class MetadataValidatorPlugin extends Plugin {
     // Apply CSS overrides immediately (no vault needed)
     this.cssInjector.update();
 
-    // Register sidebar view type
-    this.registerView(SIDEBAR_PANEL_TYPE, (leaf) => new SidebarPanel(leaf));
+    // Register sidebar view type — pass callback so the panel validates immediately on open
+    this.registerView(
+      SIDEBAR_PANEL_TYPE,
+      (leaf) =>
+        new SidebarPanel(leaf, () => {
+          const file = this.app.workspace.getActiveFile();
+          if (file) void this.validateAndUpdate(file);
+        })
+    );
 
     // Register settings tab
     this.addSettingTab(new MetadataValidatorSettingTab(this.app, this));
