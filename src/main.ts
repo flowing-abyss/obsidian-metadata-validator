@@ -22,12 +22,12 @@ export default class MetadataValidatorPlugin extends Plugin {
   cssInjector!: CssInjector;
   private decorator!: PropertyDecorator;
   private badges!: ExplorerBadges;
-  private sidebarPanel: SidebarPanel | null = null;
   private backgroundScanTimer: number | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
 
+    // Initialize all layers — but don't load vault files yet (vault not ready)
     this.cache = new ManifestCache(this.app, this.settings.schemasRoot);
     this.resolver = new SchemaResolver(this.cache);
     this.engine = new ValidationEngine(this.app);
@@ -35,75 +35,16 @@ export default class MetadataValidatorPlugin extends Plugin {
     this.decorator = new PropertyDecorator(this.app, this.resolver, this.engine, this.settings);
     this.badges = new ExplorerBadges();
 
-    await this.cache.load();
-    this.resolver.rebuild();
-
+    // Apply CSS overrides immediately (no vault needed)
     this.cssInjector.update();
-    this.decorator.attach();
 
-    this.addSettingTab(new MetadataValidatorSettingTab(this.app, this));
+    // Register sidebar view type
     this.registerView(SIDEBAR_PANEL_TYPE, (leaf) => new SidebarPanel(leaf));
 
-    // Watch manifest changes
-    this.registerEvent(
-      this.app.vault.on("modify", async (file: TFile) => {
-        if (file.basename === "manifest" && file.extension === "md") {
-          await this.cache.refresh(file);
-          this.resolver.rebuild();
-        }
-        if (this.settings.enableOnSave) {
-          await this.validateAndUpdate(file);
-        }
-      })
-    );
+    // Register settings tab
+    this.addSettingTab(new MetadataValidatorSettingTab(this.app, this));
 
-    this.registerEvent(
-      this.app.vault.on("delete", (file: TFile) => {
-        if (file.basename === "manifest" && file.extension === "md") {
-          this.cache.delete(file.path);
-          this.resolver.rebuild();
-        }
-      })
-    );
-
-    this.registerEvent(
-      this.app.workspace.on("file-open", async (file: TFile | null) => {
-        if (!file) return;
-        if (this.settings.enableOnOpen) {
-          await this.validateAndUpdate(file);
-        }
-      })
-    );
-
-    // Bases decorator (lazy import)
-    void import("./ui/bases-decorator").then(
-      (mod: { BasesDecorator: typeof BasesDecoratorType }) => {
-        const basesDecorator = new mod.BasesDecorator(this.app, this.resolver, this.settings);
-        basesDecorator.attach();
-        this.register(() => basesDecorator.detach());
-      }
-    );
-
-    // Context menu
-    this.registerEvent(
-      this.app.workspace.on("file-menu", (menu, file: TFile) => {
-        const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as
-          | Record<string, unknown>
-          | undefined;
-        const schema = this.resolver.resolveForNote(file, fm ?? {});
-        if (!schema) return;
-
-        menu.addItem((item) =>
-          item
-            .setTitle("Edit properties")
-            .setIcon("pencil")
-            .onClick(() => new ContextMenuModal(this.app, file, schema).open())
-        );
-      })
-    );
-
-    this.startBackgroundScan();
-
+    // Register commands
     this.addCommand({
       id: "validate-current-note",
       name: "Validate current note",
@@ -130,6 +71,82 @@ export default class MetadataValidatorPlugin extends Plugin {
         );
       },
     });
+
+    // === CRITICAL: wait for vault to be fully indexed before loading schemas ===
+    this.app.workspace.onLayoutReady(async () => {
+      // Load schemas from vault
+      await this.cache.load();
+      this.resolver.rebuild();
+
+      // Start DOM decoration
+      this.decorator.attach();
+
+      // Register vault event watchers
+      this.registerEvent(
+        this.app.vault.on("modify", async (file: TFile) => {
+          if (file.basename === "manifest" && file.extension === "md") {
+            await this.cache.refresh(file);
+            this.resolver.rebuild();
+          }
+          if (this.settings.enableOnSave) {
+            await this.validateAndUpdate(file);
+          }
+        })
+      );
+
+      this.registerEvent(
+        this.app.vault.on("delete", (file: TFile) => {
+          if (file.basename === "manifest" && file.extension === "md") {
+            this.cache.delete(file.path);
+            this.resolver.rebuild();
+          }
+        })
+      );
+
+      this.registerEvent(
+        this.app.workspace.on("file-open", async (file: TFile | null) => {
+          if (!file) return;
+          if (this.settings.enableOnOpen) {
+            await this.validateAndUpdate(file);
+          }
+        })
+      );
+
+      // Context menu
+      this.registerEvent(
+        this.app.workspace.on("file-menu", (menu, file: TFile) => {
+          const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as
+            | Record<string, unknown>
+            | undefined;
+          const schema = this.resolver.resolveForNote(file, fm ?? {});
+          if (!schema) return;
+
+          menu.addItem((item) =>
+            item
+              .setTitle("Edit properties")
+              .setIcon("pencil")
+              .onClick(() => new ContextMenuModal(this.app, file, schema).open())
+          );
+        })
+      );
+
+      // Bases decorator (lazy import)
+      void import("./ui/bases-decorator").then(
+        (mod: { BasesDecorator: typeof BasesDecoratorType }) => {
+          const basesDecorator = new mod.BasesDecorator(this.app, this.resolver, this.settings);
+          basesDecorator.attach();
+          this.register(() => basesDecorator.detach());
+        }
+      );
+
+      this.startBackgroundScan();
+
+      // Validate the currently active file right away
+      const activeFile = this.app.workspace.getActiveFile();
+      if (activeFile && this.settings.enableOnOpen) {
+        await this.validateAndUpdate(activeFile);
+      }
+    });
   }
 
   onunload(): void {
@@ -140,14 +157,17 @@ export default class MetadataValidatorPlugin extends Plugin {
   }
 
   async reloadSchemas(): Promise<void> {
+    // Create fresh cache with (potentially updated) schemasRoot
     this.cache = new ManifestCache(this.app, this.settings.schemasRoot);
     await this.cache.load();
+    // Update the resolver's cache reference in-place (decorator still points to same resolver)
+    this.resolver.setCache(this.cache);
     this.resolver.rebuild();
   }
 
   private async validateAndUpdate(file: TFile): Promise<void> {
-    const cache = this.app.metadataCache.getFileCache(file);
-    const frontmatter = { ...(cache?.frontmatter ?? {}) } as Record<string, unknown>;
+    const metaCache = this.app.metadataCache.getFileCache(file);
+    const frontmatter = { ...(metaCache?.frontmatter ?? {}) } as Record<string, unknown>;
     const schema = this.resolver.resolveForNote(file, frontmatter);
 
     if (!schema) {
@@ -186,9 +206,12 @@ export default class MetadataValidatorPlugin extends Plugin {
     this.updateSidebarPanel(file.basename, results);
   }
 
+  /** Look up the live SidebarPanel instance from the workspace — never stale. */
   private updateSidebarPanel(fileName: string, results: ValidationResult[]): void {
-    if (!this.sidebarPanel) return;
-    this.sidebarPanel.update(fileName, results);
+    const leaves = this.app.workspace.getLeavesOfType(SIDEBAR_PANEL_TYPE);
+    if (leaves.length > 0) {
+      (leaves[0]?.view as SidebarPanel | undefined)?.update(fileName, results);
+    }
   }
 
   private async activateSidebarPanel(): Promise<void> {

@@ -42,7 +42,7 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    new Setting(containerEl).setName("Metadata validator").setHeading();
+    new Setting(containerEl).setName("Schemas").setHeading();
 
     new Setting(containerEl)
       .setName("Schemas folder")

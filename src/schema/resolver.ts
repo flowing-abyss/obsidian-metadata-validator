@@ -5,9 +5,13 @@ import { mergeSchemas } from "./merger";
 
 export class SchemaResolver {
   private resolved: Map<string, ResolvedSchema> = new Map();
-  private readonly cache: ManifestCache;
+  private cache: ManifestCache;
 
   constructor(cache: ManifestCache) {
+    this.cache = cache;
+  }
+
+  setCache(cache: ManifestCache): void {
     this.cache = cache;
   }
 

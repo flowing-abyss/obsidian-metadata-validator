@@ -1,3 +1,4 @@
+import { parseYaml as obsidianParseYaml } from "obsidian";
 import type { ManifestData } from "../types";
 
 /**
@@ -12,25 +13,21 @@ export function parseManifest(fileContent: string): ManifestData {
   const yaml = match[1].trim();
   if (!yaml) return {};
 
-  return parseYaml(yaml) as ManifestData;
-}
-
-/**
- * Minimal YAML parser sufficient for manifest frontmatter.
- * Handles: strings, numbers, booleans, null, arrays, nested objects.
- * Does NOT handle: anchors, aliases, multi-document streams, tags.
- */
-function parseYaml(yaml: string): unknown {
-  // Use Obsidian's built-in parseYaml when available (runtime),
-  // fall back to a minimal implementation for tests.
-  const g = globalThis as unknown as Record<string, ((s: string) => unknown) | undefined>;
-  if (typeof g["parseYaml"] === "function") {
-    return g["parseYaml"](yaml);
+  try {
+    const result = obsidianParseYaml(yaml) as ManifestData | null;
+    return result ?? {};
+  } catch {
+    return parseMinimal(yaml) as ManifestData;
   }
-  return parseYamlMinimal(yaml);
 }
 
-function parseYamlMinimal(yaml: string): unknown {
+// ---------------------------------------------------------------------------
+// Minimal YAML fallback (used in test environment where obsidian is mocked)
+// Handles: strings, numbers, booleans, null, block arrays, nested objects,
+// and YAML flow sequences [a, b, c].
+// ---------------------------------------------------------------------------
+
+function parseMinimal(yaml: string): unknown {
   const lines = yaml.split(/\r?\n/);
   return parseObject(lines, 0, 0).value;
 }
@@ -153,6 +150,14 @@ function parseScalar(raw: string): unknown {
   if (s === "false") return false;
   if (s === "null" || s === "~") return null;
   if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
+  // YAML flow sequence: [a, b, c]
+  if (s.startsWith("[") && s.endsWith("]")) {
+    return s
+      .slice(1, -1)
+      .split(",")
+      .map((item) => parseScalar(item.trim()))
+      .filter((item) => item !== "");
+  }
   if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
     return s.slice(1, -1);
   }
