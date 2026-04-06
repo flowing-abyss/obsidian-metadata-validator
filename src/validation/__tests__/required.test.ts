@@ -14,11 +14,8 @@ describe("checkRequired", () => {
     expect(checkRequired("active", false, "m.md")).toBeNull();
   });
 
-  it("returns error when value is null (auto-inserted placeholder for required field)", () => {
-    const result = checkRequired("title", null, "m.md");
-    expect(result).not.toBeNull();
-    expect(result?.rule).toBe("required");
-    expect(result?.severity).toBe("error");
+  it("returns null when value is null (field present but empty — not an error)", () => {
+    expect(checkRequired("title", null, "m.md")).toBeNull();
   });
 
   it("returns null when value is empty string (key present but empty)", () => {

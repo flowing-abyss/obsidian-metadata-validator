@@ -5,8 +5,9 @@ export function checkRequired(
   value: unknown,
   manifestPath: string
 ): ValidationResult | null {
-  // Error if the key is absent or null (null is the auto-inserted placeholder)
-  if (value !== undefined && value !== null) return null;
+  // Only error if the key is completely absent (undefined).
+  // null means the field exists but is empty — not an error.
+  if (value !== undefined) return null;
 
   return {
     field,

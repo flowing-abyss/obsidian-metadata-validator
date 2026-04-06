@@ -607,7 +607,7 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 
 .mv-field-row {
   display: grid;
-  grid-template-columns: minmax(100px, 120px) 20px 1fr;
+  grid-template-columns: 130px 1fr 22px;
   align-items: center;
   gap: 8px;
   padding: 6px 0;
@@ -621,13 +621,27 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 .mv-field-label {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-normal);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mv-field-type-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--text-faint);
+  opacity: 0.6;
+}
+
+.mv-field-type-icon svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: 2px;
 }
 
 .mv-field-badge {
@@ -684,9 +698,31 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 }
 
 .mv-field-err {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  cursor: pointer;
   color: var(--color-red);
-  cursor: help;
-  font-size: 14px;
+  transition: background 0.15s;
+}
+
+.mv-field-err.has-errors:hover {
+  background: var(--background-modifier-hover);
+}
+
+.mv-field-err svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: 2px;
+}
+
+.mv-chip-sep {
+  color: var(--text-faint);
+  font-size: 11px;
   flex-shrink: 0;
 }
 
@@ -904,7 +940,7 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 }
 
 .mv-field-row {
-  grid-template-columns: 120px 20px 1fr;
+  grid-template-columns: 130px 1fr 22px;
   min-height: 28px;
   padding: 4px 0;
 }
@@ -928,5 +964,116 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 
 /* ── Expression input (full width) ───────────────────────── */
 .mv-expression-input {
+  width: 100%;
+}
+
+/* ── JS textarea ─────────────────────────────────────────── */
+.mv-js-textarea {
+  width: 100%;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  resize: vertical;
+}
+
+/* ── Options mode toggle ─────────────────────────────────── */
+.mv-options-mode {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.mv-options-mode-btn {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.mv-options-mode-btn.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+/* ── Quick edit modal ────────────────────────────────────── */
+.mv-quick-edit-modal {
+  max-width: 320px;
+}
+
+.mv-quick-edit-modal .mv-qe-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.mv-qe-input {
+  width: 100%;
+  font-size: 14px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.mv-qe-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+.mv-qe-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.mv-qe-list-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mv-qe-list-input {
+  flex: 1;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.mv-qe-list-add {
+  border-style: dashed;
+}
+
+.mv-qe-list-del {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0.5;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.mv-qe-list-del:hover {
+  opacity: 1;
+  color: var(--color-red);
+  background: var(--background-modifier-hover);
+}
+
+.mv-qe-done {
+  margin-top: 4px;
   width: 100%;
 }

@@ -47,6 +47,18 @@ export function applyAutoFix(
     changed = true;
   }
 
+  // list: if the current value is a non-null scalar, wrap it in an array
+  const postFix = frontmatter[fieldName];
+  if (
+    field.type === "list" &&
+    postFix !== undefined &&
+    postFix !== null &&
+    !Array.isArray(postFix)
+  ) {
+    frontmatter[fieldName] = [postFix];
+    changed = true;
+  }
+
   // sort: alphabetical
   if (field.sort === "alphabetical" && Array.isArray(frontmatter[fieldName])) {
     const arr = frontmatter[fieldName] as unknown[];

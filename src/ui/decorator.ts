@@ -4,7 +4,7 @@ import type { SchemaResolver } from "../schema/resolver";
 import type { ValidationEngine } from "../validation/engine";
 import type { PluginSettings } from "../settings";
 import type { PickerModal as PickerModalType } from "./picker-modal";
-import type { ContextMenuModal as ContextMenuModalType } from "./context-menu-modal";
+import type { QuickEditModal as QuickEditModalType } from "./quick-edit-modal";
 import type { showValidatorTooltip as showValidatorTooltipType } from "./validator-tooltip";
 
 const PICKER_ATTR = "data-mv-picker";
@@ -156,12 +156,26 @@ export class PropertyDecorator {
           ).open();
         });
       });
+    } else if (fieldDef.type === "boolean") {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const newVal = !frontmatter[fieldKey];
+        void this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+          fm[fieldKey] = newVal;
+        });
+      });
     } else {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
-        void import("./context-menu-modal").then(
-          (mod: { ContextMenuModal: typeof ContextMenuModalType }) => {
-            new mod.ContextMenuModal(this.app, file, schema).open();
+        void import("./quick-edit-modal").then(
+          (mod: { QuickEditModal: typeof QuickEditModalType }) => {
+            new mod.QuickEditModal(
+              this.app,
+              file,
+              fieldKey,
+              fieldDef,
+              frontmatter[fieldKey]
+            ).open();
           }
         );
       });

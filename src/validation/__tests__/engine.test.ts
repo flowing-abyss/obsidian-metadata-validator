@@ -32,15 +32,20 @@ const SCHEMA: ResolvedSchema = {
 };
 
 describe("ValidationEngine", () => {
-  it("returns error for required field that is absent", async () => {
+  it("auto-inserts null for required field that is absent (no error shown)", async () => {
     const app = makeApp();
     const engine = new ValidationEngine(app);
     const file = { path: "Books/A.md", basename: "A" } as TFile;
-    const frontmatter = { rating: 3 };
+    const frontmatter: Record<string, unknown> = { rating: 3 };
 
     const results = await engine.validate(file, frontmatter, SCHEMA);
+    // Required field without default → auto-inserted as null (autoFixed), not an error
+    const autoFixed = results.find((r) => r.autoFixed && r.field === "status");
+    expect(autoFixed).toBeDefined();
+    expect(frontmatter["status"]).toBeNull();
+    // No "required" error
     const req = results.find((r) => r.rule === "required");
-    expect(req?.field).toBe("status");
+    expect(req).toBeUndefined();
   });
 
   it("returns error for value not in options", async () => {

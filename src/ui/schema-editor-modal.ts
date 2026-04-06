@@ -512,42 +512,28 @@ export class SchemaEditorModal extends Modal {
   ): void {
     new Setting(body).setName("Source").setHeading();
 
-    const structuredSourceGroup = body.createDiv();
-    const hasSourceExpr = !!field.source?.query?.trim();
-    if (hasSourceExpr) structuredSourceGroup.addClass("mv-hidden");
-
-    new Setting(structuredSourceGroup)
-      .setName("Folder")
-      .setDesc("Only show notes from this folder.")
-      .addText((t) => {
-        t.inputEl.setAttribute("placeholder", "People/");
-        t.setValue(field.source?.folder ?? "").onChange((v) =>
-          update({ source: { ...field.source, folder: v || undefined } })
-        );
-      });
-
-    new Setting(structuredSourceGroup)
-      .setName("Tag")
-      .setDesc("Only show notes with this tag.")
-      .addText((t) => {
-        t.inputEl.setAttribute("placeholder", "Person");
-        t.setValue(field.source?.tag ?? "").onChange((v) =>
-          update({ source: { ...field.source, tag: v || undefined } })
-        );
-      });
-
     new Setting(body)
       .setName("Expression")
       .setDesc(
-        'Filter by expression — overrides Folder/Tag: "Folder/" AND/OR #tag' // eslint-disable-line obsidianmd/ui/sentence-case
+        'Filter notes by expression: "Folder/" AND/OR #tag' // eslint-disable-line obsidianmd/ui/sentence-case
       )
       .addText((t) => {
         t.inputEl.setAttribute("placeholder", '"People/" AND #person'); // eslint-disable-line obsidianmd/ui/sentence-case
         t.inputEl.addClass("mv-expression-input");
         t.setValue(field.source?.query ?? "").onChange((v) => {
-          const trimmed = v.trim();
-          update({ source: { ...field.source, query: trimmed || undefined } });
-          structuredSourceGroup.toggleClass("mv-hidden", !!trimmed);
+          update({ source: { ...field.source, query: v.trim() || undefined } });
+        });
+      });
+
+    new Setting(body)
+      .setName("JS code") // eslint-disable-line obsidianmd/ui/sentence-case
+      .setDesc("DataView/Obsidian JS returning [{value, label}] — overrides expression if set.")  
+      .addTextArea((t) => {
+        t.inputEl.addClass("mv-js-textarea");
+        t.inputEl.setAttribute("placeholder", "return app.vault.getMarkdownFiles()..."); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.rows = 4;
+        t.setValue(field.source?.js ?? "").onChange((v) => {
+          update({ source: { ...field.source, js: v.trim() || undefined } });
         });
       });
 
@@ -567,11 +553,94 @@ export class SchemaEditorModal extends Modal {
   ): void {
     new Setting(body).setName("Options").setHeading();
 
+    // Determine initial mode: dynamic if options is a source object
+    const isDynamic =
+      field.options !== undefined &&
+      !Array.isArray(field.options) &&
+      (field.options as { source?: unknown }).source !== undefined;
+    const dynamicSource = isDynamic
+      ? ((field.options as { source: { query?: string; js?: string } }).source ?? {})
+      : {};
+
+    // Mode toggle
+    const modeContainer = body.createDiv("mv-options-mode");
+    const staticBtn = modeContainer.createEl("button", {
+      text: "Static list",
+      cls: "mv-options-mode-btn" + (!isDynamic ? " is-active" : ""),
+    });
+    const dynamicBtn = modeContainer.createEl("button", {
+      text: "Dynamic (expression / JS)", // eslint-disable-line obsidianmd/ui/sentence-case
+      cls: "mv-options-mode-btn" + (isDynamic ? " is-active" : ""),
+    });
+
+    const staticPanel = body.createDiv();
+    const dynamicPanel = body.createDiv();
+    if (isDynamic) staticPanel.addClass("mv-hidden");
+    else dynamicPanel.addClass("mv-hidden");
+
+    staticBtn.addEventListener("click", () => {
+      staticPanel.removeClass("mv-hidden");
+      dynamicPanel.addClass("mv-hidden");
+      staticBtn.addClass("is-active");
+      dynamicBtn.removeClass("is-active");
+    });
+    dynamicBtn.addEventListener("click", () => {
+      dynamicPanel.removeClass("mv-hidden");
+      staticPanel.addClass("mv-hidden");
+      dynamicBtn.addClass("is-active");
+      staticBtn.removeClass("is-active");
+    });
+
+    // ── Dynamic panel ─────────────────────────────────────────
+    new Setting(dynamicPanel)
+      .setName("Expression")
+      .setDesc(
+        'Filter by expression: "Folder/" AND/OR #tag' // eslint-disable-line obsidianmd/ui/sentence-case
+      )
+      .addText((t) => {
+        t.inputEl.addClass("mv-expression-input");
+        t.inputEl.setAttribute("placeholder", '"Sources/" AND #book'); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.setValue(dynamicSource.query ?? "").onChange((v) => {
+          update({
+            options: {
+              source: {
+                ...(field.options && !Array.isArray(field.options)
+                  ? (field.options as { source: object }).source
+                  : {}),
+                query: v.trim() || undefined,
+              } as { query?: string; js?: string },
+            },
+          });
+        });
+      });
+
+    new Setting(dynamicPanel)
+      .setName("JS code") // eslint-disable-line obsidianmd/ui/sentence-case
+      .setDesc("DataView/Obsidian JS returning [{value, label}] — overrides expression.")  
+      .addTextArea((t) => {
+        t.inputEl.addClass("mv-js-textarea");
+        t.inputEl.setAttribute("placeholder", "return app.vault.getMarkdownFiles()..."); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.rows = 4;
+        t.setValue(dynamicSource.js ?? "").onChange((v) => {
+          update({
+            options: {
+              source: {
+                ...(field.options && !Array.isArray(field.options)
+                  ? (field.options as { source: object }).source
+                  : {}),
+                js: v.trim() || undefined,
+              } as { query?: string; js?: string },
+            },
+          });
+        });
+      });
+
+    // ── Static panel ──────────────────────────────────────────
     const options: FieldOption[] = Array.isArray(field.options)
       ? (JSON.parse(JSON.stringify(field.options)) as FieldOption[])
       : [];
 
-    const listEl = body.createDiv("mv-options-list");
+    const listEl = staticPanel.createDiv("mv-options-list");
     const save = () => update({ options: options.length ? [...options] : undefined });
 
     const renderList = () => {
@@ -659,7 +728,7 @@ export class SchemaEditorModal extends Modal {
     };
     renderList();
 
-    new Setting(body).addButton((btn) =>
+    new Setting(staticPanel).addButton((btn) =>
       btn.setButtonText("Add option").onClick(() => {
         options.push({ value: "" });
         save();

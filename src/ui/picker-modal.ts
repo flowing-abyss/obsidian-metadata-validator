@@ -8,6 +8,7 @@ export class PickerModal extends Modal {
   private readonly field: ManifestField;
   private readonly schema: ResolvedSchema;
   private readonly file: TFile;
+  private readonly onSaved: ((value: unknown) => void) | null;
   private options: FieldOption[] = [];
   // Mutable selection state — normalised values (no [[]])
   private selected: Set<string> = new Set();
@@ -18,13 +19,15 @@ export class PickerModal extends Modal {
     field: ManifestField,
     currentValue: unknown,
     schema: ResolvedSchema,
-    file: TFile
+    file: TFile,
+    onSaved?: (value: unknown) => void
   ) {
     super(app);
     this.fieldKey = fieldKey;
     this.field = field;
     this.schema = schema;
     this.file = file;
+    this.onSaved = onSaved ?? null;
     this.initSelected(currentValue);
   }
 
@@ -173,16 +176,22 @@ export class PickerModal extends Modal {
 
   private persistSelection(): void {
     const key = this.fieldKey;
+    let savedValue: unknown;
 
-    void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
-      if (this.isMulti) {
-        // Always store as array, even single item
-        fm[key] = Array.from(this.selected).map((v) => (this.isLink ? `[[${v}]]` : v));
-      } else {
-        const val = Array.from(this.selected)[0];
-        fm[key] = val !== undefined ? (this.isLink ? `[[${val}]]` : val) : null;
-      }
-    });
+    if (this.isMulti) {
+      savedValue = Array.from(this.selected).map((v) => (this.isLink ? `[[${v}]]` : v));
+    } else {
+      const val = Array.from(this.selected)[0];
+      savedValue = val !== undefined ? (this.isLink ? `[[${val}]]` : val) : null;
+    }
+
+    void this.app.fileManager
+      .processFrontMatter(this.file, (fm: Record<string, unknown>) => {
+        fm[key] = savedValue;
+      })
+      .then(() => {
+        this.onSaved?.(savedValue);
+      });
   }
 
   onClose(): void {

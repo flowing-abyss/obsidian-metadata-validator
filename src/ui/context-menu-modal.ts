@@ -1,8 +1,22 @@
-import { App, Modal } from "obsidian";
+import { App, Modal, setIcon } from "obsidian";
 import type { TFile } from "obsidian";
-import type { ManifestField, ResolvedSchema, ValidationResult } from "../types";
+import type { FieldType, ManifestField, ResolvedSchema, ValidationResult } from "../types";
 import { ValidationEngine } from "../validation/engine";
 import { PickerModal } from "./picker-modal";
+import type { showValidatorTooltip as showValidatorTooltipType } from "./validator-tooltip";
+
+const FIELD_TYPE_ICON: Record<FieldType, string> = {
+  text: "type",
+  number: "hash",
+  select: "chevron-down",
+  multiselect: "list-checks",
+  list: "list",
+  date: "calendar",
+  link: "link",
+  multilink: "link-2",
+  boolean: "toggle-left",
+  url: "globe",
+};
 
 export class ContextMenuModal extends Modal {
   private readonly file: TFile;
@@ -15,6 +29,8 @@ export class ContextMenuModal extends Modal {
 
   /** Persist optional-section expand state across refreshes */
   private optionalExpanded = false;
+  /** Local frontmatter — updated immediately on save (no cache round-trip) */
+  private localFrontmatter: Record<string, unknown> = {};
 
   constructor(
     app: App,
@@ -33,10 +49,10 @@ export class ContextMenuModal extends Modal {
 
   async onOpen(): Promise<void> {
     const cache = this.app.metadataCache.getFileCache(this.file);
-    const frontmatter = { ...(cache?.frontmatter ?? {}) } as Record<string, unknown>;
-    delete frontmatter["position"];
-    const results = await this.engine.validate(this.file, frontmatter, this.schema);
-    this.render(frontmatter, this.buildResultMap(results));
+    this.localFrontmatter = { ...(cache?.frontmatter ?? {}) } as Record<string, unknown>;
+    delete this.localFrontmatter["position"];
+    const results = await this.engine.validate(this.file, this.localFrontmatter, this.schema);
+    this.render(this.localFrontmatter, this.buildResultMap(results));
   }
 
   private buildResultMap(results: ValidationResult[]): Map<string, ValidationResult[]> {
@@ -114,21 +130,31 @@ export class ContextMenuModal extends Modal {
     // Store field key for footer hover-highlight
     row.setAttribute("data-mv-field", fieldKey);
 
-    // Label column — just the display name
+    // Label column: type icon + field name
     const labelEl = row.createDiv("mv-field-label");
+    const iconEl = labelEl.createEl("span", { cls: "mv-field-type-icon" });
+    setIcon(iconEl, FIELD_TYPE_ICON[fieldDef.type] ?? "square");
     labelEl.createEl("span", { text: fieldDef.label ?? fieldKey, cls: "mv-field-label-text" });
-
-    // Error icon column (between label and value)
-    const errors = (resultMap.get(fieldKey) ?? []).filter((r) => !r.autoFixed);
-    const errEl = row.createDiv("mv-field-err");
-    if (errors.length > 0) {
-      errEl.textContent = "\u26A0";
-      errEl.title = errors.map((e) => e.message).join("\n");
-    }
 
     // Value / editor column
     const valueEl = row.createDiv("mv-field-value");
     this.renderEditor(valueEl, fieldKey, fieldDef, frontmatter);
+
+    // Error icon column (right side)
+    const errors = (resultMap.get(fieldKey) ?? []).filter((r) => !r.autoFixed);
+    const errEl = row.createDiv("mv-field-err");
+    if (errors.length > 0) {
+      setIcon(errEl, "triangle-alert");
+      errEl.addClass("has-errors");
+      errEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        void import("./validator-tooltip").then(
+          (mod: { showValidatorTooltip: typeof showValidatorTooltipType }) => {
+            mod.showValidatorTooltip(errEl, errors);
+          }
+        );
+      });
+    }
   }
 
   private renderEditor(
@@ -252,8 +278,15 @@ export class ContextMenuModal extends Modal {
       return;
     }
 
-    for (const raw of values) {
+    for (let i = 0; i < values.length; i++) {
+      const raw = values[i] ?? "";
       const name = raw.replace(/^\[\[/, "").replace(/\]\]$/, "").replace(/\|.*$/, "");
+
+      // Separator between items
+      if (i > 0) {
+        container.createEl("span", { text: " \u2022 ", cls: "mv-chip-sep" });
+      }
+
       if (isLink) {
         const link = container.createEl("a", { cls: "mv-wikilink", text: name });
         link.setAttribute("data-href", name);
@@ -270,17 +303,13 @@ export class ContextMenuModal extends Modal {
     }
   }
 
-  /** List type: chips for each value + inline add/remove editing */
+  /** List type: chips with inline add/remove */
   private renderListChips(container: HTMLElement, fieldKey: string, currentValue: unknown): void {
     const values: string[] = Array.isArray(currentValue)
       ? (currentValue as unknown[]).map((v) => this.toStr(v)).filter(Boolean)
       : [];
 
     const chipsEl = container.createDiv("mv-list-chips");
-
-    const saveList = (items: string[]) => {
-      this.saveField(fieldKey, items.length > 0 ? items : null);
-    };
 
     const refresh = (items: string[]) => {
       chipsEl.empty();
@@ -290,39 +319,55 @@ export class ContextMenuModal extends Modal {
         const rem = chip.createEl("span", { text: "\u00D7", cls: "mv-chip-remove" });
         rem.addEventListener("click", () => {
           const updated = items.filter((_, i) => i !== idx);
-          saveList(updated);
+          this.saveField(fieldKey, updated.length > 0 ? updated : null);
           refresh(updated);
         });
       });
 
       const addInput = chipsEl.createEl("input", { type: "text", cls: "mv-list-add-input" });
       addInput.setAttribute("placeholder", "+");
+      const commit = () => {
+        const val = addInput.value.trim().replace(/,$/, "");
+        if (val) {
+          const updated = [...items, val];
+          this.saveField(fieldKey, updated);
+          refresh(updated);
+        }
+      };
       addInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === ",") {
           e.preventDefault();
-          const val = addInput.value.trim().replace(/,$/, "");
-          if (val) {
-            const updated = [...items, val];
-            saveList(updated);
-            refresh(updated);
-          }
+          commit();
         }
       });
-      addInput.addEventListener("blur", () => {
-        const val = addInput.value.trim();
-        if (val) {
-          const updated = [...items, val];
-          saveList(updated);
-          refresh(updated);
-        }
-      });
+      addInput.addEventListener("blur", commit);
     };
 
     refresh(values);
   }
 
   private openPicker(fieldKey: string, fieldDef: ManifestField, currentValue: unknown): void {
-    new PickerModal(this.app, fieldKey, fieldDef, currentValue, this.schema, this.file).open();
+    new PickerModal(
+      this.app,
+      fieldKey,
+      fieldDef,
+      currentValue,
+      this.schema,
+      this.file,
+      (savedValue) => this.applyLocalChange(fieldKey, savedValue)
+    ).open();
+  }
+
+  /** Apply a change from PickerModal to local state and re-render */
+  private applyLocalChange(fieldKey: string, value: unknown): void {
+    if (value === null || value === undefined) {
+      delete this.localFrontmatter[fieldKey];
+    } else {
+      this.localFrontmatter[fieldKey] = value;
+    }
+    void this.engine
+      .validate(this.file, this.localFrontmatter, this.schema)
+      .then((results) => this.render(this.localFrontmatter, this.buildResultMap(results)));
   }
 
   /**
@@ -345,25 +390,26 @@ export class ContextMenuModal extends Modal {
   }
 
   private saveField(fieldKey: string, value: unknown): void {
-    void this.app.fileManager
-      .processFrontMatter(this.file, (fm: Record<string, unknown>) => {
-        if (value === null || value === undefined) {
-          delete fm[fieldKey];
-        } else {
-          fm[fieldKey] = value;
-        }
-      })
-      .then(() => {
-        void this.refreshView();
-      });
-  }
+    // Update local state immediately
+    if (value === null || value === undefined) {
+      delete this.localFrontmatter[fieldKey];
+    } else {
+      this.localFrontmatter[fieldKey] = value;
+    }
 
-  private async refreshView(): Promise<void> {
-    const cache = this.app.metadataCache.getFileCache(this.file);
-    const frontmatter = { ...(cache?.frontmatter ?? {}) } as Record<string, unknown>;
-    delete frontmatter["position"];
-    const results = await this.engine.validate(this.file, frontmatter, this.schema);
-    this.render(frontmatter, this.buildResultMap(results));
+    // Re-render from local state
+    void this.engine
+      .validate(this.file, this.localFrontmatter, this.schema)
+      .then((results) => this.render(this.localFrontmatter, this.buildResultMap(results)));
+
+    // Persist to file (fire and forget)
+    void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
+      if (value === null || value === undefined) {
+        delete fm[fieldKey];
+      } else {
+        fm[fieldKey] = value;
+      }
+    });
   }
 
   private toStr(v: unknown): string {
@@ -374,7 +420,7 @@ export class ContextMenuModal extends Modal {
 
   /**
    * Footer shows the inheritance chain. Hovering each schema name highlights
-   * which fields come from it via data attributes.
+   * which fields come from it via data attributes. Clicking opens the schema editor.
    */
   private renderFooter(container: HTMLElement, resultMap: Map<string, ValidationResult[]>): void {
     const footer = container.createDiv("mv-context-footer");
@@ -439,7 +485,7 @@ export class ContextMenuModal extends Modal {
     });
     if (totalErrors > 0) {
       footer.createEl("span", {
-        text: ` · ${totalErrors} error${totalErrors > 1 ? "s" : ""}`,
+        text: ` \u00B7 ${totalErrors} error${totalErrors > 1 ? "s" : ""}`,
         cls: "mv-footer-errors",
       });
     }
