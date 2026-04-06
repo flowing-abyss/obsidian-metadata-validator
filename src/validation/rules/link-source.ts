@@ -9,8 +9,10 @@ export function checkLinkSource(
   if (value === undefined || value === null) return null;
 
   const allowed = new Set(allowedOptions.map((o) => o.value));
+  // Obsidian stores internal links as "[[basename]]" — strip brackets before comparing
+  const strip = (v: unknown) => String(v).trim().replace(/^\[\[/, "").replace(/\]\]$/, "");
   const values = Array.isArray(value) ? value : [value];
-  const invalid = values.filter((v) => !allowed.has(String(v)));
+  const invalid = values.filter((v) => !allowed.has(strip(v)));
 
   if (invalid.length === 0) return null;
 

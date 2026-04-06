@@ -103,9 +103,10 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 
 /* ── Inline decorator icons ───────────────────────────────── */
 .mv-picker-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
+  align-self: center;
   width: 20px;
   height: 20px;
   padding: 0;
@@ -117,7 +118,6 @@ body.mv-hide-validator .metadata-property-invalid-icon {
   cursor: pointer;
   opacity: 0.4;
   color: var(--icon-color, var(--text-muted));
-  vertical-align: middle;
   transition: opacity 0.15s, background 0.15s;
 }
 
@@ -129,20 +129,21 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 .mv-picker-btn svg {
   width: 13px;
   height: 13px;
+  flex-shrink: 0;
   stroke-width: 2.2px;
 }
 
 .mv-validator-icon {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
+  align-self: center;
   width: 20px;
   height: 20px;
   flex-shrink: 0;
   border-radius: 4px;
   cursor: pointer;
   color: var(--color-red, #f38ba8);
-  vertical-align: middle;
   transition: background 0.15s;
 }
 
@@ -153,6 +154,7 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 .mv-validator-icon svg {
   width: 13px;
   height: 13px;
+  flex-shrink: 0;
   stroke-width: 2.2px;
 }
 
