@@ -513,7 +513,7 @@ export class SchemaEditorModal extends Modal {
     new Setting(body).setName("Source").setHeading();
 
     const structuredSourceGroup = body.createDiv();
-    const hasSourceExpr = !!field.source?.js?.trim();
+    const hasSourceExpr = !!field.source?.query?.trim();
     if (hasSourceExpr) structuredSourceGroup.addClass("mv-hidden");
 
     new Setting(structuredSourceGroup)
