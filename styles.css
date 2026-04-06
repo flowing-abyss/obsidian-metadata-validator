@@ -593,11 +593,6 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
   min-width: 380px;
 }
 
-.mv-context-modal h3 {
-  margin: 0 0 12px;
-  font-size: 16px;
-  font-weight: 600;
-}
 
 .mv-context-modal h4.mv-context-section-header {
   margin: 8px 0 4px;
@@ -953,6 +948,10 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
 
 .mv-footer-errors {
   color: var(--color-red);
+}
+
+.mv-footer-filepath {
+  opacity: 0.5;
 }
 
 /* ── Context menu: dense layout ───────────────────────────── */

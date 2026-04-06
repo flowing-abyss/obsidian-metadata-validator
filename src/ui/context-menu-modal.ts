@@ -97,8 +97,6 @@ export class ContextMenuModal extends Modal {
     contentEl.empty();
     contentEl.addClass("mv-context-modal");
 
-    contentEl.createEl("h3", { text: `Edit properties \u2014 ${this.file.basename}` });
-
     const entries = Object.entries(this.schema.fields).filter(([, def]) => !def.hidden);
     const required = entries.filter(([, def]) => def.required === true);
     const optional = entries.filter(([, def]) => def.required !== true);
@@ -527,6 +525,10 @@ export class ContextMenuModal extends Modal {
 
     if (chain.length <= 1) {
       footer.createEl("span", { text: `Schema: ${this.schema.name}` });
+      footer.createEl("span", {
+        text: ` \u00B7 ${this.file.path}`,
+        cls: "mv-footer-filepath",
+      });
       return;
     }
 
@@ -586,6 +588,12 @@ export class ContextMenuModal extends Modal {
         cls: "mv-footer-errors",
       });
     }
+
+    // File path at the very end of the footer
+    footer.createEl("span", {
+      text: ` \u00B7 ${this.file.path}`,
+      cls: "mv-footer-filepath",
+    });
   }
 
   onClose(): void {
