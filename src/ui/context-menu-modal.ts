@@ -285,7 +285,10 @@ export class ContextMenuModal extends Modal {
           void this.app.workspace.openLinkText(name, this.file.path, false);
         });
       } else {
-        container.createEl("span", { text: name, cls: "mv-chip" });
+        const chip = container.createEl("span", { text: name, cls: "mv-chip" });
+        chip.addEventListener("click", () => {
+          this.openPicker(fieldKey, fieldDef, currentValue);
+        });
       }
     }
 
@@ -319,7 +322,7 @@ export class ContextMenuModal extends Modal {
       const inputs = listEl.querySelectorAll("input");
       const newValues: string[] = [];
       inputs.forEach((inp) => {
-        const val = (inp).value.trim();
+        const val = inp.value.trim();
         if (val) {
           // Auto-quote markdown link patterns
           const quoted = this.quoteLinksIfNeeded(val);
@@ -336,10 +339,9 @@ export class ContextMenuModal extends Modal {
       input.addEventListener("change", () => {
         saveList();
       });
-      input.addEventListener("blur", () => {
-        // If this was the last (empty) row and user typed something, add a new empty row
-        if (isLast && input.value.trim()) {
-          addRow("", true);
+      input.addEventListener("input", () => {
+        if (input.value.trim() && input === listEl.lastElementChild?.querySelector("input")) {
+          addRow("", false);
         }
       });
     };
