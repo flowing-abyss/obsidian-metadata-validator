@@ -526,7 +526,7 @@ export class ContextMenuModal extends Modal {
     if (chain.length <= 1) {
       footer.createEl("span", { text: `Schema: ${this.schema.name}` });
       footer.createEl("span", {
-        text: ` \u00B7 ${this.file.path}`,
+        text: this.file.path,
         cls: "mv-footer-filepath",
       });
       return;
@@ -591,7 +591,7 @@ export class ContextMenuModal extends Modal {
 
     // File path at the very end of the footer
     footer.createEl("span", {
-      text: ` \u00B7 ${this.file.path}`,
+      text: this.file.path,
       cls: "mv-footer-filepath",
     });
   }

@@ -537,8 +537,12 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
   gap: 6px;
   padding: 8px 0;
   font-weight: 600;
-  border-bottom: 1px solid var(--background-modifier-border);
   user-select: none;
+}
+
+/* Separator only when body is visible — avoids double-line when collapsed */
+.mv-collapsible-body:not(.mv-collapsible-body--collapsed) {
+  border-top: 1px solid var(--background-modifier-border);
 }
 
 .mv-collapsible-header:hover {
@@ -821,6 +825,9 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
 .mv-list-add-input {
   width: 22px;
   height: 20px;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
   min-width: 0;
   font-size: 13px;
   padding: 0 3px;
@@ -951,12 +958,16 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
 }
 
 .mv-footer-filepath {
+  display: block;
   opacity: 0.5;
+  margin-top: 2px;
 }
 
 /* ── Context menu: dense layout ───────────────────────────── */
-.mv-context-modal {
-  padding: 12px 16px;
+/* Higher specificity (.modal-content.mv-context-modal) overrides Obsidian's
+   own .modal-content top padding so there's no wasted space above the fields. */
+.modal-content.mv-context-modal {
+  padding: 4px 16px 12px;
 }
 
 .mv-context-section {
