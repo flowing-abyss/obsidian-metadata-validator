@@ -7,10 +7,12 @@ export class SidebarPanel extends ItemView {
   private results: ValidationResult[] = [];
   private fileName = "";
   private onOpenCallback: (() => void) | null = null;
+  onScanVault: (() => Promise<void>) | null = null;
 
-  constructor(leaf: WorkspaceLeaf, onOpenCallback?: () => void) {
+  constructor(leaf: WorkspaceLeaf, onOpenCallback?: () => void, onScanVault?: () => Promise<void>) {
     super(leaf);
     this.onOpenCallback = onOpenCallback ?? null;
+    this.onScanVault = onScanVault ?? null;
   }
 
   getViewType(): string {
@@ -35,9 +37,36 @@ export class SidebarPanel extends ItemView {
     this.render();
   }
 
+  showScanSummary(count: number): void {
+    const { contentEl } = this;
+    // Append a summary line without clearing the current results
+    const existing = contentEl.querySelector(".mv-scan-summary");
+    if (existing) existing.remove();
+    contentEl.createDiv({
+      text: `Scanned ${count} file(s)`,
+      cls: "mv-sidebar-summary mv-scan-summary",
+    });
+  }
+
   private render(): void {
     const { contentEl } = this;
     contentEl.empty();
+
+    // Scan vault button
+    const scanBtn = contentEl.createEl("button", {
+      text: "Scan vault",
+      cls: "mv-scan-btn",
+    });
+    scanBtn.addEventListener("click", () => {
+      if (this.onScanVault) {
+        scanBtn.disabled = true;
+        scanBtn.textContent = "Scanning...";
+        void this.onScanVault().then(() => {
+          scanBtn.disabled = false;
+          scanBtn.textContent = "Scan vault";
+        });
+      }
+    });
 
     if (!this.fileName) {
       contentEl.createEl("p", {

@@ -39,14 +39,26 @@ export default class MetadataValidatorPlugin extends Plugin {
     // Apply CSS overrides immediately (no vault needed)
     this.cssInjector.update();
 
-    // Register sidebar view type — pass callback so the panel validates immediately on open
+    // Register sidebar view type — pass callbacks so the panel validates immediately on open
+    // and supports scanning the entire vault
     this.registerView(
       SIDEBAR_PANEL_TYPE,
       (leaf) =>
-        new SidebarPanel(leaf, () => {
-          const file = this.app.workspace.getActiveFile();
-          if (file) void this.validateAndUpdate(file);
-        })
+        new SidebarPanel(
+          leaf,
+          () => {
+            const file = this.app.workspace.getActiveFile();
+            if (file) void this.validateAndUpdate(file);
+          },
+          async () => {
+            const files = this.app.vault.getMarkdownFiles();
+            for (const f of files) {
+              await this.validateAndUpdate(f);
+            }
+            const panel = this.getSidebarPanel();
+            panel?.showScanSummary(files.length);
+          }
+        )
     );
 
     // Register settings tab
@@ -304,6 +316,12 @@ export default class MetadataValidatorPlugin extends Plugin {
     if (leaves.length > 0) {
       (leaves[0]?.view as SidebarPanel | undefined)?.update(fileName, results);
     }
+  }
+
+  /** Return the live SidebarPanel instance, or undefined if none is open. */
+  private getSidebarPanel(): SidebarPanel | undefined {
+    const leaves = this.app.workspace.getLeavesOfType(SIDEBAR_PANEL_TYPE);
+    return leaves[0]?.view as SidebarPanel | undefined;
   }
 
   private async activateSidebarPanel(): Promise<void> {

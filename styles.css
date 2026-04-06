@@ -541,3 +541,14 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 .mv-hidden { display: none; }
 
 .mv-field-empty { color: var(--text-muted); font-style: italic; cursor: pointer; }
+
+/* ── Scan vault button ────────────────────────────────────── */
+.mv-scan-btn {
+  font-size: 12px;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+}
+.mv-scan-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

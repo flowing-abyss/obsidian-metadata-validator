@@ -36,41 +36,44 @@ export class BasesDecorator {
   private onMutation(): void {
     if (!this.settings.showInlineErrors) return;
 
-    const editableCells = Array.from(
+    // Target cells not yet intercepted
+    const cells = Array.from(
       document.querySelectorAll<HTMLElement>(
-        ".bases-cell[contenteditable='true']:not([data-mv-intercepted])"
+        ".bases-cell:not([data-mv-intercepted]), [data-bases-cell]:not([data-mv-intercepted])"
       )
     );
 
-    for (const cell of editableCells) {
+    for (const cell of cells) {
       cell.setAttribute("data-mv-intercepted", "true");
-      this.interceptCell(cell);
+      this.addCellClickHandler(cell);
     }
   }
 
-  private interceptCell(cell: HTMLElement): void {
-    const rowEl = cell.closest<HTMLElement>("[data-file-path]");
-    const filePath = rowEl?.getAttribute("data-file-path");
-    const fieldKey =
-      cell.getAttribute("data-property-key") ??
-      cell.closest<HTMLElement>("[data-property-key]")?.getAttribute("data-property-key");
+  private addCellClickHandler(cell: HTMLElement): void {
+    cell.addEventListener("click", (e) => {
+      const rowEl = cell.closest<HTMLElement>("[data-file-path]");
+      const filePath = rowEl?.getAttribute("data-file-path");
+      const fieldKey =
+        cell.getAttribute("data-property-key") ??
+        cell.closest<HTMLElement>("[data-property-key]")?.getAttribute("data-property-key");
 
-    if (!filePath || !fieldKey) return;
+      if (!filePath || !fieldKey) return;
 
-    const file = this.app.vault.getMarkdownFiles().find((f) => f.path === filePath);
-    if (!file) return;
+      const file = this.app.vault.getMarkdownFiles().find((f) => f.path === filePath);
+      if (!file) return;
 
-    const cache = this.app.metadataCache.getFileCache(file);
-    const frontmatter = (cache?.frontmatter ?? {}) as Record<string, unknown>;
-    const schema = this.resolver.resolveForNote(file, frontmatter);
-    if (!schema) return;
+      const cache = this.app.metadataCache.getFileCache(file);
+      const frontmatter = (cache?.frontmatter ?? {}) as Record<string, unknown>;
+      const schema = this.resolver.resolveForNote(file, frontmatter);
+      if (!schema) return;
 
-    const fieldDef = schema.fields[fieldKey];
-    if (!fieldDef) return;
+      const fieldDef = schema.fields[fieldKey];
+      if (!fieldDef) return;
 
-    cell.blur();
-    cell.setAttribute("contenteditable", "false");
-
-    new PickerModal(this.app, fieldKey, fieldDef, frontmatter[fieldKey], schema, file).open();
+      // Only intercept for fields with schema definitions
+      e.preventDefault();
+      e.stopPropagation();
+      new PickerModal(this.app, fieldKey, fieldDef, frontmatter[fieldKey], schema, file).open();
+    });
   }
 }
