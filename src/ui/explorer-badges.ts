@@ -37,7 +37,7 @@ export class ExplorerBadges {
 
       const badge = document.createElement("span");
       badge.className = `${BADGE_CLASS} ${STATUS_CLASS[status]}`;
-      item.appendChild(badge);
+      item.prepend(badge);
     }
   }
 }

@@ -66,14 +66,15 @@ export class SchemaTreeView {
 
     const children = childrenOf.get(manifestPath) ?? [];
     if (children.length > 0) {
-      const toggle = row.createEl("span", { text: "▸", cls: "mv-tree-toggle" });
-      const childUl = li.createEl("ul", { cls: "mv-tree-children is-collapsed" });
+      // Start expanded so the user sees the hierarchy immediately
+      const toggle = row.createEl("span", { text: "▾", cls: "mv-tree-toggle" });
+      const childUl = li.createEl("ul", { cls: "mv-tree-children" });
 
       toggle.addEventListener("click", (e) => {
         e.stopPropagation();
-        const nowCollapsed = !childUl.hasClass("is-collapsed");
-        childUl.toggleClass("is-collapsed", nowCollapsed);
-        toggle.setText(nowCollapsed ? "▸" : "▾");
+        const willCollapse = !childUl.hasClass("is-collapsed");
+        childUl.toggleClass("is-collapsed", willCollapse);
+        toggle.setText(willCollapse ? "▸" : "▾");
       });
 
       for (const child of children) {

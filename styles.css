@@ -259,7 +259,7 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
   height: 6px;
   border-radius: 50%;
   display: inline-block;
-  margin-left: 4px;
+  margin-right: 4px;
   vertical-align: middle;
 }
 
@@ -666,7 +666,7 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
   min-width: 0;
 }
 
-.mv-field-value input[type="text"],
+.mv-field-value input[type="text"]:not(.mv-list-add-input),
 .mv-field-value input[type="number"],
 .mv-field-value input[type="url"],
 .mv-field-value input[type="date"] {
@@ -680,7 +680,7 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
   color: var(--text-normal);
 }
 
-.mv-field-value input[type="text"]:focus,
+.mv-field-value input[type="text"]:not(.mv-list-add-input):focus,
 .mv-field-value input[type="number"]:focus,
 .mv-field-value input[type="url"]:focus,
 .mv-field-value input[type="date"]:focus {
@@ -948,7 +948,7 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
   padding: 4px 0;
 }
 
-.mv-field-value input[type="text"],
+.mv-field-value input[type="text"]:not(.mv-list-add-input),
 .mv-field-value input[type="number"],
 .mv-field-value input[type="url"],
 .mv-field-value input[type="date"] {

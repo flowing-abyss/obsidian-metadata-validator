@@ -145,21 +145,25 @@ export class PropertyDecorator {
     if (isPicker) {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
+        // Read fresh frontmatter at click time — avoids stale-closure bug when
+        // the user edits values through the native properties panel.
+        const fresh = (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<
+          string,
+          unknown
+        >;
         void import("./picker-modal").then((mod: { PickerModal: typeof PickerModalType }) => {
-          new mod.PickerModal(
-            this.app,
-            fieldKey,
-            fieldDef,
-            frontmatter[fieldKey],
-            schema,
-            file
-          ).open();
+          new mod.PickerModal(this.app, fieldKey, fieldDef, fresh[fieldKey], schema, file).open();
         });
       });
     } else if (fieldDef.type === "boolean") {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
-        const newVal = !frontmatter[fieldKey];
+        // Read fresh frontmatter at click time to avoid stale-closure issues.
+        const fresh = (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const newVal = fresh[fieldKey] !== true;
         void this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
           fm[fieldKey] = newVal;
         });
