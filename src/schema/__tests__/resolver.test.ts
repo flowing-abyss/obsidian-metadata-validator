@@ -115,6 +115,52 @@ describe("SchemaResolver", () => {
     ]);
   });
 
+  it("child schema inherits parent target when child has no explicit target", () => {
+    const parent: Manifest = {
+      path: "schemas/sources/manifest.md",
+      folderPath: "schemas/sources",
+      data: { name: "sources", target: { tag: "source" }, fields: { url: { type: "url" } } },
+    };
+    const child: Manifest = {
+      path: "schemas/sources/books/manifest.md",
+      folderPath: "schemas/sources/books",
+      data: { name: "books", fields: { rating: { type: "number" } } },
+      // No target — should inherit from parent
+    };
+
+    const cache = makeCache([parent, child]);
+    const resolver = new SchemaResolver(cache);
+    resolver.rebuild();
+
+    // Note tagged "source/book" should match the child (books) schema
+    const file = makeFile("Notes/MyBook.md");
+    const schema = resolver.resolveForNote(file, { tags: ["source/book"] });
+    expect(schema?.name).toBe("books"); // child wins, inherits parent's target
+    expect(schema?.fields["rating"]?.type).toBe("number"); // child field
+    expect(schema?.fields["url"]?.type).toBe("url"); // inherited field
+  });
+
+  it("child schema wins over parent when both match via inherited target", () => {
+    const parent: Manifest = {
+      path: "schemas/sources/manifest.md",
+      folderPath: "schemas/sources",
+      data: { name: "sources", target: { tag: "source" }, fields: {} },
+    };
+    const child: Manifest = {
+      path: "schemas/sources/books/manifest.md",
+      folderPath: "schemas/sources/books",
+      data: { name: "books", fields: {} },
+    };
+
+    const cache = makeCache([parent, child]);
+    const resolver = new SchemaResolver(cache);
+    resolver.rebuild();
+
+    const file = makeFile("Notes/MyBook.md");
+    const schema = resolver.resolveForNote(file, { tags: ["source"] });
+    expect(schema?.name).toBe("books"); // deeper chain = more specific
+  });
+
   it("explicit extends overrides folder-nesting inheritance", () => {
     const resource: Manifest = {
       path: "schemas/resource/manifest.md",

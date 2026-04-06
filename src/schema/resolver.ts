@@ -94,7 +94,10 @@ export class SchemaResolver {
 
     matches.sort((a, b) => {
       if (b.priority !== a.priority) return b.priority - a.priority;
-      return targetSpecificity(b.target) - targetSpecificity(a.target);
+      const specDiff = targetSpecificity(b.target) - targetSpecificity(a.target);
+      if (specDiff !== 0) return specDiff;
+      // Deeper inheritance chain = more specific schema = wins
+      return b.inheritanceChain.length - a.inheritanceChain.length;
     });
     return matches[0] ?? null;
   }

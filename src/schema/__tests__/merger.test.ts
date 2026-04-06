@@ -59,4 +59,25 @@ describe("mergeSchemas", () => {
     const merged = mergeSchemas({}, child);
     expect(merged.fields?.x?.type).toBe("text");
   });
+
+  it("inherits parent target when child has no target", () => {
+    const parent = { target: { tag: "source" }, fields: {} };
+    const child = { fields: { rating: { type: "number" as const } } };
+    const merged = mergeSchemas(parent, child);
+    expect(merged.target).toEqual({ tag: "source" });
+  });
+
+  it("uses child target when child has explicit target", () => {
+    const parent = { target: { tag: "source" }, fields: {} };
+    const child = { target: { folder: "Books/" }, fields: {} };
+    const merged = mergeSchemas(parent, child);
+    expect(merged.target).toEqual({ folder: "Books/" });
+  });
+
+  it("inherits parent target when child has empty target object", () => {
+    const parent = { target: { tag: "source" }, fields: {} };
+    const child = { target: {}, fields: {} };
+    const merged = mergeSchemas(parent, child);
+    expect(merged.target).toEqual({ tag: "source" });
+  });
 });

@@ -16,7 +16,7 @@ export function mergeSchemas(parent: ManifestData, child: ManifestData): Manifes
     priority: child.priority ?? parent.priority,
     extends: child.extends,
     enforce_folder: child.enforce_folder ?? parent.enforce_folder,
-    target: child.target,
+    target: child.target && Object.keys(child.target).length > 0 ? child.target : parent.target,
     fields: {
       ...(parent.fields ?? {}),
       ...(child.fields ?? {}),
