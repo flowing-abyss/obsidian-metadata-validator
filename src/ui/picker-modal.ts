@@ -6,10 +6,11 @@ import { resolveSource } from "../schema/source-resolver";
 export class PickerModal extends Modal {
   private readonly fieldKey: string;
   private readonly field: ManifestField;
-  private readonly currentValue: unknown;
   private readonly schema: ResolvedSchema;
   private readonly file: TFile;
   private options: FieldOption[] = [];
+  // Mutable selection state — normalised values (no [[]])
+  private selected: Set<string> = new Set();
 
   constructor(
     app: App,
@@ -22,9 +23,21 @@ export class PickerModal extends Modal {
     super(app);
     this.fieldKey = fieldKey;
     this.field = field;
-    this.currentValue = currentValue;
     this.schema = schema;
     this.file = file;
+    this.initSelected(currentValue);
+  }
+
+  private initSelected(currentValue: unknown): void {
+    if (Array.isArray(currentValue)) {
+      for (const v of currentValue as unknown[]) {
+        const n = this.normalise(v);
+        if (n) this.selected.add(n);
+      }
+    } else {
+      const n = this.normalise(currentValue);
+      if (n) this.selected.add(n);
+    }
   }
 
   async onOpen(): Promise<void> {
@@ -60,19 +73,15 @@ export class PickerModal extends Modal {
 
     const search = contentEl.createEl("input", {
       type: "text",
-      placeholder: "Search...",
       cls: "mv-picker-search",
     });
+    search.setAttribute("placeholder", "Search...");
 
     const listEl = contentEl.createDiv("mv-picker-list");
-    this.renderOptions(listEl, this.options);
+    this.renderOptions(listEl, this.options, search.value);
 
     search.addEventListener("input", () => {
-      const q = search.value.toLowerCase();
-      const filtered = this.options.filter(
-        (o) => o.value.toLowerCase().includes(q) || (o.label ?? "").toLowerCase().includes(q)
-      );
-      this.renderOptions(listEl, filtered);
+      this.renderOptions(listEl, this.options, search.value);
     });
 
     const footer = contentEl.createDiv("mv-picker-footer");
@@ -87,21 +96,44 @@ export class PickerModal extends Modal {
 
   /** Strip [[...]] so stored "[[man]]" compares equal to option value "man". */
   private normalise(v: unknown): string {
-    return String(v).trim().replace(/^\[\[/, "").replace(/\]\]$/, "");
+    if (v === undefined || v === null || v === "") return "";
+    return String(v as string)
+      .trim()
+      .replace(/^\[\[/, "")
+      .replace(/\]\]$/, "");
   }
 
-  private renderOptions(listEl: HTMLElement, options: FieldOption[]): void {
+  private sortedOptions(options: FieldOption[], query: string): FieldOption[] {
+    const q = query.toLowerCase();
+    const filtered = q
+      ? options.filter(
+          (o) => o.value.toLowerCase().includes(q) || (o.label ?? "").toLowerCase().includes(q)
+        )
+      : options;
+    const sel = filtered.filter((o) => this.selected.has(o.value));
+    const unsel = filtered
+      .filter((o) => !this.selected.has(o.value))
+      .sort((a, b) => (a.label ?? a.value).localeCompare(b.label ?? b.value));
+    return [...sel, ...unsel];
+  }
+
+  private renderOptions(listEl: HTMLElement, options: FieldOption[], query: string): void {
     listEl.empty();
 
-    if (options.length === 0) {
+    const sorted = this.sortedOptions(options, query);
+
+    if (sorted.length === 0) {
       listEl.createEl("p", { text: "No options available.", cls: "mv-picker-empty" });
       return;
     }
 
-    for (const opt of options) {
-      const isSelected = Array.isArray(this.currentValue)
-        ? (this.currentValue as unknown[]).some((v) => this.normalise(v) === opt.value)
-        : this.normalise(this.currentValue) === opt.value;
+    const isMulti =
+      this.field.type === "multiselect" ||
+      this.field.type === "multilink" ||
+      this.field.type === "list";
+
+    for (const opt of sorted) {
+      const isSelected = this.selected.has(opt.value);
 
       const item = listEl.createDiv({
         cls: isSelected ? "mv-picker-option is-selected" : "mv-picker-option",
@@ -113,33 +145,42 @@ export class PickerModal extends Modal {
       }
 
       item.addEventListener("click", () => {
-        this.selectValue(opt.value);
-        this.close();
+        if (isMulti) {
+          // Toggle selection
+          if (this.selected.has(opt.value)) {
+            this.selected.delete(opt.value);
+          } else {
+            this.selected.add(opt.value);
+          }
+          this.persistSelection();
+          // Re-render without closing
+          this.renderOptions(listEl, options, query);
+        } else {
+          // Single select: set and close
+          this.selected.clear();
+          this.selected.add(opt.value);
+          this.persistSelection();
+          this.close();
+        }
       });
     }
   }
 
-  private selectValue(value: string): void {
+  private persistSelection(): void {
     const isMulti =
       this.field.type === "multiselect" ||
       this.field.type === "multilink" ||
       this.field.type === "list";
     const isLink = this.field.type === "link" || this.field.type === "multilink";
-    // Wrap link values in [[...]] so Obsidian treats them as internal links
-    const formatted = isLink ? `[[${value}]]` : value;
-
     const key = this.fieldKey;
+
     void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
       if (isMulti) {
-        const current = Array.isArray(fm[key]) ? (fm[key] as string[]) : [];
-        // Compare by normalised basename to avoid duplicates with/without [[]]
-        if (current.some((v) => this.normalise(v) === value)) {
-          fm[key] = current.filter((v) => this.normalise(v) !== value);
-        } else {
-          fm[key] = [...current, formatted];
-        }
+        // Always store as array, even single item
+        fm[key] = Array.from(this.selected).map((v) => (isLink ? `[[${v}]]` : v));
       } else {
-        fm[key] = formatted;
+        const val = Array.from(this.selected)[0];
+        fm[key] = val !== undefined ? (isLink ? `[[${val}]]` : val) : null;
       }
     });
   }
