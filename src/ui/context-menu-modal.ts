@@ -1,5 +1,5 @@
 import { App, Modal, setIcon } from "obsidian";
-import type { TFile } from "obsidian";
+import type { EventRef, TFile } from "obsidian";
 import type { FieldType, ManifestField, ResolvedSchema, ValidationResult } from "../types";
 import { ValidationEngine } from "../validation/engine";
 import { PickerModal } from "./picker-modal";
@@ -31,6 +31,8 @@ export class ContextMenuModal extends Modal {
   private optionalExpanded = false;
   /** Local frontmatter — updated immediately on save (no cache round-trip) */
   private localFrontmatter: Record<string, unknown> = {};
+  /** EventRef for metadataCache sync — unregistered on close */
+  private cacheEventRef: EventRef | null = null;
 
   constructor(
     app: App,
@@ -53,6 +55,18 @@ export class ContextMenuModal extends Modal {
     delete this.localFrontmatter["position"];
     const results = await this.engine.validate(this.file, this.localFrontmatter, this.schema);
     this.render(this.localFrontmatter, this.buildResultMap(results));
+
+    // Sync with external file changes (e.g. native Obsidian properties panel edits)
+    this.cacheEventRef = this.app.metadataCache.on("changed", (changedFile) => {
+      if (changedFile.path !== this.file.path) return;
+      const fresh = this.app.metadataCache.getFileCache(this.file);
+      const freshFm = { ...(fresh?.frontmatter ?? {}) } as Record<string, unknown>;
+      delete freshFm["position"];
+      this.localFrontmatter = freshFm;
+      void this.engine
+        .validate(this.file, this.localFrontmatter, this.schema)
+        .then((r) => this.render(this.localFrontmatter, this.buildResultMap(r)));
+    });
   }
 
   private buildResultMap(results: ValidationResult[]): Map<string, ValidationResult[]> {
@@ -146,7 +160,7 @@ export class ContextMenuModal extends Modal {
       iconEl.addClass("mv-field-type-icon--clickable");
       iconEl.addEventListener("click", (e) => {
         e.stopPropagation();
-        this.openPicker(fieldKey, fieldDef, frontmatter[fieldKey]);
+        this.openPicker(fieldKey, fieldDef);
       });
     } else if (fieldDef.type === "boolean" && fieldDef.fixed === undefined) {
       iconEl.addClass("mv-field-type-icon--clickable");
@@ -293,7 +307,7 @@ export class ContextMenuModal extends Modal {
     if (values.length === 0) {
       const noneEl = container.createEl("span", { text: "None", cls: "mv-field-empty" });
       noneEl.addEventListener("click", () => {
-        this.openPicker(fieldKey, fieldDef, currentValue);
+        this.openPicker(fieldKey, fieldDef);
       });
       return;
     }
@@ -317,7 +331,7 @@ export class ContextMenuModal extends Modal {
       } else {
         const chip = container.createEl("span", { text: name, cls: "mv-chip" });
         chip.addEventListener("click", () => {
-          this.openPicker(fieldKey, fieldDef, currentValue);
+          this.openPicker(fieldKey, fieldDef);
         });
       }
     }
@@ -385,12 +399,13 @@ export class ContextMenuModal extends Modal {
     refresh(values);
   }
 
-  private openPicker(fieldKey: string, fieldDef: ManifestField, currentValue: unknown): void {
+  private openPicker(fieldKey: string, fieldDef: ManifestField): void {
+    // Always read from localFrontmatter — never from a stale render-time closure
     new PickerModal(
       this.app,
       fieldKey,
       fieldDef,
-      currentValue,
+      this.localFrontmatter[fieldKey],
       this.schema,
       this.file,
       (savedValue) => this.applyLocalChange(fieldKey, savedValue)
@@ -541,6 +556,10 @@ export class ContextMenuModal extends Modal {
   }
 
   onClose(): void {
+    if (this.cacheEventRef) {
+      this.app.metadataCache.offref(this.cacheEventRef);
+      this.cacheEventRef = null;
+    }
     this.contentEl.empty();
   }
 }
