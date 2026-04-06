@@ -1,5 +1,5 @@
 import { setIcon, type App, type TFile } from "obsidian";
-import type { ResolvedSchema, ValidationResult } from "../types";
+import type { FieldType, ResolvedSchema, ValidationResult } from "../types";
 import type { SchemaResolver } from "../schema/resolver";
 import type { ValidationEngine } from "../validation/engine";
 import type { PluginSettings } from "../settings";
@@ -8,6 +8,23 @@ import type { showValidatorTooltip as showValidatorTooltipType } from "./validat
 
 const PICKER_ATTR = "data-mv-picker";
 const VALIDATOR_ATTR = "data-mv-validator";
+
+/** Lucide icon name for each field type */
+const FIELD_TYPE_ICON: Record<FieldType, string> = {
+  text: "type",
+  number: "hash",
+  select: "chevron-down",
+  multiselect: "list-checks",
+  list: "list",
+  date: "calendar",
+  link: "link",
+  multilink: "link-2",
+  boolean: "toggle-left",
+  url: "globe",
+};
+
+/** Field types that support the PickerModal (have options/sources to choose from) */
+const PICKER_TYPES = new Set<FieldType>(["select", "multiselect", "link", "multilink"]);
 
 export class PropertyDecorator {
   private observer: MutationObserver | null = null;
@@ -94,27 +111,41 @@ export class PropertyDecorator {
     const nameEl = row.querySelector<HTMLElement>(".metadata-property-key");
     if (!nameEl) return;
 
-    const btn = document.createElement("button");
-    btn.setAttribute(PICKER_ATTR, "true");
-    btn.className = "mv-picker-btn clickable-icon";
-    btn.setAttribute("aria-label", `Pick value for ${fieldKey}`);
-    setIcon(btn, "chevron-down");
+    const iconName = FIELD_TYPE_ICON[fieldDef.type] ?? "square";
+    const isPicker = PICKER_TYPES.has(fieldDef.type);
 
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      void import("./picker-modal").then((mod: { PickerModal: typeof PickerModalType }) => {
-        new mod.PickerModal(
-          this.app,
-          fieldKey,
-          fieldDef,
-          frontmatter[fieldKey],
-          schema,
-          file
-        ).open();
+    if (isPicker) {
+      // Clickable button that opens PickerModal
+      const btn = document.createElement("button");
+      btn.setAttribute(PICKER_ATTR, "true");
+      btn.className = "mv-picker-btn clickable-icon";
+      btn.setAttribute("aria-label", `Pick value for ${fieldKey}`);
+      setIcon(btn, iconName);
+
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        void import("./picker-modal").then((mod: { PickerModal: typeof PickerModalType }) => {
+          new mod.PickerModal(
+            this.app,
+            fieldKey,
+            fieldDef,
+            frontmatter[fieldKey],
+            schema,
+            file
+          ).open();
+        });
       });
-    });
 
-    nameEl.after(btn);
+      nameEl.after(btn);
+    } else {
+      // Non-interactive type indicator icon
+      const indicator = document.createElement("span");
+      indicator.setAttribute(PICKER_ATTR, "true");
+      indicator.className = "mv-type-icon";
+      indicator.setAttribute("aria-label", fieldDef.type);
+      setIcon(indicator, iconName);
+      nameEl.after(indicator);
+    }
   }
 
   private injectValidatorIcon(

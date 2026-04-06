@@ -420,6 +420,9 @@ export class SchemaEditorModal extends Modal {
       case "text":
         this.renderTextFields(body, field, update);
         break;
+      case "date":
+        this.renderDateFields(body, field, update);
+        break;
       default:
         this.renderDefaultField(body, field, update);
     }
@@ -601,6 +604,22 @@ export class SchemaEditorModal extends Modal {
     const [moved] = opts.splice(fromIdx, 1);
     if (moved) opts.splice(toIdx, 0, moved);
     field.options = opts;
+  }
+
+  private renderDateFields(
+    body: HTMLElement,
+    field: ManifestField,
+    update: (p: Partial<ManifestField>) => void
+  ): void {
+    new Setting(body)
+      .setName("Format")
+      .setDesc("Expected date format, e.g. YYYY-MM-DD or DD/MM/YYYY")
+      .addText((t) => {
+        t.inputEl.setAttribute("placeholder", "YYYY-MM-DD"); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.setValue(field.format ?? "").onChange((v) => update({ format: v || undefined }));
+      });
+
+    this.renderDefaultField(body, field, update);
   }
 
   private renderTextFields(
