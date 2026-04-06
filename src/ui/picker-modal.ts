@@ -85,6 +85,11 @@ export class PickerModal extends Modal {
     }
   }
 
+  /** Strip [[...]] so stored "[[man]]" compares equal to option value "man". */
+  private normalise(v: unknown): string {
+    return String(v).trim().replace(/^\[\[/, "").replace(/\]\]$/, "");
+  }
+
   private renderOptions(listEl: HTMLElement, options: FieldOption[]): void {
     listEl.empty();
 
@@ -95,8 +100,8 @@ export class PickerModal extends Modal {
 
     for (const opt of options) {
       const isSelected = Array.isArray(this.currentValue)
-        ? (this.currentValue as unknown[]).includes(opt.value)
-        : this.currentValue === opt.value;
+        ? (this.currentValue as unknown[]).some((v) => this.normalise(v) === opt.value)
+        : this.normalise(this.currentValue) === opt.value;
 
       const item = listEl.createDiv({
         cls: isSelected ? "mv-picker-option is-selected" : "mv-picker-option",
@@ -119,18 +124,22 @@ export class PickerModal extends Modal {
       this.field.type === "multiselect" ||
       this.field.type === "multilink" ||
       this.field.type === "list";
+    const isLink = this.field.type === "link" || this.field.type === "multilink";
+    // Wrap link values in [[...]] so Obsidian treats them as internal links
+    const formatted = isLink ? `[[${value}]]` : value;
 
     const key = this.fieldKey;
     void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
       if (isMulti) {
         const current = Array.isArray(fm[key]) ? (fm[key] as string[]) : [];
-        if (current.includes(value)) {
-          fm[key] = current.filter((v) => v !== value);
+        // Compare by normalised basename to avoid duplicates with/without [[]]
+        if (current.some((v) => this.normalise(v) === value)) {
+          fm[key] = current.filter((v) => this.normalise(v) !== value);
         } else {
-          fm[key] = [...current, value];
+          fm[key] = [...current, formatted];
         }
       } else {
-        fm[key] = value;
+        fm[key] = formatted;
       }
     });
   }
