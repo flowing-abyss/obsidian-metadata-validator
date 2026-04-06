@@ -698,7 +698,7 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
   display: flex;
   align-items: center;
   gap: 6px;
-  width: 100%;
+  flex: 1;
   min-width: 0;
 }
 
@@ -825,9 +825,10 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
 
 .mv-list-add-input {
   width: 22px;
+  height: 20px;
   min-width: 0;
   font-size: 13px;
-  padding: 1px 3px;
+  padding: 0 3px;
   border-radius: 6px;
   border: 1px dashed var(--background-modifier-border);
   background: transparent;
@@ -835,6 +836,8 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
   text-align: center;
   cursor: pointer;
   flex-shrink: 0;
+  align-self: center;
+  line-height: 18px;
 }
 
 .mv-list-add-input:focus {
