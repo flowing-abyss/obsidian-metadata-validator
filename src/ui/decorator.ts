@@ -27,12 +27,6 @@ const FIELD_TYPE_ICON: Record<FieldType, string> = {
 /** Field types that open PickerModal (have options/sources) */
 const PICKER_TYPES = new Set<FieldType>(["select", "multiselect", "link", "multilink"]);
 
-/**
- * Field types where Obsidian already renders its own type icon in the property row.
- * We suppress our icon for these to avoid duplicates.
- */
-const OBSIDIAN_HANDLES_ICON = new Set<FieldType>(["date", "boolean"]);
-
 interface CachedResult {
   fmHash: string;
   results: ValidationResult[];
@@ -145,15 +139,8 @@ export class PropertyDecorator {
     const btn = document.createElement("button");
     btn.setAttribute(PICKER_ATTR, "true");
     btn.setAttribute("aria-label", fieldDef.type);
-
-    if (OBSIDIAN_HANDLES_ICON.has(fieldDef.type)) {
-      // Obsidian already shows an icon for this type — render ours as invisible
-      // but still clickable so the user can open the context menu
-      btn.className = "mv-type-icon mv-type-icon--hidden clickable-icon";
-    } else {
-      btn.className = isPicker ? "mv-picker-btn clickable-icon" : "mv-type-icon clickable-icon";
-      setIcon(btn, iconName);
-    }
+    btn.className = isPicker ? "mv-picker-btn clickable-icon" : "mv-type-icon clickable-icon";
+    setIcon(btn, iconName);
 
     if (isPicker) {
       btn.addEventListener("click", (e) => {

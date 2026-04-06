@@ -79,7 +79,6 @@ export class SchemaEditorModal extends Modal {
         })
       );
     });
-    this.renderCollapsibleSection(contentEl, "Formatting", (body) => this.renderFormatting(body));
 
     const footer = new Setting(contentEl);
     footer
@@ -171,22 +170,13 @@ export class SchemaEditorModal extends Modal {
   }
 
   private renderTarget(el: HTMLElement): void {
-    new Setting(el)
-      .setName("Expression")
-      .setDesc(
-        'Match by expression: "Folder/" AND/OR #tag — leave empty to use fields below' // eslint-disable-line obsidianmd/ui/sentence-case
-      )
-      .addText((t) => {
-        t.inputEl.setAttribute("placeholder", '"Sources/" AND #book'); // eslint-disable-line obsidianmd/ui/sentence-case
-        t.inputEl.addClass("mv-expression-input");
-        t.setValue(this.data.target?.query ?? "").onChange((v) => {
-          this.data.target = { ...this.data.target, query: v.trim() || undefined };
-        });
-      });
+    const structuredGroup = el.createDiv();
+    const hasExpr = !!this.data.target?.query?.trim();
+    if (hasExpr) structuredGroup.addClass("mv-hidden");
 
-    new Setting(el)
+    new Setting(structuredGroup)
       .setName("Folder")
-      .setDesc("Apply to notes whose path starts with this folder (used when expression is empty).")
+      .setDesc("Apply to notes whose path starts with this folder.")
       .addText((t) => {
         t.inputEl.setAttribute("placeholder", "Sources/");
         t.setValue(this.data.target?.folder ?? "").onChange((v) => {
@@ -194,9 +184,9 @@ export class SchemaEditorModal extends Modal {
         });
       });
 
-    new Setting(el)
+    new Setting(structuredGroup)
       .setName("Tag")
-      .setDesc("Apply to notes with this tag (used when expression is empty).")
+      .setDesc("Apply to notes with this tag.")
       .addText((t) => {
         t.inputEl.setAttribute("placeholder", "Article");
         t.setValue(this.data.target?.tag ?? "").onChange((v) => {
@@ -204,9 +194,9 @@ export class SchemaEditorModal extends Modal {
         });
       });
 
-    new Setting(el)
+    new Setting(structuredGroup)
       .setName("Match mode")
-      .setDesc("How folder and tag conditions are combined (used when expression is empty).")
+      .setDesc("How folder and tag conditions are combined.")
       .addDropdown((d) =>
         d
           .addOption("AND", "All conditions must match")
@@ -216,6 +206,21 @@ export class SchemaEditorModal extends Modal {
             this.data.target = { ...this.data.target, op: v as "AND" | "OR" };
           })
       );
+
+    new Setting(el)
+      .setName("Expression")
+      .setDesc(
+        'Match by expression — overrides Folder/Tag above: "Folder/" AND/OR #tag' // eslint-disable-line obsidianmd/ui/sentence-case
+      )
+      .addText((t) => {
+        t.inputEl.setAttribute("placeholder", '"Sources/" AND #book'); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.addClass("mv-expression-input");
+        t.setValue(this.data.target?.query ?? "").onChange((v) => {
+          const trimmed = v.trim();
+          this.data.target = { ...this.data.target, query: trimmed || undefined };
+          structuredGroup.toggleClass("mv-hidden", !!trimmed);
+        });
+      });
 
     // ── Enforce folder ────────────────────────────────────────
     const enforceVal = this.data.enforce_folder;
@@ -507,7 +512,11 @@ export class SchemaEditorModal extends Modal {
   ): void {
     new Setting(body).setName("Source").setHeading();
 
-    new Setting(body)
+    const structuredSourceGroup = body.createDiv();
+    const hasSourceExpr = !!field.source?.js?.trim();
+    if (hasSourceExpr) structuredSourceGroup.addClass("mv-hidden");
+
+    new Setting(structuredSourceGroup)
       .setName("Folder")
       .setDesc("Only show notes from this folder.")
       .addText((t) => {
@@ -517,7 +526,7 @@ export class SchemaEditorModal extends Modal {
         );
       });
 
-    new Setting(body)
+    new Setting(structuredSourceGroup)
       .setName("Tag")
       .setDesc("Only show notes with this tag.")
       .addText((t) => {
@@ -525,6 +534,21 @@ export class SchemaEditorModal extends Modal {
         t.setValue(field.source?.tag ?? "").onChange((v) =>
           update({ source: { ...field.source, tag: v || undefined } })
         );
+      });
+
+    new Setting(body)
+      .setName("Expression")
+      .setDesc(
+        'Filter by expression — overrides Folder/Tag: "Folder/" AND/OR #tag' // eslint-disable-line obsidianmd/ui/sentence-case
+      )
+      .addText((t) => {
+        t.inputEl.setAttribute("placeholder", '"People/" AND #person'); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.addClass("mv-expression-input");
+        t.setValue(field.source?.query ?? "").onChange((v) => {
+          const trimmed = v.trim();
+          update({ source: { ...field.source, query: trimmed || undefined } });
+          structuredSourceGroup.toggleClass("mv-hidden", !!trimmed);
+        });
       });
 
     new Setting(body)
@@ -568,17 +592,21 @@ export class SchemaEditorModal extends Modal {
         let rowEnterCount = 0;
         row.addEventListener("dragenter", (e) => {
           e.preventDefault();
+          e.stopPropagation();
           rowEnterCount++;
           row.addClass("mv-drag-over");
         });
-        row.addEventListener("dragleave", () => {
+        row.addEventListener("dragleave", (e) => {
+          e.stopPropagation();
           if (--rowEnterCount === 0) row.removeClass("mv-drag-over");
         });
         row.addEventListener("dragover", (e) => {
-          e.preventDefault(); // keep this for drop to work
+          e.preventDefault();
+          e.stopPropagation();
         });
         row.addEventListener("drop", (e) => {
           e.preventDefault();
+          e.stopPropagation(); // prevent card-level drop from re-rendering fields
           row.removeClass("mv-drag-over");
           const fromIdxStr = e.dataTransfer?.getData("text/plain");
           if (fromIdxStr === undefined || fromIdxStr === String(idx)) return;
@@ -753,6 +781,7 @@ export class SchemaEditorModal extends Modal {
       if (Array.isArray(f.options) && f.options.length) fOut.options = f.options;
       if (f.source) {
         const src: Record<string, unknown> = {};
+        if (f.source.query) src.query = f.source.query;
         if (f.source.folder) src.folder = f.source.folder;
         if (f.source.tag) src.tag = f.source.tag;
         if (f.source.js) src.js = f.source.js;

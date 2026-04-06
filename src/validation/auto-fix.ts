@@ -35,6 +35,18 @@ export function applyAutoFix(
     }
   }
 
+  // required: auto-insert null placeholder so the field key appears in frontmatter
+  // Only when the key is completely absent (undefined); explicit null is left as-is
+  if (
+    field.required &&
+    field.default === undefined &&
+    field.fixed === undefined &&
+    current === undefined
+  ) {
+    frontmatter[fieldName] = null;
+    changed = true;
+  }
+
   // sort: alphabetical
   if (field.sort === "alphabetical" && Array.isArray(frontmatter[fieldName])) {
     const arr = frontmatter[fieldName] as unknown[];

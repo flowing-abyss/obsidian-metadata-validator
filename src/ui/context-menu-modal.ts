@@ -11,6 +11,7 @@ export class ContextMenuModal extends Modal {
   private readonly getManifestFields:
     | ((path: string) => Record<string, ManifestField> | undefined)
     | null;
+  private readonly openSchemaEditor: ((manifestPath: string) => void) | null;
 
   /** Persist optional-section expand state across refreshes */
   private optionalExpanded = false;
@@ -19,13 +20,15 @@ export class ContextMenuModal extends Modal {
     app: App,
     file: TFile,
     schema: ResolvedSchema,
-    getManifestFields?: (path: string) => Record<string, ManifestField> | undefined
+    getManifestFields?: (path: string) => Record<string, ManifestField> | undefined,
+    openSchemaEditor?: (manifestPath: string) => void
   ) {
     super(app);
     this.file = file;
     this.schema = schema;
     this.engine = new ValidationEngine(app);
     this.getManifestFields = getManifestFields ?? null;
+    this.openSchemaEditor = openSchemaEditor ?? null;
   }
 
   async onOpen(): Promise<void> {
@@ -111,21 +114,21 @@ export class ContextMenuModal extends Modal {
     // Store field key for footer hover-highlight
     row.setAttribute("data-mv-field", fieldKey);
 
-    // Label column — just the display name, no inline badges
+    // Label column — just the display name
     const labelEl = row.createDiv("mv-field-label");
     labelEl.createEl("span", { text: fieldDef.label ?? fieldKey, cls: "mv-field-label-text" });
+
+    // Error icon column (between label and value)
+    const errors = (resultMap.get(fieldKey) ?? []).filter((r) => !r.autoFixed);
+    const errEl = row.createDiv("mv-field-err");
+    if (errors.length > 0) {
+      errEl.textContent = "\u26A0";
+      errEl.title = errors.map((e) => e.message).join("\n");
+    }
 
     // Value / editor column
     const valueEl = row.createDiv("mv-field-value");
     this.renderEditor(valueEl, fieldKey, fieldDef, frontmatter);
-
-    // Error icon column
-    const errors = (resultMap.get(fieldKey) ?? []).filter((r) => !r.autoFixed);
-    if (errors.length > 0) {
-      const errEl = row.createDiv("mv-field-err");
-      errEl.textContent = "\u26A0";
-      errEl.title = errors.map((e) => e.message).join("\n");
-    }
   }
 
   private renderEditor(
@@ -219,7 +222,7 @@ export class ContextMenuModal extends Modal {
       }
 
       case "list": {
-        this.renderListEditor(container, fieldKey, currentValue);
+        this.renderListChips(container, fieldKey, currentValue);
         break;
       }
     }
@@ -238,14 +241,14 @@ export class ContextMenuModal extends Modal {
         ? [this.toStr(currentValue)]
         : [];
 
+    // "Change" button comes first
+    const editBtn = container.createEl("button", { text: "Change", cls: "mv-chip-edit" });
+    editBtn.addEventListener("click", () => {
+      this.openPicker(fieldKey, fieldDef, currentValue);
+    });
+
     if (values.length === 0) {
-      const emptySpan = container.createEl("span", {
-        text: "None selected",
-        cls: "mv-field-empty",
-      });
-      emptySpan.addEventListener("click", () => {
-        this.openPicker(fieldKey, fieldDef, currentValue);
-      });
+      container.createEl("span", { text: "None", cls: "mv-field-empty" });
       return;
     }
 
@@ -265,54 +268,61 @@ export class ContextMenuModal extends Modal {
         });
       }
     }
-
-    const editBtn = container.createEl("button", { text: "Change", cls: "mv-chip-edit" });
-    editBtn.addEventListener("click", () => {
-      this.openPicker(fieldKey, fieldDef, currentValue);
-    });
   }
 
-  private openPicker(fieldKey: string, fieldDef: ManifestField, currentValue: unknown): void {
-    new PickerModal(this.app, fieldKey, fieldDef, currentValue, this.schema, this.file).open();
-  }
-
-  private renderListEditor(container: HTMLElement, fieldKey: string, currentValue: unknown): void {
-    const listEl = container.createDiv("mv-list-editor");
-
+  /** List type: chips for each value + inline add/remove editing */
+  private renderListChips(container: HTMLElement, fieldKey: string, currentValue: unknown): void {
     const values: string[] = Array.isArray(currentValue)
-      ? (currentValue as unknown[]).map((v) => this.toStr(v))
+      ? (currentValue as unknown[]).map((v) => this.toStr(v)).filter(Boolean)
       : [];
 
-    const rows = [...values, ""];
+    const chipsEl = container.createDiv("mv-list-chips");
 
-    const saveList = (): void => {
-      const inputs = listEl.querySelectorAll("input");
-      const newValues: string[] = [];
-      inputs.forEach((inp) => {
-        const val = inp.value.trim();
-        if (val) newValues.push(val);
-      });
-      // Always save as array when field type is list, even with a single value
-      this.saveField(fieldKey, newValues.length > 0 ? newValues : null);
+    const saveList = (items: string[]) => {
+      this.saveField(fieldKey, items.length > 0 ? items : null);
     };
 
-    const addRow = (value: string, isLast: boolean): void => {
-      const rowDiv = listEl.createDiv("mv-list-row");
-      const input = rowDiv.createEl("input", { type: "text", value });
-      input.setAttribute("placeholder", isLast ? "Add item..." : "");
-      input.addEventListener("change", () => {
-        saveList();
+    const refresh = (items: string[]) => {
+      chipsEl.empty();
+      items.forEach((val, idx) => {
+        const chip = chipsEl.createEl("span", { cls: "mv-chip mv-chip--removable" });
+        chip.createEl("span", { text: val });
+        const rem = chip.createEl("span", { text: "\u00D7", cls: "mv-chip-remove" });
+        rem.addEventListener("click", () => {
+          const updated = items.filter((_, i) => i !== idx);
+          saveList(updated);
+          refresh(updated);
+        });
       });
-      input.addEventListener("input", () => {
-        if (input.value.trim() && input === listEl.lastElementChild?.querySelector("input")) {
-          addRow("", true);
+
+      const addInput = chipsEl.createEl("input", { type: "text", cls: "mv-list-add-input" });
+      addInput.setAttribute("placeholder", "+");
+      addInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === ",") {
+          e.preventDefault();
+          const val = addInput.value.trim().replace(/,$/, "");
+          if (val) {
+            const updated = [...items, val];
+            saveList(updated);
+            refresh(updated);
+          }
+        }
+      });
+      addInput.addEventListener("blur", () => {
+        const val = addInput.value.trim();
+        if (val) {
+          const updated = [...items, val];
+          saveList(updated);
+          refresh(updated);
         }
       });
     };
 
-    for (let i = 0; i < rows.length; i++) {
-      addRow(rows[i] ?? "", i === rows.length - 1);
-    }
+    refresh(values);
+  }
+
+  private openPicker(fieldKey: string, fieldDef: ManifestField, currentValue: unknown): void {
+    new PickerModal(this.app, fieldKey, fieldDef, currentValue, this.schema, this.file).open();
   }
 
   /**
@@ -391,7 +401,16 @@ export class ContextMenuModal extends Modal {
         });
         schemaSpan.setAttribute("data-mv-chain-path", manifestPath);
 
-        // On hover: highlight fields that originate from this schema
+        // Click: open schema editor for this manifest
+        if (this.openSchemaEditor) {
+          const openFn = this.openSchemaEditor;
+          schemaSpan.addEventListener("click", () => {
+            this.close();
+            openFn(manifestPath);
+          });
+        }
+
+        // Hover: highlight fields that originate from this schema
         schemaSpan.addEventListener("mouseenter", () => {
           if (!this.getManifestFields) return;
           const fieldsFromThis = this.getManifestFields(manifestPath);

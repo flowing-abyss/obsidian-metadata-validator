@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
+import { Menu, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
 import { DEFAULT_SETTINGS, MetadataValidatorSettingTab, type PluginSettings } from "./settings";
 import type { ValidationResult } from "./types";
 import { ManifestCache } from "./manifest/cache";
@@ -207,7 +207,13 @@ export default class MetadataValidatorPlugin extends Plugin {
               .setIcon("pencil")
               .onClick(() => {
                 const getFields = (p: string) => this.cache.getByPath(p)?.data.fields;
-                new ContextMenuModal(this.app, file, schema, getFields).open();
+                new ContextMenuModal(
+                  this.app,
+                  file,
+                  schema,
+                  getFields,
+                  (p) => void this.openSchemaEditor(p)
+                ).open();
               })
           );
 
@@ -219,6 +225,47 @@ export default class MetadataValidatorPlugin extends Plugin {
           );
         })
       );
+
+      // Right-click on wikilinks in properties panel → "Edit properties"
+      this.registerDomEvent(document, "contextmenu", (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        // Only act on internal-link elements inside a metadata-property value
+        const linkEl = target.closest<HTMLElement>(
+          ".metadata-property .internal-link, .metadata-property [data-type='wikilink']"
+        );
+        if (!linkEl) return;
+
+        const propRow = linkEl.closest<HTMLElement>(".metadata-property");
+        if (!propRow) return;
+
+        const activeFile = this.app.workspace.getActiveFile();
+        if (!activeFile) return;
+
+        const fm = this.app.metadataCache.getFileCache(activeFile)?.frontmatter as
+          | Record<string, unknown>
+          | undefined;
+        const schema = this.resolver.resolveForNote(activeFile, fm ?? {});
+        if (!schema) return;
+
+        e.preventDefault();
+        const menu = new Menu();
+        menu.addItem((item) =>
+          item
+            .setTitle("Edit properties")
+            .setIcon("pencil")
+            .onClick(() => {
+              const getFields = (p: string) => this.cache.getByPath(p)?.data.fields;
+              new ContextMenuModal(
+                this.app,
+                activeFile,
+                schema,
+                getFields,
+                (p) => void this.openSchemaEditor(p)
+              ).open();
+            })
+        );
+        menu.showAtPosition({ x: e.clientX, y: e.clientY });
+      });
 
       // Bases decorator (lazy import)
       void import("./ui/bases-decorator").then(

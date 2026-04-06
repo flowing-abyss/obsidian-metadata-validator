@@ -140,9 +140,21 @@ body.mv-hide-validator .metadata-property-invalid-icon {
   align-self: center;
   width: 20px;
   height: 20px;
+  padding: 0;
+  margin: 0 2px;
   flex-shrink: 0;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
   color: var(--text-faint);
-  pointer-events: none;
+  opacity: 0.4;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.mv-type-icon:hover {
+  opacity: 1;
+  background: var(--background-modifier-hover);
 }
 
 .mv-type-icon svg {
@@ -595,7 +607,7 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 
 .mv-field-row {
   display: grid;
-  grid-template-columns: minmax(100px, 1fr) 2fr auto;
+  grid-template-columns: minmax(100px, 120px) 20px 1fr;
   align-items: center;
   gap: 8px;
   padding: 6px 0;
@@ -733,6 +745,49 @@ body.mv-hide-validator .metadata-property-invalid-icon {
   color: var(--text-normal);
 }
 
+.mv-list-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.mv-chip--removable {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.mv-chip-remove {
+  font-size: 11px;
+  opacity: 0.6;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.mv-chip-remove:hover {
+  opacity: 1;
+  color: var(--color-red);
+}
+
+.mv-list-add-input {
+  width: 48px;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 1px dashed var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.mv-list-add-input:focus {
+  width: 100px;
+  outline: none;
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
 .mv-context-footer {
   margin-top: 12px;
   padding-top: 8px;
@@ -849,7 +904,7 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 }
 
 .mv-field-row {
-  grid-template-columns: 120px 1fr auto;
+  grid-template-columns: 120px 20px 1fr;
   min-height: 28px;
   padding: 4px 0;
 }
@@ -869,16 +924,6 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 /* ── Suppress Obsidian's type icon when we inject our own ──  */
 .metadata-property:has([data-mv-picker]) .metadata-property-icon {
   display: none;
-}
-
-/* ── Hidden-but-clickable type icon (for date/boolean) ─────── */
-.mv-type-icon--hidden {
-  width: 0 !important;
-  overflow: hidden;
-  padding: 0 !important;
-  margin: 0 !important;
-  opacity: 0;
-  pointer-events: auto;
 }
 
 /* ── Expression input (full width) ───────────────────────── */

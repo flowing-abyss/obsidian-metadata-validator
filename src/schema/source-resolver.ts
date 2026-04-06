@@ -1,5 +1,6 @@
 import type { App, TFile } from "obsidian";
 import type { FieldOption, FieldSource } from "../types";
+import { evaluateQuery } from "./query";
 
 export async function resolveSource(
   source: FieldSource,
@@ -11,6 +12,23 @@ export async function resolveSource(
   }
 
   const files = app.vault.getMarkdownFiles();
+
+  if (source.query) {
+    const q = source.query;
+    const filtered = files.filter((f) => {
+      const cache = app.metadataCache.getFileCache(f);
+      const tags = [
+        ...((cache as unknown as { tags?: Array<{ tag: string }> })?.tags?.map(
+          (t: { tag: string }) => t.tag
+        ) ?? []),
+        ...((cache?.frontmatter?.["tags"] as string[] | undefined) ?? []),
+      ];
+      const fm = (cache?.frontmatter ?? {}) as Record<string, unknown>;
+      return evaluateQuery(q, f.path, tags, fm);
+    });
+    return filtered.map((f) => ({ value: f.basename, label: f.basename }));
+  }
+
   const filtered = files.filter((f) => fileMatchesSource(f, source, app));
   return filtered.map((f) => ({ value: f.basename, label: f.basename }));
 }

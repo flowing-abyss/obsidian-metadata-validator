@@ -23,6 +23,8 @@ export interface FieldSource {
   tag?: string;
   /** key=value pairs, all must match (AND) */
   property?: Record<string, string>;
+  /** Expression filter: "Folder/" AND/OR #tag (overrides folder/tag when set) */
+  query?: string;
   js?: string;
 }
 
