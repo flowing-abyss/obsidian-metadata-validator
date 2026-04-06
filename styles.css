@@ -491,6 +491,48 @@ body.mv-hide-validator .metadata-property-invalid-icon {
   background: var(--background-modifier-hover);
 }
 
+/* ── Collapsible sections ─────────────────────────────────── */
+.mv-collapsible-body--collapsed {
+  display: none;
+}
+
+.mv-collapsible-header {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  font-weight: 600;
+  border-bottom: 1px solid var(--background-modifier-border);
+  user-select: none;
+}
+
+.mv-collapsible-header:hover {
+  color: var(--text-accent);
+}
+
+.mv-collapsible-chevron {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.mv-collapsible-title {
+  font-size: 14px;
+}
+
+/* ── Drag-and-drop ────────────────────────────────────────── */
+.mv-field-card[draggable="true"] {
+  cursor: grab;
+}
+
+.mv-dragging {
+  opacity: 0.4;
+}
+
+.mv-drag-over {
+  outline: 2px dashed var(--interactive-accent);
+}
+
 /* ── Utility: number inputs ───────────────────────────────── */
 .mv-input-number-sm { width: 80px; }
 .mv-input-number-md { width: 100px; }

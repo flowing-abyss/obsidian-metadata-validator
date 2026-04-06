@@ -1,4 +1,5 @@
 import { App, Modal, Notice, Setting, TFile, stringifyYaml } from "obsidian";
+import type { ManifestCache } from "../manifest/cache";
 import type { FieldOption, FieldType, ManifestData, ManifestField, ManifestTarget } from "../types";
 
 const FIELD_TYPES: FieldType[] = [
@@ -25,13 +26,21 @@ export class SchemaEditorModal extends Modal {
   private data: ManifestData;
   private readonly manifestPath: string;
   private readonly onSaved: () => Promise<void>;
+  private readonly cache?: ManifestCache;
 
-  constructor(app: App, manifestPath: string, data: ManifestData, onSaved: () => Promise<void>) {
+  constructor(
+    app: App,
+    manifestPath: string,
+    data: ManifestData,
+    onSaved: () => Promise<void>,
+    cache?: ManifestCache
+  ) {
     super(app);
     this.manifestPath = manifestPath;
     // Deep-clone so edits don't affect the live cache until Save
     this.data = JSON.parse(JSON.stringify(data)) as ManifestData;
     this.onSaved = onSaved;
+    this.cache = cache;
     this.modalEl.addClass("mv-schema-editor-modal");
   }
 
@@ -54,24 +63,23 @@ export class SchemaEditorModal extends Modal {
       cls: "mv-editor-title",
     });
 
-    this.renderBasic(contentEl);
-    this.renderTarget(contentEl);
-
-    new Setting(contentEl).setName("Fields").setHeading();
-    const fieldsEl = contentEl.createDiv("mv-fields-list");
-    this.renderFields(fieldsEl);
-    new Setting(contentEl).addButton((btn) =>
-      btn.setButtonText("Add field").onClick(() => {
-        this.data.fields ??= {};
-        let name = "new_field";
-        let n = 2;
-        while (this.data.fields[name]) name = `new_field_${n++}`;
-        this.data.fields[name] = { type: "text" };
-        this.renderFields(fieldsEl);
-      })
-    );
-
-    this.renderFormatting(contentEl);
+    this.renderCollapsibleSection(contentEl, "Basic", (body) => this.renderBasic(body));
+    this.renderCollapsibleSection(contentEl, "Target", (body) => this.renderTarget(body));
+    this.renderCollapsibleSection(contentEl, "Fields", (body) => {
+      const fieldsEl = body.createDiv("mv-fields-list");
+      this.renderFields(fieldsEl);
+      new Setting(body).addButton((btn) =>
+        btn.setButtonText("Add field").onClick(() => {
+          this.data.fields ??= {};
+          let name = "new_field";
+          let n = 2;
+          while (this.data.fields[name]) name = `new_field_${n++}`;
+          this.data.fields[name] = { type: "text" };
+          this.renderFields(fieldsEl);
+        })
+      );
+    });
+    this.renderCollapsibleSection(contentEl, "Formatting", (body) => this.renderFormatting(body));
 
     const footer = new Setting(contentEl);
     footer
@@ -85,11 +93,30 @@ export class SchemaEditorModal extends Modal {
       .setDesc(`File: ${this.manifestPath}`);
   }
 
+  // ── Collapsible section helper ────────────────────────────────────────────
+
+  private renderCollapsibleSection(
+    el: HTMLElement,
+    title: string,
+    renderFn: (body: HTMLElement) => void
+  ): void {
+    const wrapper = el.createDiv("mv-collapsible");
+    const header = wrapper.createDiv("mv-collapsible-header");
+    const chevron = header.createEl("span", { cls: "mv-collapsible-chevron", text: "›" });
+    header.createEl("span", { text: title, cls: "mv-collapsible-title" });
+    const body = wrapper.createDiv("mv-collapsible-body");
+    body.addClass("mv-collapsible-body--collapsed");
+    renderFn(body);
+    header.addEventListener("click", () => {
+      const wasCollapsed = body.hasClass("mv-collapsible-body--collapsed");
+      body.toggleClass("mv-collapsible-body--collapsed", !wasCollapsed);
+      chevron.textContent = wasCollapsed ? "⌄" : "›";
+    });
+  }
+
   // ── Sections ──────────────────────────────────────────────────────────────
 
   private renderBasic(el: HTMLElement): void {
-    new Setting(el).setName("Basic").setHeading();
-
     new Setting(el).setName("Name").addText((t) =>
       t.setValue(this.data.name ?? "").onChange((v) => {
         this.data.name = v || undefined;
@@ -116,6 +143,23 @@ export class SchemaEditorModal extends Modal {
           this.data.extends = v || undefined;
         });
       });
+
+    // Auto-detected parent from folder nesting
+    if (this.cache) {
+      const folder = this.manifestPath.replace(/\/manifest\.md$/, "");
+      const parentFolder = folder.split("/").slice(0, -1).join("/");
+      const autoParent = this.cache.getByFolder(parentFolder);
+      if (autoParent && !this.data.extends) {
+        new Setting(el)
+          .setName("Auto-detected parent")
+          .setDesc(
+            `Inheriting from ${autoParent.path} (folder nesting). Set "Extends" above to override.`
+          )
+          .addExtraButton((btn) =>
+            btn.setIcon("info").setTooltip("Parent detected from folder structure")
+          );
+      }
+    }
 
     const enforceVal = this.data.enforce_folder;
     let enforceToggleOn = !!enforceVal;
@@ -156,8 +200,6 @@ export class SchemaEditorModal extends Modal {
   }
 
   private renderTarget(el: HTMLElement): void {
-    new Setting(el).setName("Target").setHeading();
-
     new Setting(el)
       .setName("Folder")
       .setDesc("Apply to notes whose path starts with this folder.")
@@ -193,8 +235,6 @@ export class SchemaEditorModal extends Modal {
   }
 
   private renderFormatting(el: HTMLElement): void {
-    new Setting(el).setName("Formatting").setHeading();
-
     new Setting(el)
       .setName("Property order")
       .setDesc("Comma-separated field names in the desired display order.")
@@ -221,6 +261,34 @@ export class SchemaEditorModal extends Modal {
 
   private renderFieldCard(container: HTMLElement, key: string, field: ManifestField): void {
     const card = container.createDiv("mv-field-card");
+
+    // ── Drag-and-drop ─────────────────────────────────────────
+    card.setAttribute("draggable", "true");
+    card.setAttribute("data-field-key", key);
+
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer?.setData("text/plain", key);
+      card.addClass("mv-dragging");
+    });
+    card.addEventListener("dragend", () => {
+      card.removeClass("mv-dragging");
+    });
+    card.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      card.addClass("mv-drag-over");
+    });
+    card.addEventListener("dragleave", () => {
+      card.removeClass("mv-drag-over");
+    });
+    card.addEventListener("drop", (e) => {
+      e.preventDefault();
+      card.removeClass("mv-drag-over");
+      const fromKey = e.dataTransfer?.getData("text/plain");
+      if (fromKey && fromKey !== key) {
+        this.reorderFields(fromKey, key);
+        this.renderFields(container);
+      }
+    });
 
     // ── Card header ───────────────────────────────────────────
     const header = card.createDiv("mv-field-card-header");
@@ -289,6 +357,20 @@ export class SchemaEditorModal extends Modal {
     });
   }
 
+  private reorderFields(fromKey: string, toKey: string): void {
+    const fields = this.data.fields ?? {};
+    const keys = Object.keys(fields);
+    const fromIdx = keys.indexOf(fromKey);
+    const toIdx = keys.indexOf(toKey);
+    if (fromIdx === -1 || toIdx === -1) return;
+    keys.splice(fromIdx, 1);
+    keys.splice(toIdx, 0, fromKey);
+    const reordered: Record<string, (typeof fields)[string]> = {};
+    for (const k of keys) reordered[k] = fields[k]!;
+    this.data.fields = reordered;
+    this.data.formatting = { ...this.data.formatting, property_order: keys };
+  }
+
   private renderFieldBody(body: HTMLElement, key: string, field: ManifestField): void {
     const update = (patch: Partial<ManifestField>) => {
       const fields = this.data.fields ?? {};
@@ -320,7 +402,7 @@ export class SchemaEditorModal extends Modal {
         break;
       case "select":
       case "multiselect":
-        this.renderOptionsFields(body, field, update);
+        this.renderOptionsFields(body, key, field, update);
         break;
       case "text":
         this.renderTextFields(body, field, update);
@@ -395,6 +477,7 @@ export class SchemaEditorModal extends Modal {
 
   private renderOptionsFields(
     body: HTMLElement,
+    fieldName: string,
     field: ManifestField,
     update: (p: Partial<ManifestField>) => void
   ): void {
@@ -411,6 +494,40 @@ export class SchemaEditorModal extends Modal {
       listEl.empty();
       options.forEach((opt, idx) => {
         const row = listEl.createDiv("mv-option-row");
+        row.setAttribute("draggable", "true");
+        row.setAttribute("data-option-index", String(idx));
+
+        row.addEventListener("dragstart", (e) => {
+          e.dataTransfer?.setData("text/plain", String(idx));
+          row.addClass("mv-dragging");
+        });
+        row.addEventListener("dragend", () => {
+          row.removeClass("mv-dragging");
+        });
+        row.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          row.addClass("mv-drag-over");
+        });
+        row.addEventListener("dragleave", () => {
+          row.removeClass("mv-drag-over");
+        });
+        row.addEventListener("drop", (e) => {
+          e.preventDefault();
+          row.removeClass("mv-drag-over");
+          const fromIdxStr = e.dataTransfer?.getData("text/plain");
+          if (fromIdxStr === undefined || fromIdxStr === String(idx)) return;
+          const fromIdx = parseInt(fromIdxStr, 10);
+          if (isNaN(fromIdx)) return;
+          this.reorderOptions(fieldName, fromIdx, idx);
+          // Sync local options array from data
+          const updated = this.data.fields?.[fieldName]?.options;
+          if (Array.isArray(updated)) {
+            options.length = 0;
+            options.push(...updated);
+          }
+          save();
+          renderList();
+        });
 
         const valInput = row.createEl("input", {
           type: "text",
@@ -457,6 +574,15 @@ export class SchemaEditorModal extends Modal {
     );
 
     this.renderDefaultField(body, field, update);
+  }
+
+  private reorderOptions(fieldName: string, fromIdx: number, toIdx: number): void {
+    const field = this.data.fields?.[fieldName];
+    if (!field || !Array.isArray(field.options)) return;
+    const opts = [...field.options];
+    const [moved] = opts.splice(fromIdx, 1);
+    if (moved) opts.splice(toIdx, 0, moved);
+    field.options = opts;
   }
 
   private renderTextFields(

@@ -347,9 +347,15 @@ export default class MetadataValidatorPlugin extends Plugin {
       path = `${this.settings.schemasRoot}/new-schema/manifest.md`;
     }
 
-    new SchemaEditorModal(this.app, path, data, async () => {
-      await this.reloadSchemas();
-    }).open();
+    new SchemaEditorModal(
+      this.app,
+      path,
+      data,
+      async () => {
+        await this.reloadSchemas();
+      },
+      this.cache
+    ).open();
   }
 
   async loadSettings(): Promise<void> {
