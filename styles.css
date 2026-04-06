@@ -336,3 +336,161 @@ body.mv-hide-validator .metadata-property-invalid-icon {
   color: var(--text-faint);
   margin-top: 8px;
 }
+
+/* ── Schema editor modal ──────────────────────────────────── */
+.mv-schema-editor-modal {
+  width: min(720px, 92vw);
+}
+
+.mv-schema-editor-modal .mv-editor-title {
+  margin: 0 0 16px;
+  font-size: 18px;
+}
+
+/* Field cards */
+.mv-fields-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.mv-field-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.mv-field-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.mv-field-key-input {
+  flex: 1;
+  font-weight: 600;
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--text-normal);
+}
+
+.mv-field-key-input:focus {
+  border-color: var(--interactive-accent);
+  background: var(--background-primary);
+  outline: none;
+}
+
+.mv-field-type-select {
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.mv-field-remove-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.mv-field-remove-btn:hover {
+  opacity: 1;
+  color: var(--color-red);
+  background: var(--background-modifier-hover);
+}
+
+.mv-field-card-body {
+  padding: 4px 0 4px 12px;
+}
+
+.mv-field-card-body .setting-item {
+  border-top: none;
+  padding: 6px 12px 6px 0;
+}
+
+.mv-field-card-body .setting-item-heading {
+  padding-top: 8px;
+  opacity: 0.6;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Options list */
+.mv-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.mv-option-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mv-option-input {
+  flex: 1;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.mv-option-value {
+  max-width: 140px;
+}
+
+.mv-option-arrow {
+  color: var(--text-faint);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.mv-option-del {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0.5;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.mv-option-del:hover {
+  opacity: 1;
+  color: var(--color-red);
+  background: var(--background-modifier-hover);
+}
+
+/* ── Utility: number inputs ───────────────────────────────── */
+.mv-input-number-sm { width: 80px; }
+.mv-input-number-md { width: 100px; }

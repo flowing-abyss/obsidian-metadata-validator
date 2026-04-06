@@ -28,6 +28,7 @@ export interface FieldSource {
 
 export interface ManifestField {
   type: FieldType;
+  label?: string;
   required?: boolean;
   default?: unknown;
   /** Always overwrite with this value (auto-fix) */

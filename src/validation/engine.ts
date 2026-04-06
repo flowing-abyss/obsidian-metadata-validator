@@ -35,7 +35,17 @@ export class ValidationEngine {
     }
 
     if (schema.formatting.property_order?.length) {
-      this.applyPropertyOrder(frontmatter, schema.formatting.property_order);
+      const reordered = this.applyPropertyOrder(frontmatter, schema.formatting.property_order);
+      if (reordered) {
+        results.push({
+          field: "__order__",
+          severity: "info",
+          message: "Properties reordered.",
+          rule: "property-order",
+          manifestPath: schema.manifestPath,
+          autoFixed: true,
+        });
+      }
     }
 
     return results;
@@ -106,14 +116,16 @@ export class ValidationEngine {
     return results;
   }
 
-  private applyPropertyOrder(frontmatter: Record<string, unknown>, order: string[]): void {
+  private applyPropertyOrder(frontmatter: Record<string, unknown>, order: string[]): boolean {
     const keys = Object.keys(frontmatter);
     const orderedKeys = [
       ...order.filter((k) => keys.includes(k)),
       ...keys.filter((k) => !order.includes(k)),
     ];
+    if (orderedKeys.every((k, i) => k === keys[i])) return false;
     const copy = { ...frontmatter };
     for (const k of Object.keys(frontmatter)) delete frontmatter[k];
     for (const k of orderedKeys) frontmatter[k] = copy[k];
+    return true;
   }
 }

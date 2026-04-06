@@ -171,12 +171,16 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
     const treeContainer = containerEl.createDiv("mv-schema-tree");
     this.renderTree(treeContainer);
 
-    new Setting(containerEl).addButton((btn) =>
-      btn.setButtonText("Refresh schemas").onClick(async () => {
-        await this.plugin.reloadSchemas();
-        this.renderTree(treeContainer);
-      })
-    );
+    new Setting(containerEl)
+      .addButton((btn) =>
+        btn.setButtonText("Refresh schemas").onClick(async () => {
+          await this.plugin.reloadSchemas();
+          this.renderTree(treeContainer);
+        })
+      )
+      .addButton((btn) =>
+        btn.setButtonText("New schema").onClick(() => void this.plugin.openSchemaEditor(null))
+      );
   }
 
   private renderTree(container: HTMLElement): void {

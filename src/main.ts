@@ -12,6 +12,7 @@ import { ExplorerBadges } from "./ui/explorer-badges";
 import { checkFolderLocation } from "./validation/rules/folder-location";
 import type { BasesDecorator as BasesDecoratorType } from "./ui/bases-decorator";
 import type { ValidationReportModal as ValidationReportModalType } from "./ui/validation-report";
+import type { SchemaEditorModal as SchemaEditorModalType } from "./ui/schema-editor-modal";
 
 export default class MetadataValidatorPlugin extends Plugin {
   settings: PluginSettings = { ...DEFAULT_SETTINGS };
@@ -79,6 +80,31 @@ export default class MetadataValidatorPlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: "edit-schema-for-note",
+      name: "Edit schema for current note",
+      callback: () => {
+        const file = this.app.workspace.getActiveFile();
+        if (!file) return;
+        const fm = (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const schema = this.resolver.resolveForNote(file, fm);
+        if (!schema) {
+          new Notice("No schema matches this note.");
+          return;
+        }
+        void this.openSchemaEditor(schema.manifestPath);
+      },
+    });
+
+    this.addCommand({
+      id: "create-schema",
+      name: "Create new schema",
+      callback: () => void this.openSchemaEditor(null),
+    });
+
     // === CRITICAL: wait for vault to be fully indexed before loading schemas ===
     this.app.workspace.onLayoutReady(async () => {
       // Load schemas from vault
@@ -122,6 +148,17 @@ export default class MetadataValidatorPlugin extends Plugin {
       // Context menu
       this.registerEvent(
         this.app.workspace.on("file-menu", (menu, file: TFile) => {
+          // On manifest.md files — offer schema editor
+          if (file.basename === "manifest" && file.extension === "md") {
+            menu.addItem((item) =>
+              item
+                .setTitle("Edit schema")
+                .setIcon("settings-2")
+                .onClick(() => void this.openSchemaEditor(file.path))
+            );
+            return;
+          }
+
           const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as
             | Record<string, unknown>
             | undefined;
@@ -133,6 +170,13 @@ export default class MetadataValidatorPlugin extends Plugin {
               .setTitle("Edit properties")
               .setIcon("pencil")
               .onClick(() => new ContextMenuModal(this.app, file, schema).open())
+          );
+
+          menu.addItem((item) =>
+            item
+              .setTitle("Edit schema")
+              .setIcon("settings-2")
+              .onClick(() => void this.openSchemaEditor(schema.manifestPath))
           );
         })
       );
@@ -198,6 +242,8 @@ export default class MetadataValidatorPlugin extends Plugin {
     const hasAutoFix = results.some((r) => r.autoFixed);
     if (hasAutoFix) {
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+        // Delete existing keys first so key order is fully controlled by frontmatter
+        for (const k of Object.keys(fm)) delete fm[k];
         Object.assign(fm, frontmatter);
       });
     }
@@ -246,6 +292,28 @@ export default class MetadataValidatorPlugin extends Plugin {
         })();
       }, intervalMs)
     );
+  }
+
+  /** Open the schema editor for a manifest.md. Pass null to create a new schema. */
+  async openSchemaEditor(manifestPath: string | null): Promise<void> {
+    const { SchemaEditorModal } = (await import("./ui/schema-editor-modal")) as {
+      SchemaEditorModal: typeof SchemaEditorModalType;
+    };
+
+    let path = manifestPath;
+    let data = {};
+
+    if (path) {
+      const manifest = this.cache.getAll().find((m) => m.path === path);
+      data = manifest?.data ?? {};
+    } else {
+      // Prompt for folder path then create
+      path = `${this.settings.schemasRoot}/new-schema/manifest.md`;
+    }
+
+    new SchemaEditorModal(this.app, path, data, async () => {
+      await this.reloadSchemas();
+    }).open();
   }
 
   async loadSettings(): Promise<void> {
