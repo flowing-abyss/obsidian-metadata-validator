@@ -32,7 +32,7 @@ const SCHEMA: ResolvedSchema = {
 };
 
 describe("ValidationEngine", () => {
-  it("returns error for required field that is empty", async () => {
+  it("returns error for required field that is absent", async () => {
     const app = makeApp();
     const engine = new ValidationEngine(app);
     const file = { path: "Books/A.md", basename: "A" } as TFile;

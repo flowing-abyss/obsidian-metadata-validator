@@ -129,7 +129,7 @@ export default class MetadataValidatorPlugin extends Plugin {
 
       this.registerEvent(
         this.app.metadataCache.on("changed", async (file: TFile) => {
-          if (file.basename === "manifest" && file.extension === "md") return; // handled above
+          if (file.path.startsWith(this.settings.schemasRoot + "/")) return;
           if (this.settings.enableOnSave) {
             await this.validateAndUpdate(file);
           }
