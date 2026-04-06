@@ -30,10 +30,18 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 
 export class MetadataValidatorSettingTab extends PluginSettingTab {
   plugin: MetadataValidatorPlugin;
+  private treeContainer: HTMLElement | null = null;
 
   constructor(app: App, plugin: MetadataValidatorPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+  }
+
+  /** Re-render the schema tree if the settings panel is currently open. */
+  refreshTree(): void {
+    if (this.treeContainer?.isConnected) {
+      this.renderTree(this.treeContainer);
+    }
   }
 
   display(): void {
@@ -150,19 +158,12 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName("Schema hierarchy").setHeading();
 
-    const treeContainer = containerEl.createDiv("mv-schema-tree");
-    this.renderTree(treeContainer);
+    this.treeContainer = containerEl.createDiv("mv-schema-tree");
+    this.renderTree(this.treeContainer);
 
-    new Setting(containerEl)
-      .addButton((btn) =>
-        btn.setButtonText("Refresh schemas").onClick(async () => {
-          await this.plugin.reloadSchemas();
-          this.renderTree(treeContainer);
-        })
-      )
-      .addButton((btn) =>
-        btn.setButtonText("New schema").onClick(() => void this.plugin.openSchemaEditor(null))
-      );
+    new Setting(containerEl).addButton((btn) =>
+      btn.setButtonText("New schema").onClick(() => void this.plugin.openSchemaEditor(null))
+    );
   }
 
   private renderTree(container: HTMLElement): void {
@@ -174,5 +175,9 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
         (path) => void this.plugin.openSchemaEditor(path)
       ).render(container);
     });
+  }
+
+  override hide(): void {
+    this.treeContainer = null;
   }
 }

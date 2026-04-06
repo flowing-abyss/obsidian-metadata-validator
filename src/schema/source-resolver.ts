@@ -65,6 +65,28 @@ function fileMatchesSource(file: TFile, source: FieldSource, app: App): boolean 
   return conditions.every(Boolean);
 }
 
+/**
+ * Convert a value that may be a DataView Link object, plain string, or primitive
+ * to a string we can use as a picker value/label.
+ */
+function coerceToString(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  // DataView Link objects have a .path property
+  if (typeof v === "object" && "path" in (v)) {
+    const path = (v as { path: string }).path;
+    // Return bare basename without extension
+    return (
+      path
+        .replace(/\.[^./]+$/, "")
+        .split("/")
+        .pop() ?? path
+    );
+  }
+  return "";
+}
+
 interface JsSourceItem {
   value?: string | number | boolean;
   label?: string | number | boolean;
@@ -76,8 +98,10 @@ async function resolveJsSource(
   currentFile: TFile | null
 ): Promise<FieldOption[]> {
   const appRecord = app as unknown as Record<string, unknown>;
-  const plugins = appRecord["plugins"] as Record<string, unknown> | undefined;
-  const dataview = plugins?.["dataview"] as Record<string, unknown> | undefined;
+  // DataView API lives at app.plugins.plugins.dataview.api
+  const pluginManager = appRecord["plugins"] as Record<string, unknown> | undefined;
+  const pluginsMap = pluginManager?.["plugins"] as Record<string, unknown> | undefined;
+  const dataview = pluginsMap?.["dataview"] as Record<string, unknown> | undefined;
   const dv = dataview?.["api"];
 
   try {
@@ -92,8 +116,8 @@ async function resolveJsSource(
     return (result as unknown[]).map((item) => {
       if (typeof item === "string") return { value: item, label: item };
       const typed = item as JsSourceItem;
-      const value = String(typed.value ?? "");
-      const label = String(typed.label ?? typed.value ?? "");
+      const value = coerceToString(typed.value);
+      const label = coerceToString(typed.label ?? typed.value);
       return { value, label };
     });
   } catch (e) {

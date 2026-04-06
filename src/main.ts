@@ -1,4 +1,4 @@
-import { Menu, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
+import { Menu, Notice, Plugin, TFile, WorkspaceLeaf, stringifyYaml } from "obsidian";
 import { DEFAULT_SETTINGS, MetadataValidatorSettingTab, type PluginSettings } from "./settings";
 import type { ValidationResult } from "./types";
 import { ManifestCache } from "./manifest/cache";
@@ -23,6 +23,7 @@ export default class MetadataValidatorPlugin extends Plugin {
   cssInjector!: CssInjector;
   decorator!: PropertyDecorator;
   badges!: ExplorerBadges;
+  private settingTab!: MetadataValidatorSettingTab;
   private backgroundScanTimer: number | null = null;
 
   async onload(): Promise<void> {
@@ -75,7 +76,8 @@ export default class MetadataValidatorPlugin extends Plugin {
     );
 
     // Register settings tab
-    this.addSettingTab(new MetadataValidatorSettingTab(this.app, this));
+    this.settingTab = new MetadataValidatorSettingTab(this.app, this);
+    this.addSettingTab(this.settingTab);
 
     // Register commands
     this.addCommand({
@@ -145,6 +147,7 @@ export default class MetadataValidatorPlugin extends Plugin {
           if (file.basename === "manifest" && file.extension === "md") {
             await this.cache.refresh(file);
             this.resolver.rebuild();
+            this.settingTab.refreshTree();
             // Re-validate active note after schema change
             const active = this.app.workspace.getActiveFile();
             if (active) await this.validateAndUpdate(active);
@@ -300,6 +303,7 @@ export default class MetadataValidatorPlugin extends Plugin {
     // Update the resolver's cache reference in-place (decorator still points to same resolver)
     this.resolver.setCache(this.cache);
     this.resolver.rebuild();
+    this.settingTab?.refreshTree();
   }
 
   private async validateAndUpdate(file: TFile): Promise<void> {
@@ -352,13 +356,8 @@ export default class MetadataValidatorPlugin extends Plugin {
 
     const hasAutoFix = results.some((r) => r.autoFixed);
     if (hasAutoFix) {
-      await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-        // Delete only user-facing keys (skip Obsidian-internal 'position')
-        for (const k of Object.keys(fm)) {
-          if (k !== "position") delete fm[k];
-        }
-        Object.assign(fm, frontmatter);
-      });
+      // Write directly to preserve key insertion order — processFrontMatter may reorder keys
+      await this.writeOrderedFrontmatter(file, frontmatter);
     }
 
     const errors = results.filter((r) => !r.autoFixed && r.severity === "error");
@@ -375,6 +374,23 @@ export default class MetadataValidatorPlugin extends Plugin {
   /** Look up the live SidebarPanel instance from the workspace — never stale. */
   private updateSidebarPanel(fileName: string, results: ValidationResult[]): void {
     this.getSidebarPanel()?.update(fileName, results);
+  }
+
+  /**
+   * Write frontmatter to a file preserving exact key insertion order.
+   * Uses vault.read + vault.modify to bypass processFrontMatter's potential key reordering.
+   */
+  private async writeOrderedFrontmatter(
+    file: TFile,
+    frontmatter: Record<string, unknown>
+  ): Promise<void> {
+    const content = await this.app.vault.read(file);
+    const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+    if (!fmMatch) return;
+    const afterFrontmatter = content.slice(fmMatch[0].length);
+    // stringifyYaml output always ends with \n
+    const newYaml = stringifyYaml(frontmatter);
+    await this.app.vault.modify(file, `---\n${newYaml}---\n${afterFrontmatter}`);
   }
 
   /**

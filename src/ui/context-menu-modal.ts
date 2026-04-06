@@ -130,10 +130,15 @@ export class ContextMenuModal extends Modal {
     // Store field key for footer hover-highlight
     row.setAttribute("data-mv-field", fieldKey);
 
-    // Label column: field name + type icon (icon clickable for picker types)
+    // Label column: field name only
     const labelEl = row.createDiv("mv-field-label");
     labelEl.createEl("span", { text: fieldDef.label ?? fieldKey, cls: "mv-field-label-text" });
-    const iconEl = labelEl.createEl("span", { cls: "mv-field-type-icon" });
+
+    // Value / editor column — icon leads, then the actual editor
+    const valueEl = row.createDiv("mv-field-value");
+    const iconEl = valueEl.createEl("span", {
+      cls: "mv-field-type-icon mv-field-type-icon--leading",
+    });
     setIcon(iconEl, FIELD_TYPE_ICON[fieldDef.type] ?? "square");
 
     const isPickerType = ["select", "multiselect", "link", "multilink"].includes(fieldDef.type);
@@ -143,10 +148,14 @@ export class ContextMenuModal extends Modal {
         e.stopPropagation();
         this.openPicker(fieldKey, fieldDef, frontmatter[fieldKey]);
       });
+    } else if (fieldDef.type === "boolean" && fieldDef.fixed === undefined) {
+      iconEl.addClass("mv-field-type-icon--clickable");
+      iconEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.toggleBoolean(fieldKey, frontmatter[fieldKey] !== true);
+      });
     }
 
-    // Value / editor column
-    const valueEl = row.createDiv("mv-field-value");
     this.renderEditor(valueEl, fieldKey, fieldDef, frontmatter);
 
     // Error icon column (right side)
@@ -231,9 +240,11 @@ export class ContextMenuModal extends Modal {
 
       case "boolean": {
         const input = container.createEl("input", { type: "checkbox" });
-        if (currentValue === true) input.checked = true;
+        input.checked = currentValue === true;
+        // Skip re-render for booleans — just toggle directly to avoid race conditions
         input.addEventListener("change", () => {
-          this.saveField(fieldKey, input.checked);
+          // input.checked is already the new state after browser toggle
+          this.toggleBoolean(fieldKey, input.checked);
         });
         break;
       }
@@ -324,7 +335,26 @@ export class ContextMenuModal extends Modal {
       chipsEl.empty();
       items.forEach((val, idx) => {
         const chip = chipsEl.createEl("span", { cls: "mv-chip mv-chip--removable" });
-        chip.createEl("span", { text: val });
+        // Render value: markdown link [text](url), wikilink [[...]], or plain text
+        const mdLink = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(val);
+        const wikiLink = /^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/.exec(val);
+        if (mdLink) {
+          const a = chip.createEl("a", { text: mdLink[1] ?? val, cls: "mv-chip-link" });
+          a.href = mdLink[2] ?? "";
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+        } else if (wikiLink) {
+          const display = wikiLink[2] ?? wikiLink[1] ?? val;
+          const target = wikiLink[1] ?? "";
+          const a = chip.createEl("a", { text: display, cls: "mv-chip-link mv-wikilink" });
+          a.setAttribute("data-href", target);
+          a.addEventListener("click", (e) => {
+            e.preventDefault();
+            void this.app.workspace.openLinkText(target, this.file.path, false);
+          });
+        } else {
+          chip.createEl("span", { text: val });
+        }
         const rem = chip.createEl("span", { text: "\u00D7", cls: "mv-chip-remove" });
         rem.addEventListener("click", () => {
           const updated = items.filter((_, i) => i !== idx);
@@ -398,6 +428,18 @@ export class ContextMenuModal extends Modal {
     return "own";
   }
 
+  /**
+   * Toggle a boolean field without triggering a full re-render.
+   * This avoids race conditions where a competing processFrontMatter call
+   * (from validateAndUpdate) might overwrite the just-saved value.
+   */
+  private toggleBoolean(fieldKey: string, newValue: boolean): void {
+    this.localFrontmatter[fieldKey] = newValue;
+    void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
+      fm[fieldKey] = newValue;
+    });
+  }
+
   private saveField(fieldKey: string, value: unknown): void {
     // Update local state immediately
     if (value === null || value === undefined) {
@@ -442,50 +484,48 @@ export class ContextMenuModal extends Modal {
 
     footer.createEl("span", { text: "Schema: ", cls: "mv-footer-label" });
 
-    chain
-      .slice()
-      .reverse()
-      .forEach((manifestPath, i) => {
-        // Extract a friendly name from the path
-        const parts = manifestPath.split("/");
-        const name = parts.length >= 2 ? (parts[parts.length - 2] ?? manifestPath) : manifestPath;
+    // Show chain left-to-right: root → parent → child (current is last in chain)
+    chain.forEach((manifestPath, i) => {
+      if (i > 0) {
+        footer.createEl("span", { text: " \u2192 ", cls: "mv-footer-arrow" });
+      }
 
-        const schemaSpan = footer.createEl("span", {
-          text: name,
-          cls: "mv-footer-schema-name",
-        });
-        schemaSpan.setAttribute("data-mv-chain-path", manifestPath);
+      // Extract a friendly name from the path
+      const parts = manifestPath.split("/");
+      const name = parts.length >= 2 ? (parts[parts.length - 2] ?? manifestPath) : manifestPath;
 
-        // Click: open schema editor for this manifest
-        if (this.openSchemaEditor) {
-          const openFn = this.openSchemaEditor;
-          schemaSpan.addEventListener("click", () => {
-            this.close();
-            openFn(manifestPath);
-          });
-        }
-
-        // Hover: highlight fields that originate from this schema
-        schemaSpan.addEventListener("mouseenter", () => {
-          if (!this.getManifestFields) return;
-          const fieldsFromThis = this.getManifestFields(manifestPath);
-          if (!fieldsFromThis) return;
-          const fieldKeys = new Set(Object.keys(fieldsFromThis));
-          container.querySelectorAll<HTMLElement>("[data-mv-field]").forEach((row) => {
-            const k = row.getAttribute("data-mv-field") ?? "";
-            row.toggleClass("mv-field-row--highlighted", fieldKeys.has(k));
-          });
-        });
-        schemaSpan.addEventListener("mouseleave", () => {
-          container
-            .querySelectorAll<HTMLElement>(".mv-field-row--highlighted")
-            .forEach((r) => r.removeClass("mv-field-row--highlighted"));
-        });
-
-        if (i < chain.length - 1) {
-          footer.createEl("span", { text: " \u2190 ", cls: "mv-footer-arrow" });
-        }
+      const schemaSpan = footer.createEl("span", {
+        text: name,
+        cls: "mv-footer-schema-name",
       });
+      schemaSpan.setAttribute("data-mv-chain-path", manifestPath);
+
+      // Click: open schema editor for this manifest
+      if (this.openSchemaEditor) {
+        const openFn = this.openSchemaEditor;
+        schemaSpan.addEventListener("click", () => {
+          this.close();
+          openFn(manifestPath);
+        });
+      }
+
+      // Hover: highlight fields that originate from this schema
+      schemaSpan.addEventListener("mouseenter", () => {
+        if (!this.getManifestFields) return;
+        const fieldsFromThis = this.getManifestFields(manifestPath);
+        if (!fieldsFromThis) return;
+        const fieldKeys = new Set(Object.keys(fieldsFromThis));
+        container.querySelectorAll<HTMLElement>("[data-mv-field]").forEach((row) => {
+          const k = row.getAttribute("data-mv-field") ?? "";
+          row.toggleClass("mv-field-row--highlighted", fieldKeys.has(k));
+        });
+      });
+      schemaSpan.addEventListener("mouseleave", () => {
+        container
+          .querySelectorAll<HTMLElement>(".mv-field-row--highlighted")
+          .forEach((r) => r.removeClass("mv-field-row--highlighted"));
+      });
+    });
 
     // Error count in footer
     let totalErrors = 0;

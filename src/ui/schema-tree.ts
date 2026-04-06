@@ -71,9 +71,9 @@ export class SchemaTreeView {
 
       toggle.addEventListener("click", (e) => {
         e.stopPropagation();
-        const isOpen = !childUl.hasClass("is-collapsed");
-        childUl.toggleClass("is-collapsed", !isOpen);
-        toggle.toggleClass("is-open", isOpen);
+        const nowCollapsed = !childUl.hasClass("is-collapsed");
+        childUl.toggleClass("is-collapsed", nowCollapsed);
+        toggle.setText(nowCollapsed ? "▸" : "▾");
       });
 
       for (const child of children) {
