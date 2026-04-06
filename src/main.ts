@@ -51,7 +51,9 @@ export default class MetadataValidatorPlugin extends Plugin {
             if (file) void this.validateAndUpdate(file);
           },
           async () => {
-            const files = this.app.vault.getMarkdownFiles();
+            const files = this.app.vault
+              .getMarkdownFiles()
+              .filter((f) => !f.path.startsWith(this.settings.schemasRoot + "/"));
             for (const f of files) {
               await this.validateAndUpdate(f);
             }
@@ -312,10 +314,7 @@ export default class MetadataValidatorPlugin extends Plugin {
 
   /** Look up the live SidebarPanel instance from the workspace — never stale. */
   private updateSidebarPanel(fileName: string, results: ValidationResult[]): void {
-    const leaves = this.app.workspace.getLeavesOfType(SIDEBAR_PANEL_TYPE);
-    if (leaves.length > 0) {
-      (leaves[0]?.view as SidebarPanel | undefined)?.update(fileName, results);
-    }
+    this.getSidebarPanel()?.update(fileName, results);
   }
 
   /** Return the live SidebarPanel instance, or undefined if none is open. */

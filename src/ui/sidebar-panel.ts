@@ -7,7 +7,7 @@ export class SidebarPanel extends ItemView {
   private results: ValidationResult[] = [];
   private fileName = "";
   private onOpenCallback: (() => void) | null = null;
-  onScanVault: (() => Promise<void>) | null = null;
+  private readonly onScanVault: (() => Promise<void>) | null;
 
   constructor(leaf: WorkspaceLeaf, onOpenCallback?: () => void, onScanVault?: () => Promise<void>) {
     super(leaf);
