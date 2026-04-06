@@ -157,10 +157,15 @@ export class ContextMenuModal extends Modal {
 
     // Fixed fields: read-only
     if (fieldDef.fixed !== undefined) {
-      container.createEl("span", {
-        text: `Fixed: ${fieldDef.fixed === undefined || fieldDef.fixed === null ? "" : typeof fieldDef.fixed === "string" || typeof fieldDef.fixed === "number" || typeof fieldDef.fixed === "boolean" ? String(fieldDef.fixed) : ""}`,
-        cls: "mv-field-fixed",
-      });
+      const fixedDisplay =
+        fieldDef.fixed === null
+          ? ""
+          : typeof fieldDef.fixed === "string" ||
+              typeof fieldDef.fixed === "number" ||
+              typeof fieldDef.fixed === "boolean"
+            ? String(fieldDef.fixed)
+            : "";
+      container.createEl("span", { text: `Fixed: ${fixedDisplay}`, cls: "mv-field-fixed" });
       return;
     }
 
@@ -250,21 +255,16 @@ export class ContextMenuModal extends Modal {
     currentValue: unknown,
     isLink: boolean
   ): void {
-    const toStr = (v: unknown): string => {
-      if (typeof v === "string") return v;
-      if (typeof v === "number" || typeof v === "boolean") return String(v);
-      return "";
-    };
     const values = Array.isArray(currentValue)
-      ? (currentValue as unknown[]).map(toStr)
+      ? (currentValue as unknown[]).map((v) => this.toStr(v))
       : currentValue !== undefined && currentValue !== null
-        ? [toStr(currentValue)]
+        ? [this.toStr(currentValue)]
         : [];
 
     if (values.length === 0) {
       const emptySpan = container.createEl("span", {
         text: "None selected",
-        cls: "mv-field-fixed",
+        cls: "mv-field-empty",
       });
       emptySpan.addEventListener("click", () => {
         this.openPicker(fieldKey, fieldDef, currentValue);
@@ -306,13 +306,8 @@ export class ContextMenuModal extends Modal {
   private renderListEditor(container: HTMLElement, fieldKey: string, currentValue: unknown): void {
     const listEl = container.createDiv("mv-list-editor");
 
-    const toStr = (v: unknown): string => {
-      if (typeof v === "string") return v;
-      if (typeof v === "number" || typeof v === "boolean") return String(v);
-      return "";
-    };
     const values: string[] = Array.isArray(currentValue)
-      ? (currentValue as unknown[]).map(toStr)
+      ? (currentValue as unknown[]).map((v) => this.toStr(v))
       : [];
 
     // Add an empty row at the end for new entries
@@ -341,7 +336,7 @@ export class ContextMenuModal extends Modal {
       });
       input.addEventListener("input", () => {
         if (input.value.trim() && input === listEl.lastElementChild?.querySelector("input")) {
-          addRow("", false);
+          addRow("", true);
         }
       });
     };
@@ -363,13 +358,37 @@ export class ContextMenuModal extends Modal {
   }
 
   private saveField(fieldKey: string, value: unknown): void {
-    void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
-      if (value === null || value === undefined) {
-        delete fm[fieldKey];
-      } else {
-        fm[fieldKey] = value;
-      }
-    });
+    void this.app.fileManager
+      .processFrontMatter(this.file, (fm: Record<string, unknown>) => {
+        if (value === null || value === undefined) {
+          delete fm[fieldKey];
+        } else {
+          fm[fieldKey] = value;
+        }
+      })
+      .then(() => {
+        void this.refreshView();
+      });
+  }
+
+  private async refreshView(): Promise<void> {
+    const cache = this.app.metadataCache.getFileCache(this.file);
+    const frontmatter = { ...(cache?.frontmatter ?? {}) } as Record<string, unknown>;
+    delete frontmatter["position"];
+    const results = await this.engine.validate(this.file, frontmatter, this.schema);
+    const resultMap = new Map<string, ValidationResult[]>();
+    for (const r of results) {
+      const existing = resultMap.get(r.field) ?? [];
+      existing.push(r);
+      resultMap.set(r.field, existing);
+    }
+    this.render(frontmatter, resultMap);
+  }
+
+  private toStr(v: unknown): string {
+    if (typeof v === "string") return v;
+    if (typeof v === "number" || typeof v === "boolean") return String(v);
+    return "";
   }
 
   private renderFooter(container: HTMLElement): void {

@@ -539,3 +539,5 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 
 /* ── Utility: visibility toggle ──────────────────────────── */
 .mv-hidden { display: none; }
+
+.mv-field-empty { color: var(--text-muted); font-style: italic; cursor: pointer; }
