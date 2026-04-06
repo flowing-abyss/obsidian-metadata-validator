@@ -218,7 +218,11 @@ export default class MetadataValidatorPlugin extends Plugin {
 
   private async validateAndUpdate(file: TFile): Promise<void> {
     const metaCache = this.app.metadataCache.getFileCache(file);
-    const frontmatter = { ...(metaCache?.frontmatter ?? {}) } as Record<string, unknown>;
+    // Obsidian injects a non-YAML 'position' key into the frontmatter cache object.
+    // Strip it before processing so it doesn't get written back to the file.
+    const rawFm = (metaCache?.frontmatter ?? {}) as Record<string, unknown>;
+    const frontmatter: Record<string, unknown> = { ...rawFm };
+    delete frontmatter["position"];
     const schema = this.resolver.resolveForNote(file, frontmatter);
 
     if (!schema) {
@@ -242,8 +246,10 @@ export default class MetadataValidatorPlugin extends Plugin {
     const hasAutoFix = results.some((r) => r.autoFixed);
     if (hasAutoFix) {
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-        // Delete existing keys first so key order is fully controlled by frontmatter
-        for (const k of Object.keys(fm)) delete fm[k];
+        // Delete only user-facing keys (skip Obsidian-internal 'position')
+        for (const k of Object.keys(fm)) {
+          if (k !== "position") delete fm[k];
+        }
         Object.assign(fm, frontmatter);
       });
     }
