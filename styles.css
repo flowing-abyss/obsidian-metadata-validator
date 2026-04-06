@@ -740,3 +740,51 @@ body.mv-hide-validator .metadata-property-invalid-icon {
   font-size: 11px;
   color: var(--text-faint);
 }
+
+/* ── Sidebar vault stats ──────────────────────────────────── */
+.mv-sidebar-divider {
+  border: none;
+  border-top: 1px solid var(--background-modifier-border);
+  margin: 8px 0;
+}
+
+.mv-sidebar-filename {
+  margin: 4px 0 8px;
+  font-size: 14px;
+}
+
+.mv-vault-stats {
+  margin-bottom: 4px;
+}
+
+.mv-vault-stats-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.mv-stat-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 0;
+  font-size: 13px;
+}
+
+.mv-stat-count {
+  font-weight: 600;
+  min-width: 2.5em;
+  text-align: right;
+}
+
+.mv-stat-errors { color: var(--color-red); }
+.mv-stat-warnings { color: var(--color-yellow); }
+.mv-stat-clean { color: var(--color-green); }
+.mv-stat-none { color: var(--text-faint); }
+
+.mv-stat-label {
+  color: var(--text-muted);
+}

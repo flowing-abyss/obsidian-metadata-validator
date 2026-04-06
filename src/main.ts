@@ -21,7 +21,7 @@ export default class MetadataValidatorPlugin extends Plugin {
   resolver!: SchemaResolver;
   private engine!: ValidationEngine;
   cssInjector!: CssInjector;
-  private decorator!: PropertyDecorator;
+  decorator!: PropertyDecorator;
   private badges!: ExplorerBadges;
   private backgroundScanTimer: number | null = null;
 
@@ -54,11 +54,22 @@ export default class MetadataValidatorPlugin extends Plugin {
             const files = this.app.vault
               .getMarkdownFiles()
               .filter((f) => !f.path.startsWith(this.settings.schemasRoot + "/"));
+            let errorFiles = 0;
+            let warningFiles = 0;
+            let noSchemaFiles = 0;
             for (const f of files) {
-              await this.validateAndUpdate(f);
+              const stats = await this.validateForStats(f);
+              if (stats === null) noSchemaFiles++;
+              else if (stats.errors > 0) errorFiles++;
+              else if (stats.warnings > 0) warningFiles++;
             }
             const panel = this.getSidebarPanel();
-            panel?.showScanSummary(files.length);
+            panel?.showVaultStats({
+              total: files.length,
+              errors: errorFiles,
+              warnings: warningFiles,
+              noSchema: noSchemaFiles,
+            });
           }
         )
     );
@@ -144,6 +155,8 @@ export default class MetadataValidatorPlugin extends Plugin {
       this.registerEvent(
         this.app.metadataCache.on("changed", async (file: TFile) => {
           if (file.path.startsWith(this.settings.schemasRoot + "/")) return;
+          // Invalidate the decorator's result cache so stale icons don't linger
+          this.decorator.invalidate(file.path);
           if (this.settings.enableOnSave) {
             await this.validateAndUpdate(file);
           }
@@ -315,6 +328,28 @@ export default class MetadataValidatorPlugin extends Plugin {
   /** Look up the live SidebarPanel instance from the workspace — never stale. */
   private updateSidebarPanel(fileName: string, results: ValidationResult[]): void {
     this.getSidebarPanel()?.update(fileName, results);
+  }
+
+  /**
+   * Validate a file and return raw error/warning counts without touching the UI.
+   * Returns null if no schema matches.
+   */
+  private async validateForStats(
+    file: TFile
+  ): Promise<{ errors: number; warnings: number } | null> {
+    const rawFm = (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const frontmatter: Record<string, unknown> = { ...rawFm };
+    delete frontmatter["position"];
+    const schema = this.resolver.resolveForNote(file, frontmatter);
+    if (!schema) return null;
+    const results = await this.engine.validate(file, frontmatter, schema);
+    return {
+      errors: results.filter((r) => !r.autoFixed && r.severity === "error").length,
+      warnings: results.filter((r) => !r.autoFixed && r.severity === "warning").length,
+    };
   }
 
   /** Return the live SidebarPanel instance, or undefined if none is open. */

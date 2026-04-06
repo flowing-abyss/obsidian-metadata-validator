@@ -3,11 +3,19 @@ import type { ValidationResult } from "../types";
 
 export const SIDEBAR_PANEL_TYPE = "mv-sidebar-panel";
 
+export interface VaultStats {
+  total: number;
+  errors: number;
+  warnings: number;
+  noSchema: number;
+}
+
 export class SidebarPanel extends ItemView {
   private results: ValidationResult[] = [];
   private fileName = "";
   private onOpenCallback: (() => void) | null = null;
   private readonly onScanVault: (() => Promise<void>) | null;
+  private vaultStats: VaultStats | null = null;
 
   constructor(leaf: WorkspaceLeaf, onOpenCallback?: () => void, onScanVault?: () => Promise<void>) {
     super(leaf);
@@ -37,28 +45,23 @@ export class SidebarPanel extends ItemView {
     this.render();
   }
 
-  showScanSummary(count: number): void {
-    const { contentEl } = this;
-    // Append a summary line without clearing the current results
-    const existing = contentEl.querySelector(".mv-scan-summary");
-    if (existing) existing.remove();
-    contentEl.createDiv({
-      text: `Scanned ${count} file(s)`,
-      cls: "mv-sidebar-summary mv-scan-summary",
-    });
+  showVaultStats(stats: VaultStats): void {
+    this.vaultStats = stats;
+    this.render();
   }
 
   private render(): void {
     const { contentEl } = this;
     contentEl.empty();
 
-    // Scan vault button
+    // ── Scan vault button ─────────────────────────────────────
     const scanBtn = contentEl.createEl("button", {
       text: "Scan vault",
       cls: "mv-scan-btn",
     });
     scanBtn.addEventListener("click", () => {
       if (this.onScanVault) {
+        this.vaultStats = null;
         scanBtn.disabled = true;
         scanBtn.textContent = "Scanning...";
         void this.onScanVault().then(() => {
@@ -68,6 +71,13 @@ export class SidebarPanel extends ItemView {
       }
     });
 
+    // ── Vault health summary (after scan) ─────────────────────
+    if (this.vaultStats) {
+      this.renderVaultStats(contentEl, this.vaultStats);
+      contentEl.createEl("hr", { cls: "mv-sidebar-divider" });
+    }
+
+    // ── Current-file section ──────────────────────────────────
     if (!this.fileName) {
       contentEl.createEl("p", {
         text: "Open a note to see validation results.",
@@ -76,7 +86,7 @@ export class SidebarPanel extends ItemView {
       return;
     }
 
-    contentEl.createEl("h4", { text: this.fileName });
+    contentEl.createEl("h4", { text: this.fileName, cls: "mv-sidebar-filename" });
 
     const errors = this.results.filter((r) => !r.autoFixed && r.severity === "error");
     const warnings = this.results.filter((r) => !r.autoFixed && r.severity === "warning");
@@ -88,6 +98,7 @@ export class SidebarPanel extends ItemView {
       ok.appendText(
         autoFixed.length > 0 ? `all valid — ${autoFixed.length} auto-fixed` : "all properties valid"
       );
+      if (autoFixed.length > 0) return;
       return;
     }
 
@@ -112,6 +123,26 @@ export class SidebarPanel extends ItemView {
       text: `${errors.length} error(s) · ${warnings.length} warning(s)`,
       cls: "mv-sidebar-summary",
     });
+  }
+
+  private renderVaultStats(container: HTMLElement, stats: VaultStats): void {
+    const section = container.createDiv("mv-vault-stats");
+    section.createEl("h4", { text: "Vault health", cls: "mv-vault-stats-title" });
+
+    const clean = stats.total - stats.errors - stats.warnings - stats.noSchema;
+    const rows: Array<{ label: string; count: number; cls: string }> = [
+      { label: "notes scanned", count: stats.total, cls: "" },
+      { label: "with errors", count: stats.errors, cls: "mv-stat-errors" },
+      { label: "with warnings", count: stats.warnings, cls: "mv-stat-warnings" },
+      { label: "clean", count: clean, cls: "mv-stat-clean" },
+      { label: "no schema", count: stats.noSchema, cls: "mv-stat-none" },
+    ];
+
+    for (const row of rows) {
+      const rowEl = section.createDiv("mv-stat-row");
+      rowEl.createEl("span", { text: String(row.count), cls: `mv-stat-count ${row.cls}` });
+      rowEl.createEl("span", { text: " " + row.label, cls: "mv-stat-label" });
+    }
   }
 
   async onClose(): Promise<void> {

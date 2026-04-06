@@ -26,6 +26,11 @@ const FIELD_TYPE_ICON: Record<FieldType, string> = {
 /** Field types that support the PickerModal (have options/sources to choose from) */
 const PICKER_TYPES = new Set<FieldType>(["select", "multiselect", "link", "multilink"]);
 
+interface CachedResult {
+  fmHash: string;
+  results: ValidationResult[];
+}
+
 export class PropertyDecorator {
   private observer: MutationObserver | null = null;
   private readonly app: App;
@@ -33,6 +38,8 @@ export class PropertyDecorator {
   private readonly engine: ValidationEngine;
   private readonly settings: PluginSettings;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Keyed by file path — avoids re-running validation when frontmatter hasn't changed */
+  private readonly resultCache = new Map<string, CachedResult>();
 
   constructor(
     app: App,
@@ -57,6 +64,11 @@ export class PropertyDecorator {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
   }
 
+  /** Invalidate cache for a specific file path when its metadata changes */
+  invalidate(filePath: string): void {
+    this.resultCache.delete(filePath);
+  }
+
   private onMutation(): void {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => void this.decorateAll(), 300);
@@ -73,7 +85,16 @@ export class PropertyDecorator {
     const schema = this.resolver.resolveForNote(file, frontmatter);
     if (!schema) return;
 
-    const results = await this.engine.validate(file, frontmatter, schema);
+    const fmHash = JSON.stringify(frontmatter);
+    const cached = this.resultCache.get(file.path);
+    let results: ValidationResult[];
+    if (cached && cached.fmHash === fmHash) {
+      results = cached.results;
+    } else {
+      results = await this.engine.validate(file, frontmatter, schema);
+      this.resultCache.set(file.path, { fmHash, results });
+    }
+
     const resultMap = new Map<string, ValidationResult[]>();
     for (const r of results) {
       const existing = resultMap.get(r.field) ?? [];
