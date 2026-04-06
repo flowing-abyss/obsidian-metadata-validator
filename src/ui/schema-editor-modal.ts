@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Setting, TFile, stringifyYaml } from "obsidian";
+import { App, Modal, Notice, Setting, TFile, setIcon, stringifyYaml } from "obsidian";
 import type { ManifestCache } from "../manifest/cache";
 import type { FieldOption, FieldType, ManifestData, ManifestField, ManifestTarget } from "../types";
 
@@ -168,49 +168,25 @@ export class SchemaEditorModal extends Modal {
           if (bannerWrapper) bannerWrapper.toggleClass("mv-hidden", !!v);
         });
       });
-
-    const enforceVal = this.data.enforce_folder;
-    let enforceToggleOn = !!enforceVal;
-
-    const enforceSetting = new Setting(el)
-      .setName("Enforce folder")
-      .setDesc("Auto-move notes matching this schema into the target folder.");
-
-    let enforcePathInput: HTMLInputElement | null = null;
-
-    const pathContainer = el.createDiv();
-    if (!enforceToggleOn) pathContainer.addClass("mv-hidden");
-
-    new Setting(pathContainer)
-      .setName("Destination folder")
-      .setDesc("Folder path to move notes into. Leave empty to use target.folder.")
-      .addText((t) => {
-        enforcePathInput = t.inputEl;
-        t.inputEl.setAttribute("placeholder", "Sources/books");
-        t.setValue(typeof enforceVal === "string" ? enforceVal : "");
-        t.onChange((v) => {
-          this.data.enforce_folder = v.trim() || true;
-        });
-      });
-
-    enforceSetting.addToggle((t) =>
-      t.setValue(enforceToggleOn).onChange((v) => {
-        enforceToggleOn = v;
-        if (v) {
-          pathContainer.removeClass("mv-hidden");
-          this.data.enforce_folder = enforcePathInput?.value.trim() || true;
-        } else {
-          pathContainer.addClass("mv-hidden");
-          this.data.enforce_folder = undefined;
-        }
-      })
-    );
   }
 
   private renderTarget(el: HTMLElement): void {
     new Setting(el)
+      .setName("Expression")
+      .setDesc(
+        'Match by expression: "Folder/" AND/OR #tag — leave empty to use fields below' // eslint-disable-line obsidianmd/ui/sentence-case
+      )
+      .addText((t) => {
+        t.inputEl.setAttribute("placeholder", '"Sources/" AND #book'); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.addClass("mv-expression-input");
+        t.setValue(this.data.target?.query ?? "").onChange((v) => {
+          this.data.target = { ...this.data.target, query: v.trim() || undefined };
+        });
+      });
+
+    new Setting(el)
       .setName("Folder")
-      .setDesc("Apply to notes whose path starts with this folder.")
+      .setDesc("Apply to notes whose path starts with this folder (used when expression is empty).")
       .addText((t) => {
         t.inputEl.setAttribute("placeholder", "Sources/");
         t.setValue(this.data.target?.folder ?? "").onChange((v) => {
@@ -220,7 +196,7 @@ export class SchemaEditorModal extends Modal {
 
     new Setting(el)
       .setName("Tag")
-      .setDesc("Apply to notes with this tag.")
+      .setDesc("Apply to notes with this tag (used when expression is empty).")
       .addText((t) => {
         t.inputEl.setAttribute("placeholder", "Article");
         t.setValue(this.data.target?.tag ?? "").onChange((v) => {
@@ -230,7 +206,7 @@ export class SchemaEditorModal extends Modal {
 
     new Setting(el)
       .setName("Match mode")
-      .setDesc("How folder and tag conditions are combined.")
+      .setDesc("How folder and tag conditions are combined (used when expression is empty).")
       .addDropdown((d) =>
         d
           .addOption("AND", "All conditions must match")
@@ -240,6 +216,45 @@ export class SchemaEditorModal extends Modal {
             this.data.target = { ...this.data.target, op: v as "AND" | "OR" };
           })
       );
+
+    // ── Enforce folder ────────────────────────────────────────
+    const enforceVal = this.data.enforce_folder;
+    let enforceToggleOn = !!enforceVal;
+    let enforcePathInput: HTMLInputElement | null = null;
+
+    const pathContainer = el.createDiv();
+    if (!enforceToggleOn) pathContainer.addClass("mv-hidden");
+
+    new Setting(pathContainer)
+      .setName("Destination folder")
+      .setDesc("Folder to move notes into. Leave empty to use target folder.")
+      .addText((t) => {
+        enforcePathInput = t.inputEl;
+        t.inputEl.setAttribute("placeholder", "Sources/books");
+        t.setValue(typeof enforceVal === "string" ? enforceVal : "");
+        t.onChange((v) => {
+          this.data.enforce_folder = v.trim() || true;
+        });
+      });
+
+    new Setting(el)
+      .setName("Enforce folder")
+      .setDesc("Auto-move matching notes into the destination folder.")
+      .addToggle((t) =>
+        t.setValue(enforceToggleOn).onChange((v) => {
+          enforceToggleOn = v;
+          if (v) {
+            pathContainer.removeClass("mv-hidden");
+            this.data.enforce_folder = enforcePathInput?.value.trim() || true;
+          } else {
+            pathContainer.addClass("mv-hidden");
+            this.data.enforce_folder = undefined;
+          }
+        })
+      );
+
+    // Move pathContainer after the toggle setting
+    el.appendChild(pathContainer);
   }
 
   private renderFormatting(el: HTMLElement): void {
@@ -306,6 +321,9 @@ export class SchemaEditorModal extends Modal {
     // ── Card header ───────────────────────────────────────────
     const header = card.createDiv("mv-field-card-header");
 
+    const collapseToggle = header.createEl("span", { cls: "mv-field-collapse-toggle" });
+    setIcon(collapseToggle, "chevron-right");
+
     const keyInput = header.createEl("input", { type: "text", cls: "mv-field-key-input" });
     keyInput.value = key;
     keyInput.setAttribute("placeholder", "Field name");
@@ -320,9 +338,26 @@ export class SchemaEditorModal extends Modal {
     removeBtn.setAttribute("aria-label", "Remove field");
     removeBtn.textContent = "✕";
 
-    // ── Card body ─────────────────────────────────────────────
-    const body = card.createDiv("mv-field-card-body");
-    this.renderFieldBody(body, key, field);
+    // ── Card body (collapsed by default, lazy render) ─────────
+    const body = card.createDiv("mv-field-card-body mv-hidden");
+    let bodyRendered = false;
+
+    const toggleBody = () => {
+      const isHidden = body.hasClass("mv-hidden");
+      if (isHidden && !bodyRendered) {
+        this.renderFieldBody(body, key, field);
+        bodyRendered = true;
+      }
+      body.toggleClass("mv-hidden", !isHidden);
+      setIcon(collapseToggle, isHidden ? "chevron-down" : "chevron-right");
+    };
+
+    // Click header (not on inputs/selects/buttons) to expand/collapse
+    header.addEventListener("click", (e) => {
+      const t = e.target as HTMLElement;
+      if (t.closest("input, select, button")) return;
+      toggleBody();
+    });
 
     // ── Event handlers ────────────────────────────────────────
     const renameField = () => {
@@ -360,8 +395,10 @@ export class SchemaEditorModal extends Modal {
       };
       fields[key] = updated;
       this.data.fields = fields;
-      body.empty();
-      this.renderFieldBody(body, key, updated);
+      if (bodyRendered) {
+        body.empty();
+        this.renderFieldBody(body, key, updated);
+      }
     });
 
     removeBtn.addEventListener("click", () => {
@@ -402,6 +439,13 @@ export class SchemaEditorModal extends Modal {
       .setName("Required")
       .addToggle((t) =>
         t.setValue(field.required ?? false).onChange((v) => update({ required: v || undefined }))
+      );
+
+    new Setting(body)
+      .setName("Hidden")
+      .setDesc("Exclude from the edit-properties modal")
+      .addToggle((t) =>
+        t.setValue(field.hidden ?? false).onChange((v) => update({ hidden: v || undefined }))
       );
 
     // ── Type-specific ─────────────────────────────────────────
@@ -514,6 +558,7 @@ export class SchemaEditorModal extends Modal {
         row.setAttribute("data-option-index", String(idx));
 
         row.addEventListener("dragstart", (e) => {
+          e.stopPropagation(); // prevent field-card dragstart from overwriting dataTransfer
           e.dataTransfer?.setData("text/plain", String(idx));
           row.addClass("mv-dragging");
         });
@@ -684,6 +729,7 @@ export class SchemaEditorModal extends Modal {
     if (d.enforce_folder) out.enforce_folder = d.enforce_folder;
 
     const target: ManifestTarget = {};
+    if (d.target?.query) target.query = d.target.query;
     if (d.target?.folder) target.folder = d.target.folder;
     if (d.target?.tag) target.tag = d.target.tag;
     if (d.target?.property) target.property = d.target.property;
@@ -696,10 +742,12 @@ export class SchemaEditorModal extends Modal {
       const fOut: Record<string, unknown> = { type: f.type };
       if (f.label) fOut.label = f.label;
       if (f.required) fOut.required = f.required;
+      if (f.hidden) fOut.hidden = f.hidden;
       if (f.default !== undefined && f.default !== "") fOut.default = f.default;
       if (f.fixed !== undefined && f.fixed !== "") fOut.fixed = f.fixed;
       if (f.min !== undefined) fOut.min = f.min;
       if (f.max !== undefined) fOut.max = f.max;
+      if (f.format) fOut.format = f.format;
       if (f.sort) fOut.sort = f.sort;
       if (f.validate_exists !== undefined) fOut.validate_exists = f.validate_exists;
       if (Array.isArray(f.options) && f.options.length) fOut.options = f.options;

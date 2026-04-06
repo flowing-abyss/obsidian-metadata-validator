@@ -4,8 +4,6 @@ import type { ManifestField, ResolvedSchema, ValidationResult } from "../types";
 import { ValidationEngine } from "../validation/engine";
 import { PickerModal } from "./picker-modal";
 
-type FieldOrigin = "own" | "inherited" | "overrides";
-
 export class ContextMenuModal extends Modal {
   private readonly file: TFile;
   private readonly schema: ResolvedSchema;
@@ -13,6 +11,9 @@ export class ContextMenuModal extends Modal {
   private readonly getManifestFields:
     | ((path: string) => Record<string, ManifestField> | undefined)
     | null;
+
+  /** Persist optional-section expand state across refreshes */
+  private optionalExpanded = false;
 
   constructor(
     app: App,
@@ -32,30 +33,17 @@ export class ContextMenuModal extends Modal {
     const frontmatter = { ...(cache?.frontmatter ?? {}) } as Record<string, unknown>;
     delete frontmatter["position"];
     const results = await this.engine.validate(this.file, frontmatter, this.schema);
-
-    const resultMap = new Map<string, ValidationResult[]>();
-    for (const r of results) {
-      const existing = resultMap.get(r.field) ?? [];
-      existing.push(r);
-      resultMap.set(r.field, existing);
-    }
-
-    this.render(frontmatter, resultMap);
+    this.render(frontmatter, this.buildResultMap(results));
   }
 
-  private fieldOrigin(fieldKey: string): FieldOrigin {
-    const chain = this.schema.inheritanceChain;
-    const currentPath = chain[chain.length - 1];
-    const parentPaths = chain.slice(0, -1);
-
-    const inParents = parentPaths.some(
-      (p) => this.getManifestFields?.(p)?.[fieldKey] !== undefined
-    );
-    const inCurrent = this.getManifestFields?.(currentPath ?? "")?.[fieldKey] !== undefined;
-
-    if (inCurrent && inParents) return "overrides";
-    if (!inCurrent && inParents) return "inherited";
-    return "own";
+  private buildResultMap(results: ValidationResult[]): Map<string, ValidationResult[]> {
+    const map = new Map<string, ValidationResult[]>();
+    for (const r of results) {
+      const existing = map.get(r.field) ?? [];
+      existing.push(r);
+      map.set(r.field, existing);
+    }
+    return map;
   }
 
   private render(
@@ -68,36 +56,37 @@ export class ContextMenuModal extends Modal {
 
     contentEl.createEl("h3", { text: `Edit properties \u2014 ${this.file.basename}` });
 
-    const entries = Object.entries(this.schema.fields);
+    const entries = Object.entries(this.schema.fields).filter(([, def]) => !def.hidden);
     const required = entries.filter(([, def]) => def.required === true);
     const optional = entries.filter(([, def]) => def.required !== true);
 
     // Required fields section
     if (required.length > 0) {
-      const section = contentEl.createDiv();
-      section.createEl("h4", { text: "Required fields", cls: "mv-context-section-header" });
+      const section = contentEl.createDiv("mv-context-section");
+      section.createEl("p", { text: "Required fields", cls: "mv-context-section-header" });
       for (const [key, def] of required) {
         this.renderFieldRow(section, key, def, frontmatter, resultMap);
       }
     }
 
-    // Optional fields section (collapsible)
+    // Optional fields section (collapsible — state persisted)
     if (optional.length > 0) {
-      const wrapper = contentEl.createDiv();
+      const wrapper = contentEl.createDiv("mv-context-section");
       const header = wrapper.createDiv("mv-collapsible-header");
       const chevron = header.createEl("span", {
         cls: "mv-collapsible-chevron",
-        text: "\u203A",
+        text: this.optionalExpanded ? "\u25BE" : "\u203A",
       });
       header.createEl("span", {
         text: `Optional fields (${String(optional.length)})`,
         cls: "mv-collapsible-title",
       });
       const body = wrapper.createDiv("mv-collapsible-body");
-      body.addClass("mv-collapsible-body--collapsed");
+      if (!this.optionalExpanded) body.addClass("mv-collapsible-body--collapsed");
 
       header.addEventListener("click", () => {
         const wasCollapsed = body.hasClass("mv-collapsible-body--collapsed");
+        this.optionalExpanded = wasCollapsed;
         chevron.textContent = wasCollapsed ? "\u25BE" : "\u203A";
         body.toggleClass("mv-collapsible-body--collapsed", !wasCollapsed);
       });
@@ -107,8 +96,8 @@ export class ContextMenuModal extends Modal {
       }
     }
 
-    // Footer: schema chain
-    this.renderFooter(contentEl);
+    // Footer: schema chain with hover-highlight
+    this.renderFooter(contentEl, resultMap);
   }
 
   private renderFieldRow(
@@ -119,20 +108,12 @@ export class ContextMenuModal extends Modal {
     resultMap: Map<string, ValidationResult[]>
   ): void {
     const row = container.createDiv("mv-field-row");
+    // Store field key for footer hover-highlight
+    row.setAttribute("data-mv-field", fieldKey);
 
-    // Label column
+    // Label column — just the display name, no inline badges
     const labelEl = row.createDiv("mv-field-label");
-    labelEl.createEl("span", { text: fieldDef.label ?? fieldKey });
-
-    // Inheritance badge
-    if (this.getManifestFields && this.schema.inheritanceChain.length > 1) {
-      const origin = this.fieldOrigin(fieldKey);
-      if (origin === "inherited") {
-        labelEl.createEl("span", { text: "(inherited)", cls: "mv-field-badge" });
-      } else if (origin === "overrides") {
-        labelEl.createEl("span", { text: "(overrides)", cls: "mv-field-badge" });
-      }
-    }
+    labelEl.createEl("span", { text: fieldDef.label ?? fieldKey, cls: "mv-field-label-text" });
 
     // Value / editor column
     const valueEl = row.createDiv("mv-field-value");
@@ -178,7 +159,7 @@ export class ContextMenuModal extends Modal {
         });
         input.setAttribute("placeholder", `Enter ${fieldDef.type}...`);
         input.addEventListener("change", () => {
-          this.saveField(fieldKey, input.value);
+          this.saveField(fieldKey, input.value || null);
         });
         break;
       }
@@ -193,21 +174,17 @@ export class ContextMenuModal extends Modal {
                 ? currentValue
                 : "",
         });
-        input.setAttribute("placeholder", "Enter number...");
         if (fieldDef.min !== undefined) input.setAttribute("min", String(fieldDef.min));
         if (fieldDef.max !== undefined) input.setAttribute("max", String(fieldDef.max));
+        if (fieldDef.min !== undefined || fieldDef.max !== undefined) {
+          const minText = fieldDef.min !== undefined ? String(fieldDef.min) : "\u2026";
+          const maxText = fieldDef.max !== undefined ? String(fieldDef.max) : "\u2026";
+          input.setAttribute("placeholder", `${minText}\u2013${maxText}`);
+        }
         input.addEventListener("change", () => {
           const num = parseFloat(input.value);
           this.saveField(fieldKey, isNaN(num) ? null : num);
         });
-        if (fieldDef.min !== undefined || fieldDef.max !== undefined) {
-          const minText = fieldDef.min !== undefined ? String(fieldDef.min) : "\u2026";
-          const maxText = fieldDef.max !== undefined ? String(fieldDef.max) : "\u2026";
-          container.createEl("span", {
-            text: `Range: ${minText}\u2013${maxText}`,
-            cls: "mv-field-range-hint",
-          });
-        }
         break;
       }
 
@@ -273,12 +250,9 @@ export class ContextMenuModal extends Modal {
     }
 
     for (const raw of values) {
-      const name = raw.replace(/^\[\[/, "").replace(/\]\]$/, "");
+      const name = raw.replace(/^\[\[/, "").replace(/\]\]$/, "").replace(/\|.*$/, "");
       if (isLink) {
-        const link = container.createEl("a", {
-          cls: "mv-wikilink",
-          text: name,
-        });
+        const link = container.createEl("a", { cls: "mv-wikilink", text: name });
         link.setAttribute("data-href", name);
         link.addEventListener("click", (e) => {
           e.preventDefault();
@@ -300,7 +274,6 @@ export class ContextMenuModal extends Modal {
 
   private openPicker(fieldKey: string, fieldDef: ManifestField, currentValue: unknown): void {
     new PickerModal(this.app, fieldKey, fieldDef, currentValue, this.schema, this.file).open();
-    // Do NOT close the context menu modal
   }
 
   private renderListEditor(container: HTMLElement, fieldKey: string, currentValue: unknown): void {
@@ -310,7 +283,6 @@ export class ContextMenuModal extends Modal {
       ? (currentValue as unknown[]).map((v) => this.toStr(v))
       : [];
 
-    // Add an empty row at the end for new entries
     const rows = [...values, ""];
 
     const saveList = (): void => {
@@ -318,12 +290,9 @@ export class ContextMenuModal extends Modal {
       const newValues: string[] = [];
       inputs.forEach((inp) => {
         const val = inp.value.trim();
-        if (val) {
-          // Auto-quote markdown link patterns
-          const quoted = this.quoteLinksIfNeeded(val);
-          newValues.push(quoted);
-        }
+        if (val) newValues.push(val);
       });
+      // Always save as array when field type is list, even with a single value
       this.saveField(fieldKey, newValues.length > 0 ? newValues : null);
     };
 
@@ -346,15 +315,23 @@ export class ContextMenuModal extends Modal {
     }
   }
 
-  private quoteLinksIfNeeded(value: string): string {
-    // If value contains [[ ]] or [text](url) patterns, wrap in quotes
-    if (/\[\[.*?\]\]/.test(value) || /\[.*?\]\(.*?\)/.test(value)) {
-      // Only quote if not already quoted
-      if (!value.startsWith('"') && !value.startsWith("'")) {
-        return `"${value}"`;
-      }
-    }
-    return value;
+  /**
+   * Determine whether a field is own / inherited / overrides in the inheritance chain.
+   * Used by tests and by the footer hover-highlight feature.
+   */
+  fieldOrigin(fieldKey: string): "own" | "inherited" | "overrides" {
+    const chain = this.schema.inheritanceChain;
+    const currentPath = chain[chain.length - 1];
+    const parentPaths = chain.slice(0, -1);
+
+    const inParents = parentPaths.some(
+      (p) => this.getManifestFields?.(p)?.[fieldKey] !== undefined
+    );
+    const inCurrent = this.getManifestFields?.(currentPath ?? "")?.[fieldKey] !== undefined;
+
+    if (inCurrent && inParents) return "overrides";
+    if (!inCurrent && inParents) return "inherited";
+    return "own";
   }
 
   private saveField(fieldKey: string, value: unknown): void {
@@ -376,13 +353,7 @@ export class ContextMenuModal extends Modal {
     const frontmatter = { ...(cache?.frontmatter ?? {}) } as Record<string, unknown>;
     delete frontmatter["position"];
     const results = await this.engine.validate(this.file, frontmatter, this.schema);
-    const resultMap = new Map<string, ValidationResult[]>();
-    for (const r of results) {
-      const existing = resultMap.get(r.field) ?? [];
-      existing.push(r);
-      resultMap.set(r.field, existing);
-    }
-    this.render(frontmatter, resultMap);
+    this.render(frontmatter, this.buildResultMap(results));
   }
 
   private toStr(v: unknown): string {
@@ -391,22 +362,66 @@ export class ContextMenuModal extends Modal {
     return "";
   }
 
-  private renderFooter(container: HTMLElement): void {
+  /**
+   * Footer shows the inheritance chain. Hovering each schema name highlights
+   * which fields come from it via data attributes.
+   */
+  private renderFooter(container: HTMLElement, resultMap: Map<string, ValidationResult[]>): void {
     const footer = container.createDiv("mv-context-footer");
     const chain = this.schema.inheritanceChain;
+
     if (chain.length <= 1) {
-      footer.createEl("span", { text: `Applied schema: ${this.schema.name}` });
-    } else {
-      // Build names from paths: extract folder name from each path
-      const names = chain
-        .map((p) => {
-          const parts = p.split("/");
-          // Path like "schemas/book/manifest.md" -> "book"
-          return parts.length >= 2 ? (parts[parts.length - 2] ?? p) : p;
-        })
-        .reverse(); // current first, root last
+      footer.createEl("span", { text: `Schema: ${this.schema.name}` });
+      return;
+    }
+
+    footer.createEl("span", { text: "Schema: ", cls: "mv-footer-label" });
+
+    chain
+      .slice()
+      .reverse()
+      .forEach((manifestPath, i) => {
+        // Extract a friendly name from the path
+        const parts = manifestPath.split("/");
+        const name = parts.length >= 2 ? (parts[parts.length - 2] ?? manifestPath) : manifestPath;
+
+        const schemaSpan = footer.createEl("span", {
+          text: name,
+          cls: "mv-footer-schema-name",
+        });
+        schemaSpan.setAttribute("data-mv-chain-path", manifestPath);
+
+        // On hover: highlight fields that originate from this schema
+        schemaSpan.addEventListener("mouseenter", () => {
+          if (!this.getManifestFields) return;
+          const fieldsFromThis = this.getManifestFields(manifestPath);
+          if (!fieldsFromThis) return;
+          const fieldKeys = new Set(Object.keys(fieldsFromThis));
+          container.querySelectorAll<HTMLElement>("[data-mv-field]").forEach((row) => {
+            const k = row.getAttribute("data-mv-field") ?? "";
+            row.toggleClass("mv-field-row--highlighted", fieldKeys.has(k));
+          });
+        });
+        schemaSpan.addEventListener("mouseleave", () => {
+          container
+            .querySelectorAll<HTMLElement>(".mv-field-row--highlighted")
+            .forEach((r) => r.removeClass("mv-field-row--highlighted"));
+        });
+
+        if (i < chain.length - 1) {
+          footer.createEl("span", { text: " \u2190 ", cls: "mv-footer-arrow" });
+        }
+      });
+
+    // Error count in footer
+    let totalErrors = 0;
+    resultMap.forEach((rs) => {
+      totalErrors += rs.filter((r) => !r.autoFixed && r.severity === "error").length;
+    });
+    if (totalErrors > 0) {
       footer.createEl("span", {
-        text: `Applied schema: ${names.join(" \u2190 ")}`,
+        text: ` · ${totalErrors} error${totalErrors > 1 ? "s" : ""}`,
+        cls: "mv-footer-errors",
       });
     }
   }

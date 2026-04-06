@@ -5,6 +5,7 @@ import { checkRequired } from "./rules/required";
 import { checkOptions } from "./rules/options";
 import { checkLinkSource } from "./rules/link-source";
 import { checkLinkExists } from "./rules/link-exists";
+import { checkDateFormat } from "./rules/date-format";
 import { checkNumberRange } from "./rules/number-range";
 import { runJsValidator } from "./rules/js-validator";
 import { resolveSource } from "../schema/source-resolver";
@@ -90,13 +91,18 @@ export class ValidationEngine {
       if (r) results.push(r);
     }
 
+    if (field.type === "date") {
+      const r = checkDateFormat(fieldName, value, field.format, manifestPath);
+      if (r) results.push(r);
+    }
+
     if ((field.type === "link" || field.type === "multilink") && field.source) {
       const allowedOptions = await resolveSource(field.source, this.app, file);
       const r = checkLinkSource(fieldName, value, allowedOptions, manifestPath);
       if (r) results.push(r);
     }
 
-    if ((field.type === "link" || field.type === "multilink") && field.validate_exists) {
+    if ((field.type === "link" || field.type === "multilink") && field.validate_exists !== false) {
       const r = checkLinkExists(fieldName, value, this.app, manifestPath);
       if (r) results.push(r);
     }

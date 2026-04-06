@@ -52,56 +52,22 @@ describe("ContextMenuModal", () => {
 
     it("returns 'inherited' for field only in parent", () => {
       const m = makeModal({}, getFields);
-      const result = (m as unknown as { fieldOrigin: (k: string) => string }).fieldOrigin("title");
-      expect(result).toBe("inherited");
+      expect(m.fieldOrigin("title")).toBe("inherited");
     });
 
     it("returns 'own' for field only in child", () => {
       const m = makeModal({}, getFields);
-      const result = (m as unknown as { fieldOrigin: (k: string) => string }).fieldOrigin("rating");
-      expect(result).toBe("own");
+      expect(m.fieldOrigin("rating")).toBe("own");
     });
 
     it("returns 'overrides' for field in both parent and child", () => {
       const m = makeModal({}, getFields);
-      const result = (m as unknown as { fieldOrigin: (k: string) => string }).fieldOrigin("shared");
-      expect(result).toBe("overrides");
+      expect(m.fieldOrigin("shared")).toBe("overrides");
     });
 
     it("returns 'own' when getManifestFields is not provided", () => {
       const m = makeModal({});
-      const result = (m as unknown as { fieldOrigin: (k: string) => string }).fieldOrigin("title");
-      expect(result).toBe("own");
-    });
-  });
-
-  describe("quoteLinksIfNeeded", () => {
-    it("wraps wikilinks in quotes", () => {
-      const m = makeModal({});
-      const fn = (m as unknown as { quoteLinksIfNeeded: (v: string) => string }).quoteLinksIfNeeded;
-      if (!fn) return; // if method doesn't exist, skip
-      expect(fn.call(m, "[[MyNote]]")).toBe('"[[MyNote]]"');
-    });
-
-    it("wraps markdown links in quotes", () => {
-      const m = makeModal({});
-      const fn = (m as unknown as { quoteLinksIfNeeded: (v: string) => string }).quoteLinksIfNeeded;
-      if (!fn) return;
-      expect(fn.call(m, "[My Note](path/to/note.md)")).toBe('"[My Note](path/to/note.md)"');
-    });
-
-    it("returns plain strings unchanged", () => {
-      const m = makeModal({});
-      const fn = (m as unknown as { quoteLinksIfNeeded: (v: string) => string }).quoteLinksIfNeeded;
-      if (!fn) return;
-      expect(fn.call(m, "just a string")).toBe("just a string");
-    });
-
-    it("returns already-quoted strings unchanged", () => {
-      const m = makeModal({});
-      const fn = (m as unknown as { quoteLinksIfNeeded: (v: string) => string }).quoteLinksIfNeeded;
-      if (!fn) return;
-      expect(fn.call(m, '"[[MyNote]]"')).toBe('"[[MyNote]]"');
+      expect(m.fieldOrigin("title")).toBe("own");
     });
   });
 });

@@ -2,6 +2,7 @@ import type { TFile } from "obsidian";
 import type { Manifest, ManifestData, ResolvedSchema } from "../types";
 import type { ManifestCache } from "../manifest/cache";
 import { mergeSchemas } from "./merger";
+import { evaluateQuery } from "./query";
 
 export class SchemaResolver {
   private resolved: Map<string, ResolvedSchema> = new Map();
@@ -110,6 +111,11 @@ export class SchemaResolver {
   ): boolean {
     const { target } = schema;
     if (!target) return false;
+
+    // Expression query takes priority over structured fields
+    if (target.query) {
+      return evaluateQuery(target.query, file.path, fileTags, frontmatter);
+    }
 
     const conditions: boolean[] = [];
 

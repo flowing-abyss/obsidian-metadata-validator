@@ -30,6 +30,8 @@ export interface ManifestField {
   type: FieldType;
   label?: string;
   required?: boolean;
+  /** Hide this field from the Edit Properties modal */
+  hidden?: boolean;
   default?: unknown;
   /** Always overwrite with this value (auto-fix) */
   fixed?: unknown;
@@ -50,6 +52,11 @@ export interface ManifestTarget {
   folder?: string;
   tag?: string;
   property?: Record<string, string>;
+  /**
+   * Logical expression: "Folder/" AND/OR #tag  (overrides folder/tag/op when set)
+   * Terms: "path/" for folders, #tag for tags, key=value for properties
+   */
+  query?: string;
 }
 
 /** Raw parsed content of a manifest.md frontmatter */

@@ -788,3 +788,100 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 .mv-stat-label {
   color: var(--text-muted);
 }
+
+/* ── Schema editor: collapsed field cards ─────────────────── */
+.mv-field-collapse-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.mv-field-collapse-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+
+.mv-field-card-header {
+  cursor: pointer;
+}
+
+/* ── Context menu: hover-highlight from footer ────────────── */
+.mv-field-row--highlighted {
+  background: var(--background-modifier-hover);
+  border-radius: 4px;
+}
+
+.mv-footer-schema-name {
+  cursor: pointer;
+  color: var(--text-accent);
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.1s;
+}
+
+.mv-footer-schema-name:hover {
+  border-bottom-color: var(--text-accent);
+}
+
+.mv-footer-label {
+  color: var(--text-faint);
+}
+
+.mv-footer-arrow {
+  color: var(--text-faint);
+}
+
+.mv-footer-errors {
+  color: var(--color-red);
+}
+
+/* ── Context menu: dense layout ───────────────────────────── */
+.mv-context-modal {
+  padding: 12px 16px;
+}
+
+.mv-context-section {
+  margin-bottom: 8px;
+}
+
+.mv-field-row {
+  grid-template-columns: 120px 1fr auto;
+  min-height: 28px;
+  padding: 4px 0;
+}
+
+.mv-field-value input[type="text"],
+.mv-field-value input[type="number"],
+.mv-field-value input[type="url"],
+.mv-field-value input[type="date"] {
+  font-size: 12px;
+  padding: 2px 6px;
+  /* Prevent very long values from overflowing */
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Suppress Obsidian's type icon when we inject our own ──  */
+.metadata-property:has([data-mv-picker]) .metadata-property-icon {
+  display: none;
+}
+
+/* ── Hidden-but-clickable type icon (for date/boolean) ─────── */
+.mv-type-icon--hidden {
+  width: 0 !important;
+  overflow: hidden;
+  padding: 0 !important;
+  margin: 0 !important;
+  opacity: 0;
+  pointer-events: auto;
+}
+
+/* ── Expression input (full width) ───────────────────────── */
+.mv-expression-input {
+  width: 100%;
+}

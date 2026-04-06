@@ -4,6 +4,7 @@ import type { SchemaResolver } from "../schema/resolver";
 import type { ValidationEngine } from "../validation/engine";
 import type { PluginSettings } from "../settings";
 import type { PickerModal as PickerModalType } from "./picker-modal";
+import type { ContextMenuModal as ContextMenuModalType } from "./context-menu-modal";
 import type { showValidatorTooltip as showValidatorTooltipType } from "./validator-tooltip";
 
 const PICKER_ATTR = "data-mv-picker";
@@ -23,8 +24,14 @@ const FIELD_TYPE_ICON: Record<FieldType, string> = {
   url: "globe",
 };
 
-/** Field types that support the PickerModal (have options/sources to choose from) */
+/** Field types that open PickerModal (have options/sources) */
 const PICKER_TYPES = new Set<FieldType>(["select", "multiselect", "link", "multilink"]);
+
+/**
+ * Field types where Obsidian already renders its own type icon in the property row.
+ * We suppress our icon for these to avoid duplicates.
+ */
+const OBSIDIAN_HANDLES_ICON = new Set<FieldType>(["date", "boolean"]);
 
 interface CachedResult {
   fmHash: string;
@@ -135,14 +142,20 @@ export class PropertyDecorator {
     const iconName = FIELD_TYPE_ICON[fieldDef.type] ?? "square";
     const isPicker = PICKER_TYPES.has(fieldDef.type);
 
-    if (isPicker) {
-      // Clickable button that opens PickerModal
-      const btn = document.createElement("button");
-      btn.setAttribute(PICKER_ATTR, "true");
-      btn.className = "mv-picker-btn clickable-icon";
-      btn.setAttribute("aria-label", `Pick value for ${fieldKey}`);
-      setIcon(btn, iconName);
+    const btn = document.createElement("button");
+    btn.setAttribute(PICKER_ATTR, "true");
+    btn.setAttribute("aria-label", fieldDef.type);
 
+    if (OBSIDIAN_HANDLES_ICON.has(fieldDef.type)) {
+      // Obsidian already shows an icon for this type — render ours as invisible
+      // but still clickable so the user can open the context menu
+      btn.className = "mv-type-icon mv-type-icon--hidden clickable-icon";
+    } else {
+      btn.className = isPicker ? "mv-picker-btn clickable-icon" : "mv-type-icon clickable-icon";
+      setIcon(btn, iconName);
+    }
+
+    if (isPicker) {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         void import("./picker-modal").then((mod: { PickerModal: typeof PickerModalType }) => {
@@ -156,17 +169,18 @@ export class PropertyDecorator {
           ).open();
         });
       });
-
-      nameEl.after(btn);
     } else {
-      // Non-interactive type indicator icon
-      const indicator = document.createElement("span");
-      indicator.setAttribute(PICKER_ATTR, "true");
-      indicator.className = "mv-type-icon";
-      indicator.setAttribute("aria-label", fieldDef.type);
-      setIcon(indicator, iconName);
-      nameEl.after(indicator);
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        void import("./context-menu-modal").then(
+          (mod: { ContextMenuModal: typeof ContextMenuModalType }) => {
+            new mod.ContextMenuModal(this.app, file, schema).open();
+          }
+        );
+      });
     }
+
+    nameEl.after(btn);
   }
 
   private injectValidatorIcon(
