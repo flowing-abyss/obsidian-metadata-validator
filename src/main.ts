@@ -178,7 +178,11 @@ export default class MetadataValidatorPlugin extends Plugin {
             item
               .setTitle("Edit properties")
               .setIcon("pencil")
-              .onClick(() => new ContextMenuModal(this.app, file, schema).open())
+              .onClick(() => {
+                const getFields = (p: string) =>
+                  this.cache.getAll().find((m) => m.path === p)?.data.fields;
+                new ContextMenuModal(this.app, file, schema, getFields).open();
+              })
           );
 
           menu.addItem((item) =>
