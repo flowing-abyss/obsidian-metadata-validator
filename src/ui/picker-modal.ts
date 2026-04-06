@@ -94,13 +94,23 @@ export class PickerModal extends Modal {
     }
   }
 
+  private get isMulti(): boolean {
+    return (
+      this.field.type === "multiselect" ||
+      this.field.type === "multilink" ||
+      this.field.type === "list"
+    );
+  }
+
+  private get isLink(): boolean {
+    return this.field.type === "link" || this.field.type === "multilink";
+  }
+
   /** Strip [[...]] so stored "[[man]]" compares equal to option value "man". */
   private normalise(v: unknown): string {
     if (v === undefined || v === null || v === "") return "";
-    return String(v as string)
-      .trim()
-      .replace(/^\[\[/, "")
-      .replace(/\]\]$/, "");
+    if (typeof v !== "string" && typeof v !== "number" && typeof v !== "boolean") return "";
+    return String(v).trim().replace(/^\[\[/, "").replace(/\]\]$/, "");
   }
 
   private sortedOptions(options: FieldOption[], query: string): FieldOption[] {
@@ -127,11 +137,6 @@ export class PickerModal extends Modal {
       return;
     }
 
-    const isMulti =
-      this.field.type === "multiselect" ||
-      this.field.type === "multilink" ||
-      this.field.type === "list";
-
     for (const opt of sorted) {
       const isSelected = this.selected.has(opt.value);
 
@@ -145,7 +150,7 @@ export class PickerModal extends Modal {
       }
 
       item.addEventListener("click", () => {
-        if (isMulti) {
+        if (this.isMulti) {
           // Toggle selection
           if (this.selected.has(opt.value)) {
             this.selected.delete(opt.value);
@@ -167,20 +172,15 @@ export class PickerModal extends Modal {
   }
 
   private persistSelection(): void {
-    const isMulti =
-      this.field.type === "multiselect" ||
-      this.field.type === "multilink" ||
-      this.field.type === "list";
-    const isLink = this.field.type === "link" || this.field.type === "multilink";
     const key = this.fieldKey;
 
     void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
-      if (isMulti) {
+      if (this.isMulti) {
         // Always store as array, even single item
-        fm[key] = Array.from(this.selected).map((v) => (isLink ? `[[${v}]]` : v));
+        fm[key] = Array.from(this.selected).map((v) => (this.isLink ? `[[${v}]]` : v));
       } else {
         const val = Array.from(this.selected)[0];
-        fm[key] = val !== undefined ? (isLink ? `[[${val}]]` : val) : null;
+        fm[key] = val !== undefined ? (this.isLink ? `[[${val}]]` : val) : null;
       }
     });
   }
