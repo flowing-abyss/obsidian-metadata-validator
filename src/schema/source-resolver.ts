@@ -74,7 +74,7 @@ function coerceToString(v: unknown): string {
   if (typeof v === "string") return v;
   if (typeof v === "number" || typeof v === "boolean") return String(v);
   // DataView Link objects have a .path property
-  if (typeof v === "object" && "path" in (v)) {
+  if (typeof v === "object" && "path" in v) {
     const path = (v as { path: string }).path;
     // Return bare basename without extension
     return (
@@ -112,8 +112,16 @@ async function resolveJsSource(
       current: TFile | null
     ) => unknown;
     const result: unknown = await fn(app, dv, currentFile);
-    if (!Array.isArray(result)) return [];
-    return (result as unknown[]).map((item) => {
+    // dv.pages() returns a DataArray (not a plain Array) — convert any iterable
+    let items: unknown[];
+    if (Array.isArray(result)) {
+      items = result;
+    } else if (result !== null && result !== undefined && Symbol.iterator in Object(result)) {
+      items = Array.from(result as Iterable<unknown>);
+    } else {
+      return [];
+    }
+    return items.map((item) => {
       if (typeof item === "string") return { value: item, label: item };
       const typed = item as JsSourceItem;
       const value = coerceToString(typed.value);
