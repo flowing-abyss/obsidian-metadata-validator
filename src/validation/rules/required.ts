@@ -5,17 +5,13 @@ export function checkRequired(
   value: unknown,
   manifestPath: string
 ): ValidationResult | null {
-  const isEmpty =
-    value === undefined ||
-    value === null ||
-    value === "" ||
-    (Array.isArray(value) && value.length === 0);
-  if (!isEmpty) return null;
+  // Only error if the key is completely absent
+  if (value !== undefined) return null;
 
   return {
     field,
     severity: "error",
-    message: `"${field}" is required but empty.`,
+    message: `"${field}" is required but missing. Add the property.`,
     rule: "required",
     manifestPath,
     autoFixed: false,

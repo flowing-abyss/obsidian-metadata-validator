@@ -120,7 +120,16 @@ export default class MetadataValidatorPlugin extends Plugin {
           if (file.basename === "manifest" && file.extension === "md") {
             await this.cache.refresh(file);
             this.resolver.rebuild();
+            // Re-validate active note after schema change
+            const active = this.app.workspace.getActiveFile();
+            if (active) await this.validateAndUpdate(active);
           }
+        })
+      );
+
+      this.registerEvent(
+        this.app.metadataCache.on("changed", async (file: TFile) => {
+          if (file.basename === "manifest" && file.extension === "md") return; // handled above
           if (this.settings.enableOnSave) {
             await this.validateAndUpdate(file);
           }

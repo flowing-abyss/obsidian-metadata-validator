@@ -13,14 +13,12 @@ describe("checkRequired", () => {
     expect(result?.severity).toBe("error");
   });
 
-  it("returns error when required field is empty string", () => {
-    const result = checkRequired("author", "", "schemas/book/manifest.md");
-    expect(result).not.toBeNull();
+  it("returns null when required field is empty string (key present but empty)", () => {
+    expect(checkRequired("author", "", "schemas/book/manifest.md")).toBeNull();
   });
 
-  it("returns error when required field is empty array", () => {
-    const result = checkRequired("tags", [], "schemas/book/manifest.md");
-    expect(result).not.toBeNull();
+  it("returns null when required field is empty array (key present but empty)", () => {
+    expect(checkRequired("tags", [], "schemas/book/manifest.md")).toBeNull();
   });
 
   it("returns null when value is 0 (falsy but valid)", () => {
