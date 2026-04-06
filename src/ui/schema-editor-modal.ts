@@ -106,9 +106,13 @@ export class SchemaEditorModal extends Modal {
     header.createEl("span", { text: title, cls: "mv-collapsible-title" });
     const body = wrapper.createDiv("mv-collapsible-body");
     body.addClass("mv-collapsible-body--collapsed");
-    renderFn(body);
+    let rendered = false;
     header.addEventListener("click", () => {
       const wasCollapsed = body.hasClass("mv-collapsible-body--collapsed");
+      if (wasCollapsed && !rendered) {
+        renderFn(body);
+        rendered = true;
+      }
       body.toggleClass("mv-collapsible-body--collapsed", !wasCollapsed);
       chevron.textContent = wasCollapsed ? "⌄" : "›";
     });
@@ -134,23 +138,16 @@ export class SchemaEditorModal extends Modal {
         });
       });
 
-    new Setting(el)
-      .setName("Extends")
-      .setDesc("Parent schema folder path (e.g. schemas/base).")
-      .addText((t) => {
-        t.inputEl.setAttribute("placeholder", "Schemas/base");
-        t.setValue(this.data.extends ?? "").onChange((v) => {
-          this.data.extends = v || undefined;
-        });
-      });
-
-    // Auto-detected parent from folder nesting
+    // Auto-detected parent from folder nesting (computed before Extends setting so we can wire them)
+    let bannerWrapper: HTMLElement | null = null;
     if (this.cache) {
       const folder = this.manifestPath.replace(/\/manifest\.md$/, "");
       const parentFolder = folder.split("/").slice(0, -1).join("/");
       const autoParent = this.cache.getByFolder(parentFolder);
-      if (autoParent && !this.data.extends) {
-        new Setting(el)
+      if (autoParent) {
+        bannerWrapper = el.createDiv();
+        bannerWrapper.toggleClass("mv-hidden", !!this.data.extends);
+        new Setting(bannerWrapper)
           .setName("Auto-detected parent")
           .setDesc(
             `Inheriting from ${autoParent.path} (folder nesting). Set "Extends" above to override.`
@@ -160,6 +157,17 @@ export class SchemaEditorModal extends Modal {
           );
       }
     }
+
+    new Setting(el)
+      .setName("Extends")
+      .setDesc("Parent schema folder path (e.g. schemas/base).")
+      .addText((t) => {
+        t.inputEl.setAttribute("placeholder", "Schemas/base");
+        t.setValue(this.data.extends ?? "").onChange((v) => {
+          this.data.extends = v || undefined;
+          if (bannerWrapper) bannerWrapper.toggleClass("mv-hidden", !!v);
+        });
+      });
 
     const enforceVal = this.data.enforce_folder;
     let enforceToggleOn = !!enforceVal;
@@ -273,12 +281,17 @@ export class SchemaEditorModal extends Modal {
     card.addEventListener("dragend", () => {
       card.removeClass("mv-dragging");
     });
-    card.addEventListener("dragover", (e) => {
+    let enterCount = 0;
+    card.addEventListener("dragenter", (e) => {
       e.preventDefault();
+      enterCount++;
       card.addClass("mv-drag-over");
     });
     card.addEventListener("dragleave", () => {
-      card.removeClass("mv-drag-over");
+      if (--enterCount === 0) card.removeClass("mv-drag-over");
+    });
+    card.addEventListener("dragover", (e) => {
+      e.preventDefault(); // keep this for drop to work
     });
     card.addEventListener("drop", (e) => {
       e.preventDefault();
@@ -504,12 +517,17 @@ export class SchemaEditorModal extends Modal {
         row.addEventListener("dragend", () => {
           row.removeClass("mv-dragging");
         });
-        row.addEventListener("dragover", (e) => {
+        let rowEnterCount = 0;
+        row.addEventListener("dragenter", (e) => {
           e.preventDefault();
+          rowEnterCount++;
           row.addClass("mv-drag-over");
         });
         row.addEventListener("dragleave", () => {
-          row.removeClass("mv-drag-over");
+          if (--rowEnterCount === 0) row.removeClass("mv-drag-over");
+        });
+        row.addEventListener("dragover", (e) => {
+          e.preventDefault(); // keep this for drop to work
         });
         row.addEventListener("drop", (e) => {
           e.preventDefault();
