@@ -53,7 +53,7 @@ export class ContextMenuModal extends Modal {
     const cache = this.app.metadataCache.getFileCache(this.file);
     this.localFrontmatter = { ...(cache?.frontmatter ?? {}) } as Record<string, unknown>;
     delete this.localFrontmatter["position"];
-    const results = await this.engine.validate(this.file, this.localFrontmatter, this.schema);
+    const results = await this.validateForDisplay();
     this.render(this.localFrontmatter, this.buildResultMap(results));
 
     // Sync with external file changes (e.g. native Obsidian properties panel edits)
@@ -63,10 +63,20 @@ export class ContextMenuModal extends Modal {
       const freshFm = { ...(fresh?.frontmatter ?? {}) } as Record<string, unknown>;
       delete freshFm["position"];
       this.localFrontmatter = freshFm;
-      void this.engine
-        .validate(this.file, this.localFrontmatter, this.schema)
-        .then((r) => this.render(this.localFrontmatter, this.buildResultMap(r)));
+      void this.validateForDisplay().then((r) =>
+        this.render(this.localFrontmatter, this.buildResultMap(r))
+      );
     });
+  }
+
+  /**
+   * Validate localFrontmatter for display purposes only.
+   * Uses a shallow copy so engine auto-fixes never mutate localFrontmatter —
+   * the user's current values must be preserved for picker initialisation.
+   */
+  private async validateForDisplay(): Promise<ValidationResult[]> {
+    const copy = { ...this.localFrontmatter };
+    return this.engine.validate(this.file, copy, this.schema);
   }
 
   private buildResultMap(results: ValidationResult[]): Map<string, ValidationResult[]> {
@@ -419,9 +429,9 @@ export class ContextMenuModal extends Modal {
     } else {
       this.localFrontmatter[fieldKey] = value;
     }
-    void this.engine
-      .validate(this.file, this.localFrontmatter, this.schema)
-      .then((results) => this.render(this.localFrontmatter, this.buildResultMap(results)));
+    void this.validateForDisplay().then((results) =>
+      this.render(this.localFrontmatter, this.buildResultMap(results))
+    );
   }
 
   /**
