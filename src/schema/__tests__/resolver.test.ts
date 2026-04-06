@@ -28,12 +28,12 @@ function makeFile(
 }
 
 describe("SchemaResolver", () => {
-  it("matches note to schema by folder", () => {
+  it("matches note to schema by folder expression", () => {
     const cache = makeCache([
       {
         path: "schemas/book/manifest.md",
         folderPath: "schemas/book",
-        data: { name: "book", target: { folder: "Books/" }, fields: {} },
+        data: { name: "book", target: { query: '"Books/"' }, fields: {} },
       },
     ]);
 
@@ -45,12 +45,12 @@ describe("SchemaResolver", () => {
     expect(schema?.name).toBe("book");
   });
 
-  it("matches note to schema by tag", () => {
+  it("matches note to schema by tag expression", () => {
     const cache = makeCache([
       {
         path: "schemas/article/manifest.md",
         folderPath: "schemas/article",
-        data: { name: "article", target: { tag: "#article" }, fields: {} },
+        data: { name: "article", target: { query: "#article" }, fields: {} },
       },
     ]);
 
@@ -67,7 +67,7 @@ describe("SchemaResolver", () => {
       {
         path: "schemas/book/manifest.md",
         folderPath: "schemas/book",
-        data: { name: "book", target: { folder: "Books/" }, fields: {} },
+        data: { name: "book", target: { query: '"Books/"' }, fields: {} },
       },
     ]);
 
@@ -94,7 +94,7 @@ describe("SchemaResolver", () => {
       folderPath: "schemas/base/book",
       data: {
         name: "book",
-        target: { folder: "Books/" },
+        target: { query: '"Books/"' },
         fields: { rating: { type: "number" } },
       },
     };
@@ -119,7 +119,7 @@ describe("SchemaResolver", () => {
     const parent: Manifest = {
       path: "schemas/sources/manifest.md",
       folderPath: "schemas/sources",
-      data: { name: "sources", target: { tag: "source" }, fields: { url: { type: "url" } } },
+      data: { name: "sources", target: { query: "#source" }, fields: { url: { type: "url" } } },
     };
     const child: Manifest = {
       path: "schemas/sources/books/manifest.md",
@@ -132,9 +132,9 @@ describe("SchemaResolver", () => {
     const resolver = new SchemaResolver(cache);
     resolver.rebuild();
 
-    // Note tagged "source/book" should match the child (books) schema
+    // Note tagged "source" should match the child (books) schema via inherited target
     const file = makeFile("Notes/MyBook.md");
-    const schema = resolver.resolveForNote(file, { tags: ["source/book"] });
+    const schema = resolver.resolveForNote(file, { tags: ["source"] });
     expect(schema?.name).toBe("books"); // child wins, inherits parent's target
     expect(schema?.fields["rating"]?.type).toBe("number"); // child field
     expect(schema?.fields["url"]?.type).toBe("url"); // inherited field
@@ -144,7 +144,7 @@ describe("SchemaResolver", () => {
     const parent: Manifest = {
       path: "schemas/sources/manifest.md",
       folderPath: "schemas/sources",
-      data: { name: "sources", target: { tag: "source" }, fields: {} },
+      data: { name: "sources", target: { query: "#source" }, fields: {} },
     };
     const child: Manifest = {
       path: "schemas/sources/books/manifest.md",
@@ -178,7 +178,7 @@ describe("SchemaResolver", () => {
       data: {
         name: "book",
         extends: "schemas/resource",
-        target: { folder: "Books/" },
+        target: { query: '"Books/"' },
         fields: { rating: { type: "number" } },
       },
     };

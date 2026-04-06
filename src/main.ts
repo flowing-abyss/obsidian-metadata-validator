@@ -321,13 +321,9 @@ export default class MetadataValidatorPlugin extends Plugin {
       return;
     }
 
-    // enforce_folder: resolve the effective target path
+    // enforce_folder: only a string path is actionable now (true alone has no effect)
     const enforcePath =
-      typeof schema.enforce_folder === "string"
-        ? schema.enforce_folder
-        : schema.enforce_folder === true
-          ? schema.target.folder
-          : undefined;
+      typeof schema.enforce_folder === "string" ? schema.enforce_folder : undefined;
 
     // enforce_folder: auto-move if needed
     if (enforcePath) {
@@ -341,13 +337,13 @@ export default class MetadataValidatorPlugin extends Plugin {
 
     const results = await this.engine.validate(file, frontmatter, schema);
 
-    // Warn when enforce_folder: true but no target.folder was set
-    if (schema.enforce_folder === true && !schema.target.folder) {
+    // Warn when enforce_folder: true (without a path — no-op)
+    if (schema.enforce_folder === true) {
       results.push({
         field: "__location__",
         severity: "warning",
         message:
-          'enforce_folder: true has no effect without target.folder. Use enforce_folder: "folder/" to set an explicit path.',
+          "enforce_folder: true has no effect on its own. Set enforce_folder to a folder path string.",
         rule: "enforce_folder",
         manifestPath: schema.manifestPath,
         autoFixed: false,

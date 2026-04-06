@@ -6,8 +6,7 @@ describe("parseManifest", () => {
     const raw = `---
 name: book
 target:
-  folder: "Books/"
-  tag: "#book"
+  query: '"Books/"'
 fields:
   status:
     type: select
@@ -28,8 +27,7 @@ Some body text here that should be ignored.`;
     const result = parseManifest(raw);
 
     expect(result.name).toBe("book");
-    expect(result.target?.folder).toBe("Books/");
-    expect(result.target?.tag).toBe("#book");
+    expect(result.target?.query).toBe('"Books/"');
     expect(result.fields?.status?.type).toBe("select");
     expect(result.fields?.status?.required).toBe(true);
     expect(result.fields?.status?.default).toBe("to-read");

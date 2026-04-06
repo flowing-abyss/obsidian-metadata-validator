@@ -112,41 +112,23 @@ export class SchemaResolver {
     const { target } = schema;
     if (!target) return false;
 
-    // Expression query takes priority over structured fields
     if (target.query) {
       return evaluateQuery(target.query, file.path, fileTags, frontmatter);
     }
 
-    const conditions: boolean[] = [];
-
-    if (target.folder) {
-      conditions.push(file.path.startsWith(target.folder));
-    }
-    if (target.tag) {
-      const schemaTag = target.tag.replace(/^#/, "");
-      conditions.push(
-        fileTags.some((t) => {
-          const ft = t.replace(/^#/, "");
-          return ft === schemaTag || ft.startsWith(schemaTag + "/");
-        })
-      );
-    }
     if (target.property) {
-      const allMatch = Object.entries(target.property).every(([k, v]) => {
+      return Object.entries(target.property).every(([k, v]) => {
         const fmVal = frontmatter[k];
         const strVal =
           fmVal === null || fmVal === undefined ? "" : String(fmVal as string | number | boolean);
         return strVal === v;
       });
-      conditions.push(allMatch);
     }
 
-    if (conditions.length === 0) return false;
-
-    return target.op === "OR" ? conditions.some(Boolean) : conditions.every(Boolean);
+    return false;
   }
 }
 
 function targetSpecificity(target: ResolvedSchema["target"]): number {
-  return (target.folder ? 1 : 0) + (target.tag ? 1 : 0) + (target.property ? 1 : 0);
+  return (target.query ? 2 : 0) + (target.property ? 1 : 0);
 }

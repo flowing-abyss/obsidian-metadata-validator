@@ -237,47 +237,10 @@ export class SchemaEditorModal extends Modal {
   }
 
   private renderTarget(el: HTMLElement): void {
-    const structuredGroup = el.createDiv();
-    const hasExpr = !!this.data.target?.query?.trim();
-    if (hasExpr) structuredGroup.addClass("mv-hidden");
-
-    new Setting(structuredGroup)
-      .setName("Folder")
-      .setDesc("Apply to notes whose path starts with this folder.")
-      .addText((t) => {
-        t.inputEl.setAttribute("placeholder", "Sources/");
-        t.setValue(this.data.target?.folder ?? "").onChange((v) => {
-          this.data.target = { ...this.data.target, folder: v || undefined };
-        });
-      });
-
-    new Setting(structuredGroup)
-      .setName("Tag")
-      .setDesc("Apply to notes with this tag.")
-      .addText((t) => {
-        t.inputEl.setAttribute("placeholder", "Article");
-        t.setValue(this.data.target?.tag ?? "").onChange((v) => {
-          this.data.target = { ...this.data.target, tag: v || undefined };
-        });
-      });
-
-    new Setting(structuredGroup)
-      .setName("Match mode")
-      .setDesc("How folder and tag conditions are combined.")
-      .addDropdown((d) =>
-        d
-          .addOption("AND", "All conditions must match")
-          .addOption("OR", "Any condition matches")
-          .setValue(this.data.target?.op ?? "AND")
-          .onChange((v) => {
-            this.data.target = { ...this.data.target, op: v as "AND" | "OR" };
-          })
-      );
-
     new Setting(el)
       .setName("Expression")
       .setDesc(
-        'Match by expression — overrides Folder/Tag above: "Folder/" AND/OR #tag' // eslint-disable-line obsidianmd/ui/sentence-case
+        'Logical expression matching notes: "Folder/" AND/OR #tag, key=value' // eslint-disable-line obsidianmd/ui/sentence-case
       )
       .addText((t) => {
         t.inputEl.setAttribute("placeholder", '"Sources/" AND #book'); // eslint-disable-line obsidianmd/ui/sentence-case
@@ -285,7 +248,6 @@ export class SchemaEditorModal extends Modal {
         t.setValue(this.data.target?.query ?? "").onChange((v) => {
           const trimmed = v.trim();
           this.data.target = { ...this.data.target, query: trimmed || undefined };
-          structuredGroup.toggleClass("mv-hidden", !!trimmed);
         });
       });
 
@@ -894,10 +856,7 @@ export class SchemaEditorModal extends Modal {
 
     const target: ManifestTarget = {};
     if (d.target?.query) target.query = d.target.query;
-    if (d.target?.folder) target.folder = d.target.folder;
-    if (d.target?.tag) target.tag = d.target.tag;
     if (d.target?.property) target.property = d.target.property;
-    if (d.target?.op && d.target.op !== "AND") target.op = d.target.op;
     if (Object.keys(target).length) out.target = target;
 
     const fields: Record<string, unknown> = {};

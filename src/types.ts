@@ -50,13 +50,10 @@ export interface ManifestField {
 }
 
 export interface ManifestTarget {
-  op?: "AND" | "OR";
-  folder?: string;
-  tag?: string;
   property?: Record<string, string>;
   /**
-   * Logical expression: "Folder/" AND/OR #tag  (overrides folder/tag/op when set)
-   * Terms: "path/" for folders, #tag for tags, key=value for properties
+   * Logical expression for matching notes.
+   * Terms: "path/" for folders, #tag for tags, key=value for properties.
    */
   query?: string;
 }
@@ -69,12 +66,8 @@ export interface ManifestData {
   extends?: string;
   target?: ManifestTarget;
   /**
-   * If true, notes matching this manifest MUST be located in `target.folder`.
-   * If a matching note is found outside that folder, the plugin auto-moves it.
-   * Requires `target.folder` to be set; ignored otherwise.
-   *
-   * If a string, it is used as the target folder path directly — useful for
-   * tag-based or property-based schemas that have no `target.folder`.
+   * If true, has no effect (legacy: formerly required target.folder).
+   * If a string, notes matching this schema are auto-moved to that folder path.
    */
   enforce_folder?: boolean | string;
   fields?: Record<string, ManifestField>;

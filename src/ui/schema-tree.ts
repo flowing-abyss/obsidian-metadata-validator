@@ -97,18 +97,11 @@ export class SchemaTreeView {
     const fieldCount = Object.keys(manifest.data.fields ?? {}).length;
     row.createEl("span", { text: `${fieldCount} fields`, cls: "mv-tree-count" });
 
-    const targetFolder = manifest.data.target?.folder;
-    if (typeof targetFolder === "string") {
+    const targetQuery = manifest.data.target?.query;
+    if (typeof targetQuery === "string") {
       row.createEl("span", {
-        text: `📁 ${targetFolder}`,
-        cls: "mv-tree-folder",
-      });
-    }
-    const targetTag = manifest.data.target?.tag;
-    if (typeof targetTag === "string") {
-      row.createEl("span", {
-        text: targetTag,
-        cls: "mv-tree-tag",
+        text: targetQuery,
+        cls: "mv-tree-query",
       });
     }
 
