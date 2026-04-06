@@ -24,3 +24,9 @@ data.json
 # Internal docs (specs, plans) — not part of distributed plugin
 docs/
 .superpowers/
+
+# Test vault — keep schemas and notes, ignore Obsidian workspace state and compiled plugin
+test-vault/.obsidian/workspace
+test-vault/.obsidian/workspace.json
+test-vault/.obsidian/plugins/metadata-validator/main.js
+test-vault/.obsidian/plugins/metadata-validator/styles.css
