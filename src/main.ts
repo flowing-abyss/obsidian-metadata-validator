@@ -231,9 +231,17 @@ export default class MetadataValidatorPlugin extends Plugin {
       return;
     }
 
+    // enforce_folder: resolve the effective target path
+    const enforcePath =
+      typeof schema.enforce_folder === "string"
+        ? schema.enforce_folder
+        : schema.enforce_folder === true
+          ? schema.target.folder
+          : undefined;
+
     // enforce_folder: auto-move if needed
-    if (schema.enforce_folder === true && schema.target.folder) {
-      const moveResult = checkFolderLocation(file.path, schema.target.folder, schema.manifestPath);
+    if (enforcePath) {
+      const moveResult = checkFolderLocation(file.path, enforcePath, schema.manifestPath);
       if (moveResult) {
         await this.app.fileManager.renameFile(file, moveResult.targetPath);
         new Notice(`Moved "${file.basename}" → ${moveResult.targetPath}`);
@@ -242,6 +250,19 @@ export default class MetadataValidatorPlugin extends Plugin {
     }
 
     const results = await this.engine.validate(file, frontmatter, schema);
+
+    // Warn when enforce_folder: true but no target.folder was set
+    if (schema.enforce_folder === true && !schema.target.folder) {
+      results.push({
+        field: "__location__",
+        severity: "warning",
+        message:
+          'enforce_folder: true has no effect without target.folder. Use enforce_folder: "folder/" to set an explicit path.',
+        rule: "enforce_folder",
+        manifestPath: schema.manifestPath,
+        autoFixed: false,
+      });
+    }
 
     const hasAutoFix = results.some((r) => r.autoFixed);
     if (hasAutoFix) {

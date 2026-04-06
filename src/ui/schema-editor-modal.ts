@@ -158,7 +158,7 @@ export class SchemaEditorModal extends Modal {
       .setName("Enforce folder")
       .setDesc("Auto-move notes outside the target folder on validation.")
       .addToggle((t) =>
-        t.setValue(this.data.enforce_folder ?? false).onChange((v) => {
+        t.setValue(!!this.data.enforce_folder).onChange((v) => {
           this.data.enforce_folder = v || undefined;
         })
       );

@@ -63,8 +63,11 @@ export interface ManifestData {
    * If true, notes matching this manifest MUST be located in `target.folder`.
    * If a matching note is found outside that folder, the plugin auto-moves it.
    * Requires `target.folder` to be set; ignored otherwise.
+   *
+   * If a string, it is used as the target folder path directly — useful for
+   * tag-based or property-based schemas that have no `target.folder`.
    */
-  enforce_folder?: boolean;
+  enforce_folder?: boolean | string;
   fields?: Record<string, ManifestField>;
   formatting?: {
     property_order?: string[];
@@ -88,7 +91,7 @@ export interface ResolvedSchema {
   manifestPath: string;
   name: string;
   priority: number;
-  enforce_folder?: boolean;
+  enforce_folder?: boolean | string;
   target: ManifestTarget;
   fields: Record<string, ManifestField>;
   formatting: { property_order?: string[] };
