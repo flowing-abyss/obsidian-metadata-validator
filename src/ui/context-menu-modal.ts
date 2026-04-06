@@ -130,11 +130,20 @@ export class ContextMenuModal extends Modal {
     // Store field key for footer hover-highlight
     row.setAttribute("data-mv-field", fieldKey);
 
-    // Label column: type icon + field name
+    // Label column: field name + type icon (icon clickable for picker types)
     const labelEl = row.createDiv("mv-field-label");
+    labelEl.createEl("span", { text: fieldDef.label ?? fieldKey, cls: "mv-field-label-text" });
     const iconEl = labelEl.createEl("span", { cls: "mv-field-type-icon" });
     setIcon(iconEl, FIELD_TYPE_ICON[fieldDef.type] ?? "square");
-    labelEl.createEl("span", { text: fieldDef.label ?? fieldKey, cls: "mv-field-label-text" });
+
+    const isPickerType = ["select", "multiselect", "link", "multilink"].includes(fieldDef.type);
+    if (isPickerType && fieldDef.fixed === undefined) {
+      iconEl.addClass("mv-field-type-icon--clickable");
+      iconEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.openPicker(fieldKey, fieldDef, frontmatter[fieldKey]);
+      });
+    }
 
     // Value / editor column
     const valueEl = row.createDiv("mv-field-value");
@@ -205,15 +214,18 @@ export class ContextMenuModal extends Modal {
         });
         if (fieldDef.min !== undefined) input.setAttribute("min", String(fieldDef.min));
         if (fieldDef.max !== undefined) input.setAttribute("max", String(fieldDef.max));
-        if (fieldDef.min !== undefined || fieldDef.max !== undefined) {
-          const minText = fieldDef.min !== undefined ? String(fieldDef.min) : "\u2026";
-          const maxText = fieldDef.max !== undefined ? String(fieldDef.max) : "\u2026";
-          input.setAttribute("placeholder", `${minText}\u2013${maxText}`);
-        }
         input.addEventListener("change", () => {
           const num = parseFloat(input.value);
           this.saveField(fieldKey, isNaN(num) ? null : num);
         });
+        if (fieldDef.min !== undefined || fieldDef.max !== undefined) {
+          const minText = fieldDef.min !== undefined ? String(fieldDef.min) : "\u2026";
+          const maxText = fieldDef.max !== undefined ? String(fieldDef.max) : "\u2026";
+          container.createEl("span", {
+            text: `${minText}\u2013${maxText}`,
+            cls: "mv-field-range-hint",
+          });
+        }
         break;
       }
 
@@ -267,14 +279,11 @@ export class ContextMenuModal extends Modal {
         ? [this.toStr(currentValue)]
         : [];
 
-    // "Change" button comes first
-    const editBtn = container.createEl("button", { text: "Change", cls: "mv-chip-edit" });
-    editBtn.addEventListener("click", () => {
-      this.openPicker(fieldKey, fieldDef, currentValue);
-    });
-
     if (values.length === 0) {
-      container.createEl("span", { text: "None", cls: "mv-field-empty" });
+      const noneEl = container.createEl("span", { text: "None", cls: "mv-field-empty" });
+      noneEl.addEventListener("click", () => {
+        this.openPicker(fieldKey, fieldDef, currentValue);
+      });
       return;
     }
 
@@ -292,7 +301,7 @@ export class ContextMenuModal extends Modal {
         link.setAttribute("data-href", name);
         link.addEventListener("click", (e) => {
           e.preventDefault();
-          void this.app.workspace.openLinkText(name, this.file.path, false);
+          void this.app.workspace.openLinkText(name, this.file.path, true);
         });
       } else {
         const chip = container.createEl("span", { text: name, cls: "mv-chip" });

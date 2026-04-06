@@ -1,15 +1,16 @@
 /* Metadata Validator plugin styles */
 
 /* ── Body-level CSS toggles (controlled by CssInjector) ──── */
-body.mv-hide-type-icon .metadata-property-icon {
+body.mv-hide-type-icon .metadata-property-icon,
+body.mv-hide-type-icon .metadata-property-icon svg,
+body.mv-hide-type-icon .metadata-property-type-icon {
   display: none !important;
 }
 
+body.mv-hide-validator .metadata-property-invalid-icon,
+body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadata-property-icon,
+body.mv-hide-validator [class*="metadata-property"][class*="invalid"],
 body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadata-property-value::after {
-  display: none !important;
-}
-
-body.mv-hide-validator .metadata-property-invalid-icon {
   display: none !important;
 }
 
@@ -48,7 +49,9 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 }
 
 .mv-picker-modal .mv-picker-option.is-selected {
-  background: var(--interactive-accent-hover);
+  background: var(--background-modifier-hover);
+  border-left: 3px solid var(--interactive-accent);
+  padding-left: 7px;
 }
 
 .mv-picker-modal .mv-picker-value-hint {
@@ -1076,4 +1079,39 @@ body.mv-hide-validator .metadata-property-invalid-icon {
 .mv-qe-done {
   margin-top: 4px;
   width: 100%;
+}
+
+/* ── Clickable type icon in context modal ────────────────── */
+.mv-field-type-icon--clickable {
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 1px;
+  transition: background 0.1s, opacity 0.1s;
+}
+
+.mv-field-type-icon--clickable:hover {
+  opacity: 1;
+  background: var(--background-modifier-hover);
+}
+
+/* ── Schema editor inheritance nav ──────────────────────── */
+.mv-editor-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.mv-nav-btn {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-accent);
+  cursor: pointer;
+}
+
+.mv-nav-btn:hover {
+  background: var(--background-modifier-hover);
 }

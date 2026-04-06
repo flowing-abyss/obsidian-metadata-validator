@@ -35,8 +35,12 @@ export class ValidationEngine {
       results.push(...fieldResults);
     }
 
-    if (schema.formatting.property_order?.length) {
-      const reordered = this.applyPropertyOrder(frontmatter, schema.formatting.property_order);
+    // Apply ordering: explicit property_order wins; fall back to schema field definition order
+    const effectiveOrder = schema.formatting.property_order?.length
+      ? schema.formatting.property_order
+      : Object.keys(schema.fields);
+    if (effectiveOrder.length) {
+      const reordered = this.applyPropertyOrder(frontmatter, effectiveOrder);
       if (reordered) {
         results.push({
           field: "__order__",

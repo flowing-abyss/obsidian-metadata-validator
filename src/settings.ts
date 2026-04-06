@@ -13,7 +13,6 @@ export interface PluginSettings {
   showInlineErrors: boolean;
   showSidebarPanel: boolean;
   showFileExplorerBadges: boolean;
-  globalPropertyOrder: string[];
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -27,7 +26,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   showInlineErrors: true,
   showSidebarPanel: true,
   showFileExplorerBadges: true,
-  globalPropertyOrder: [],
 };
 
 export class MetadataValidatorSettingTab extends PluginSettingTab {
@@ -145,25 +143,9 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
         t.setValue(this.plugin.settings.showFileExplorerBadges).onChange(async (v) => {
           this.plugin.settings.showFileExplorerBadges = v;
           await this.plugin.saveSettings();
+          if (v) this.plugin.badges.render();
+          else this.plugin.badges.clearAll();
         })
-      );
-
-    new Setting(containerEl).setName("Property order").setHeading();
-
-    new Setting(containerEl)
-      .setName("Global property order")
-      .setDesc("Comma-separated list of property names. Applied as default order across all types.")
-      .addText((text) =>
-        text
-          .setPlaceholder("Status, author, tags, rating")
-          .setValue(this.plugin.settings.globalPropertyOrder.join(", "))
-          .onChange(async (value) => {
-            this.plugin.settings.globalPropertyOrder = value
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean);
-            await this.plugin.saveSettings();
-          })
       );
 
     new Setting(containerEl).setName("Schema hierarchy").setHeading();
@@ -185,7 +167,12 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
 
   private renderTree(container: HTMLElement): void {
     void import("./ui/schema-tree").then((mod: { SchemaTreeView: typeof SchemaTreeViewType }) => {
-      new mod.SchemaTreeView(this.app, this.plugin.cache, this.plugin.resolver).render(container);
+      new mod.SchemaTreeView(
+        this.app,
+        this.plugin.cache,
+        this.plugin.resolver,
+        (path) => void this.plugin.openSchemaEditor(path)
+      ).render(container);
     });
   }
 }

@@ -27,13 +27,15 @@ export class SchemaEditorModal extends Modal {
   private readonly manifestPath: string;
   private readonly onSaved: () => Promise<void>;
   private readonly cache?: ManifestCache;
+  private readonly openOther?: (path: string) => void;
 
   constructor(
     app: App,
     manifestPath: string,
     data: ManifestData,
     onSaved: () => Promise<void>,
-    cache?: ManifestCache
+    cache?: ManifestCache,
+    openOther?: (path: string) => void
   ) {
     super(app);
     this.manifestPath = manifestPath;
@@ -41,6 +43,7 @@ export class SchemaEditorModal extends Modal {
     this.data = JSON.parse(JSON.stringify(data)) as ManifestData;
     this.onSaved = onSaved;
     this.cache = cache;
+    this.openOther = openOther;
     this.modalEl.addClass("mv-schema-editor-modal");
   }
 
@@ -50,6 +53,68 @@ export class SchemaEditorModal extends Modal {
 
   onClose(): void {
     this.contentEl.empty();
+  }
+
+  // ── Inheritance navigation ────────────────────────────────────────────────
+
+  private renderInheritanceNav(el: HTMLElement): void {
+    if (!this.cache || !this.openOther) return;
+
+    const folder = this.manifestPath.replace(/\/manifest\.md$/, "");
+
+    // Determine parent
+    let parentManifest = this.data.extends ? this.cache.getByFolder(this.data.extends) : null;
+    if (!parentManifest) {
+      const parentFolder = folder.split("/").slice(0, -1).join("/");
+      parentManifest = parentFolder ? (this.cache.getByFolder(parentFolder) ?? null) : null;
+    }
+
+    // Determine children (schemas whose resolved parent == this manifest)
+    const children = this.cache.getAll().filter((m) => {
+      if (m.path === this.manifestPath) return false;
+      const childFolder = m.folderPath;
+      const childParentFolder = childFolder.split("/").slice(0, -1).join("/");
+      const autoParent = childParentFolder ? this.cache!.getByFolder(childParentFolder) : null;
+      const extendsParent = m.data.extends ? this.cache!.getByFolder(m.data.extends) : null;
+      return (extendsParent ?? autoParent)?.path === this.manifestPath;
+    });
+
+    if (!parentManifest && children.length === 0) return;
+
+    const nav = el.createDiv("mv-editor-nav");
+    const openFn = this.openOther;
+
+    if (parentManifest) {
+      const parentName =
+        typeof parentManifest.data.name === "string"
+          ? parentManifest.data.name
+          : (parentManifest.folderPath.split("/").pop() ?? "parent");
+      const btn = nav.createEl("button", {
+        text: `\u2190 ${parentName}`,
+        cls: "mv-nav-btn",
+      });
+      const parentPath = parentManifest.path;
+      btn.addEventListener("click", () => {
+        this.close();
+        openFn(parentPath);
+      });
+    }
+
+    for (const child of children) {
+      const childName =
+        typeof child.data.name === "string"
+          ? child.data.name
+          : (child.folderPath.split("/").pop() ?? "child");
+      const btn = nav.createEl("button", {
+        text: `${childName} \u2192`,
+        cls: "mv-nav-btn",
+      });
+      const childPath = child.path;
+      btn.addEventListener("click", () => {
+        this.close();
+        openFn(childPath);
+      });
+    }
   }
 
   // ── Main render ───────────────────────────────────────────────────────────
@@ -62,6 +127,8 @@ export class SchemaEditorModal extends Modal {
       text: `Schema editor — ${this.data.name ?? this.manifestPath}`,
       cls: "mv-editor-title",
     });
+
+    this.renderInheritanceNav(contentEl);
 
     this.renderCollapsibleSection(contentEl, "Basic", (body) => this.renderBasic(body));
     this.renderCollapsibleSection(contentEl, "Target", (body) => this.renderTarget(body));
@@ -527,7 +594,7 @@ export class SchemaEditorModal extends Modal {
 
     new Setting(body)
       .setName("JS code") // eslint-disable-line obsidianmd/ui/sentence-case
-      .setDesc("DataView/Obsidian JS returning [{value, label}] — overrides expression if set.")  
+      .setDesc("DataView/Obsidian JS returning [{value, label}] — overrides expression if set.")
       .addTextArea((t) => {
         t.inputEl.addClass("mv-js-textarea");
         t.inputEl.setAttribute("placeholder", "return app.vault.getMarkdownFiles()..."); // eslint-disable-line obsidianmd/ui/sentence-case
@@ -616,7 +683,7 @@ export class SchemaEditorModal extends Modal {
 
     new Setting(dynamicPanel)
       .setName("JS code") // eslint-disable-line obsidianmd/ui/sentence-case
-      .setDesc("DataView/Obsidian JS returning [{value, label}] — overrides expression.")  
+      .setDesc("DataView/Obsidian JS returning [{value, label}] — overrides expression.")
       .addTextArea((t) => {
         t.inputEl.addClass("mv-js-textarea");
         t.inputEl.setAttribute("placeholder", "return app.vault.getMarkdownFiles()..."); // eslint-disable-line obsidianmd/ui/sentence-case
@@ -847,7 +914,17 @@ export class SchemaEditorModal extends Modal {
       if (f.format) fOut.format = f.format;
       if (f.sort) fOut.sort = f.sort;
       if (f.validate_exists !== undefined) fOut.validate_exists = f.validate_exists;
-      if (Array.isArray(f.options) && f.options.length) fOut.options = f.options;
+      if (Array.isArray(f.options) && f.options.length) {
+        fOut.options = f.options;
+      } else if (f.options !== undefined && !Array.isArray(f.options)) {
+        const dynOpts = f.options as { source?: { query?: string; js?: string } };
+        if (dynOpts.source) {
+          const src: Record<string, unknown> = {};
+          if (dynOpts.source.query) src.query = dynOpts.source.query;
+          if (dynOpts.source.js) src.js = dynOpts.source.js;
+          if (Object.keys(src).length) fOut.options = { source: src };
+        }
+      }
       if (f.source) {
         const src: Record<string, unknown> = {};
         if (f.source.query) src.query = f.source.query;

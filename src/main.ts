@@ -22,7 +22,7 @@ export default class MetadataValidatorPlugin extends Plugin {
   private engine!: ValidationEngine;
   cssInjector!: CssInjector;
   decorator!: PropertyDecorator;
-  private badges!: ExplorerBadges;
+  badges!: ExplorerBadges;
   private backgroundScanTimer: number | null = null;
 
   async onload(): Promise<void> {
@@ -456,7 +456,8 @@ export default class MetadataValidatorPlugin extends Plugin {
       async () => {
         await this.reloadSchemas();
       },
-      this.cache
+      this.cache,
+      (p) => void this.openSchemaEditor(p)
     ).open();
   }
 

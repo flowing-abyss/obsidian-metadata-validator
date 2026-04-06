@@ -8,11 +8,18 @@ export class SchemaTreeView {
   private readonly cache: ManifestCache;
   // resolver stored for future use (e.g. showing resolved schema details)
   private readonly resolver: SchemaResolver;
+  private readonly openSchemaEditor: ((path: string) => void) | null;
 
-  constructor(app: App, cache: ManifestCache, resolver: SchemaResolver) {
+  constructor(
+    app: App,
+    cache: ManifestCache,
+    resolver: SchemaResolver,
+    openSchemaEditor?: (path: string) => void
+  ) {
     this.app = app;
     this.cache = cache;
     this.resolver = resolver;
+    this.openSchemaEditor = openSchemaEditor ?? null;
   }
 
   render(container: HTMLElement): void {
@@ -105,7 +112,11 @@ export class SchemaTreeView {
     }
 
     row.addEventListener("click", () => {
-      void this.app.workspace.openLinkText(manifestPath, "");
+      if (this.openSchemaEditor) {
+        this.openSchemaEditor(manifestPath);
+      } else {
+        void this.app.workspace.openLinkText(manifestPath, "");
+      }
     });
   }
 }
