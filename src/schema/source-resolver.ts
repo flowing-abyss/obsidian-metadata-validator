@@ -115,7 +115,7 @@ async function resolveJsSource(
     // dv.pages() returns a DataArray (not a plain Array) — convert any iterable
     let items: unknown[];
     if (Array.isArray(result)) {
-      items = result;
+      items = Array.from(result as unknown[]);
     } else if (result !== null && result !== undefined && Symbol.iterator in Object(result)) {
       items = Array.from(result as Iterable<unknown>);
     } else {
@@ -129,7 +129,7 @@ async function resolveJsSource(
       return { value, label };
     });
   } catch (e) {
-    console.error("[MetadataValidator] Error in JS source:", e);
+    console.error("[MetadataValidator] Error in JS source:", e, "\nCode:", code);
     return [];
   }
 }

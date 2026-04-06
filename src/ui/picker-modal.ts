@@ -12,6 +12,8 @@ export class PickerModal extends Modal {
   private options: FieldOption[] = [];
   // Mutable selection state — normalised values (no [[]])
   private selected: Set<string> = new Set();
+  // For multi-select: defer save to onClose to avoid concurrent processFrontMatter calls
+  private dirtyMulti = false;
 
   constructor(
     app: App,
@@ -154,19 +156,19 @@ export class PickerModal extends Modal {
 
       item.addEventListener("click", () => {
         if (this.isMulti) {
-          // Toggle selection
+          // Toggle selection — save deferred to onClose to avoid concurrent saves
           if (this.selected.has(opt.value)) {
             this.selected.delete(opt.value);
           } else {
             this.selected.add(opt.value);
           }
-          this.persistSelection();
-          // Re-render without closing
+          this.dirtyMulti = true;
           this.renderOptions(listEl, options, query);
         } else {
-          // Single select: set and close
+          // Single select: save and close immediately
           this.selected.clear();
           this.selected.add(opt.value);
+          this.dirtyMulti = false;
           this.persistSelection();
           this.close();
         }
@@ -195,6 +197,11 @@ export class PickerModal extends Modal {
   }
 
   onClose(): void {
+    // For multi-select: flush accumulated selection on close (single save, no races)
+    if (this.dirtyMulti) {
+      this.dirtyMulti = false;
+      this.persistSelection();
+    }
     this.contentEl.empty();
   }
 }
