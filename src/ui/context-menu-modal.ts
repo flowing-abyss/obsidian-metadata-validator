@@ -386,23 +386,34 @@ export class ContextMenuModal extends Modal {
         });
       });
 
-      const addInput = chipsEl.createEl("input", { type: "text", cls: "mv-list-add-input" });
-      addInput.setAttribute("placeholder", "+");
-      const commit = () => {
-        const val = addInput.value.trim().replace(/,$/, "");
-        if (val) {
-          const updated = [...items, val];
-          this.saveField(fieldKey, updated);
-          refresh(updated);
-        }
-      };
-      addInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === ",") {
-          e.preventDefault();
-          commit();
-        }
+      // "+" button — switches to an inline input on click.
+      // Using <button> avoids browser-imposed minimum heights on <input type="text">.
+      const addBtn = chipsEl.createEl("button", { text: "+", cls: "mv-list-add-btn" });
+      addBtn.addEventListener("click", () => {
+        addBtn.remove();
+        const addInput = chipsEl.createEl("input", { type: "text", cls: "mv-list-add-input" });
+        addInput.setAttribute("placeholder", "Add\u2026");
+        const commit = () => {
+          const val = addInput.value.trim().replace(/,$/, "");
+          if (val) {
+            const updated = [...items, val];
+            this.saveField(fieldKey, updated);
+            refresh(updated);
+          } else {
+            refresh(items);
+          }
+        };
+        addInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            commit();
+          } else if (e.key === "Escape") {
+            refresh(items);
+          }
+        });
+        addInput.addEventListener("blur", commit);
+        addInput.focus();
       });
-      addInput.addEventListener("blur", commit);
     };
 
     refresh(values);

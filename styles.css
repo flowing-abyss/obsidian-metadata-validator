@@ -822,33 +822,43 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
   color: var(--color-red);
 }
 
-.mv-list-add-input {
-  width: 22px;
+/* Compact "+" trigger button — uses <button> to avoid input min-height quirks */
+.mv-list-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
   height: 20px;
   box-sizing: border-box;
-  -webkit-appearance: none;
-  appearance: none;
-  min-width: 0;
-  font-size: 13px;
-  padding: 0 3px;
+  flex-shrink: 0;
+  align-self: center;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
   border-radius: 6px;
   border: 1px dashed var(--background-modifier-border);
   background: transparent;
   color: var(--text-muted);
-  text-align: center;
   cursor: pointer;
-  flex-shrink: 0;
-  align-self: center;
-  line-height: 18px;
 }
 
-.mv-list-add-input:focus {
-  width: 90px;
-  outline: none;
-  border-style: solid;
+.mv-list-add-btn:hover {
   border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
+/* Inline text input shown after clicking the "+" button */
+.mv-list-add-input {
+  width: 80px;
+  box-sizing: border-box;
+  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--interactive-accent);
+  background: var(--background-primary);
   color: var(--text-normal);
-  cursor: text;
+  outline: none;
+  align-self: center;
 }
 
 .mv-context-footer {
