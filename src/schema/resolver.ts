@@ -72,7 +72,15 @@ export class SchemaResolver {
   }
 
   resolveForNote(file: TFile, frontmatter: Record<string, unknown>): ResolvedSchema | null {
-    const fileTags: string[] = (file as unknown as { tags?: string[] }).tags ?? [];
+    // Read tags from frontmatter — TFile has no .tags property at runtime.
+    // Obsidian stores frontmatter tags as string[] or a single string.
+    const rawTags = frontmatter["tags"];
+    const fileTags: string[] = Array.isArray(rawTags)
+      ? rawTags.map((t) => String(t))
+      : typeof rawTags === "string" && rawTags
+        ? [rawTags]
+        : [];
+
     const matches: ResolvedSchema[] = [];
 
     for (const schema of this.resolved.values()) {
@@ -106,7 +114,13 @@ export class SchemaResolver {
       conditions.push(file.path.startsWith(target.folder));
     }
     if (target.tag) {
-      conditions.push(fileTags.includes(target.tag));
+      const schemaTag = target.tag.replace(/^#/, "");
+      conditions.push(
+        fileTags.some((t) => {
+          const ft = t.replace(/^#/, "");
+          return ft === schemaTag || ft.startsWith(schemaTag + "/");
+        })
+      );
     }
     if (target.property) {
       const allMatch = Object.entries(target.property).every(([k, v]) => {

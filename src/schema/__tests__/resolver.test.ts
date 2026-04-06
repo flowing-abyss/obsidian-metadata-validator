@@ -57,8 +57,8 @@ describe("SchemaResolver", () => {
     const resolver = new SchemaResolver(cache);
     resolver.rebuild();
 
-    const file = makeFile("Notes/Some Article.md", ["#article"]);
-    const schema = resolver.resolveForNote(file, {});
+    const file = makeFile("Notes/Some Article.md");
+    const schema = resolver.resolveForNote(file, { tags: ["article"] });
     expect(schema?.name).toBe("article");
   });
 
