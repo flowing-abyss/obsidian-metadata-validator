@@ -11,21 +11,22 @@ Manifest-driven metadata validation for Obsidian. Define schemas in `manifest.md
 
 ```
 vault/
-├── manifest.md          ← base schema (applies everywhere)
-│
-├── sources/
-│   ├── manifest.md      ← inherits base, adds source-specific fields
-│   └── books/
-│       └── manifest.md  ← inherits sources, adds book-specific fields
-│
-└── people/
-    └── manifest.md      ← inherits base, adds person-specific fields
+└── schemes/
+    ├── manifest.md          ← base schema
+    │
+    ├── sources/
+    │   ├── manifest.md      ← inherits base, adds source-specific fields
+    │   └── books/
+    │       └── manifest.md  ← inherits sources, adds book-specific fields
+    │
+    └── people/
+        └── manifest.md      ← inherits base, adds person-specific fields
 ```
 
 Each `manifest.md` defines fields in its frontmatter. Child manifests extend their parent — fields are merged, child wins on conflict.
 
 ```yaml
-# vault/sources/books/manifest.md
+# schemes/sources/books/manifest.md
 extends: ../  # optional — inferred automatically from folder nesting
 
 fields:
@@ -42,4 +43,4 @@ fields:
     default: to-read
 ```
 
-A note gets the schema of the deepest `manifest.md` above it in the folder tree.
+A note gets the schema of the deepest `manifest.md` above it in the `schemes/` tree.
