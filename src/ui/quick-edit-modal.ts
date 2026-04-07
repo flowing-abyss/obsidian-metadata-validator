@@ -196,9 +196,5 @@ export class QuickEditModal extends Modal {
     };
 
     render(items);
-
-    container
-      .createEl("button", { text: "Done", cls: "mv-qe-done mod-cta" })
-      .addEventListener("click", () => this.close());
   }
 }

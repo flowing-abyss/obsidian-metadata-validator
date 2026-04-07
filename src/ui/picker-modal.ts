@@ -88,15 +88,6 @@ export class PickerModal extends Modal {
     search.addEventListener("input", () => {
       this.renderOptions(listEl, this.options, search.value);
     });
-
-    const footer = contentEl.createDiv("mv-picker-footer");
-    footer.createEl("span", { text: `Manifest: ${this.schema.manifestPath}` });
-    if (this.schema.inheritanceChain.length > 1) {
-      footer.createEl("br");
-      footer.createEl("span", {
-        text: `Inherits: ${this.schema.inheritanceChain.slice(0, -1).join(" → ")}`,
-      });
-    }
   }
 
   private get isMulti(): boolean {
