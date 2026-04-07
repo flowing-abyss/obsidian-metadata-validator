@@ -1,16 +1,11 @@
 /* Metadata Validator plugin styles */
 
 /* ── Body-level CSS toggles (controlled by CssInjector) ──── */
-body.mv-hide-type-icon .metadata-property-icon,
-body.mv-hide-type-icon .metadata-property-icon svg,
-body.mv-hide-type-icon .metadata-property-type-icon {
+body.mv-hide-type-icon .metadata-content .metadata-property-icon {
   display: none !important;
 }
 
-body.mv-hide-validator .metadata-property-invalid-icon,
-body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadata-property-icon,
-body.mv-hide-validator [class*="metadata-property"][class*="invalid"],
-body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadata-property-value::after {
+body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   display: none !important;
 }
 
@@ -1004,8 +999,9 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
 }
 
 /* ── Suppress Obsidian's type icon when we inject our own ──  */
-.metadata-property:has([data-mv-picker]) .metadata-property-icon {
-  display: none;
+/* Only hide when the setting is active (mv-hide-type-icon body class) */
+body.mv-hide-type-icon .metadata-property:has([data-mv-picker]) .metadata-content .metadata-property-icon {
+  display: none !important;
 }
 
 /* ── Expression input (full width) ───────────────────────── */
