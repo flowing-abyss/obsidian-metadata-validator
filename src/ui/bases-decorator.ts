@@ -53,9 +53,16 @@ export class BasesDecorator {
     if (!target) return;
     if (!target.closest(".bases-view")) return;
 
-    // Only intercept right-click on the cell's empty padding area
+    // Skip right-clicks on links — let Obsidian handle the file context menu
+    if (target.closest("a") ?? target.closest("[data-href]")) return;
+
     const cell = target.closest<HTMLElement>(".bases-td[data-property]");
-    if (!cell || target !== cell) return;
+    if (!cell) return;
+
+    // Only intercept right-click on empty space (container elements like div/td).
+    // Right-click on a value chip (span, etc.) should show the native context menu.
+    const CONTAINERS = new Set(["DIV", "TD", "TR", "TABLE", "TBODY", "THEAD"]);
+    if (!CONTAINERS.has(target.tagName)) return;
 
     const rawProp = cell.getAttribute("data-property") ?? "";
     if (!rawProp.startsWith("note.")) return;

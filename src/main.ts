@@ -322,19 +322,15 @@ export default class MetadataValidatorPlugin extends Plugin {
               .setTitle(title)
               .setIcon("pencil")
               .onClick(() => {
+                if (!schema) {
+                  new Notice("No schema matches this note.");
+                  return;
+                }
                 const getFields = (p: string) => this.cache.getByPath(p)?.data.fields;
                 new ContextMenuModal(
                   this.app,
                   targetFile,
-                  schema ?? {
-                    fields: {},
-                    manifestPath: "",
-                    name: "",
-                    priority: 0,
-                    target: {},
-                    formatting: {},
-                    inheritanceChain: [],
-                  },
+                  schema,
                   getFields,
                   (p) => void this.openSchemaEditor(p)
                 ).open();
