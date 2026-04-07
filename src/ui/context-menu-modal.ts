@@ -179,9 +179,27 @@ export class ContextMenuModal extends Modal {
         e.stopPropagation();
         this.toggleBoolean(fieldKey, frontmatter[fieldKey] !== true);
       });
+    } else if (fieldDef.type === "url" && fieldDef.fixed === undefined) {
+      iconEl.addClass("mv-field-type-icon--clickable");
     }
 
     this.renderEditor(valueEl, fieldKey, fieldDef, frontmatter);
+
+    // Wire up URL icon → switch to edit input after editor is rendered
+    if (fieldDef.type === "url" && fieldDef.fixed === undefined) {
+      const urlRow = valueEl.querySelector<HTMLElement>(".mv-url-row");
+      if (urlRow) {
+        iconEl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          // Trigger dblclick on the link to activate edit mode
+          urlRow
+            .querySelector<HTMLElement>(".mv-url-link")
+            ?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+          // If no link (empty field), focus the existing input
+          urlRow.querySelector<HTMLInputElement>(".mv-url-input")?.focus();
+        });
+      }
+    }
 
     // Error icon column (right side)
     const errors = (resultMap.get(fieldKey) ?? []).filter((r) => !r.autoFixed);
