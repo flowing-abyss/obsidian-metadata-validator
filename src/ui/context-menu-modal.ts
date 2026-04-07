@@ -326,7 +326,13 @@ export class ContextMenuModal extends Modal {
 
     for (let i = 0; i < values.length; i++) {
       const raw = values[i] ?? "";
-      const name = raw.replace(/^\[\[/, "").replace(/\]\]$/, "").replace(/\|.*$/, "");
+      // Parse wikilink: [[path/name|alias]] or [[path/name]] or plain text
+      const inner = raw.startsWith("[[") && raw.endsWith("]]") ? raw.slice(2, -2) : raw;
+      const pipeIdx = inner.indexOf("|");
+      const linkTarget = pipeIdx !== -1 ? inner.slice(0, pipeIdx) : inner;
+      // Display: prefer alias, then basename of the target path
+      const displayName =
+        pipeIdx !== -1 ? inner.slice(pipeIdx + 1) : (linkTarget.split("/").pop() ?? linkTarget);
 
       // Separator between items
       if (i > 0) {
@@ -334,14 +340,14 @@ export class ContextMenuModal extends Modal {
       }
 
       if (isLink) {
-        const link = container.createEl("a", { cls: "mv-wikilink", text: name });
-        link.setAttribute("data-href", name);
+        const link = container.createEl("a", { cls: "mv-wikilink", text: displayName });
+        link.setAttribute("data-href", linkTarget);
         link.addEventListener("click", (e) => {
           e.preventDefault();
-          void this.app.workspace.openLinkText(name, this.file.path, true);
+          void this.app.workspace.openLinkText(linkTarget, this.file.path, true);
         });
       } else {
-        const chip = container.createEl("span", { text: name, cls: "mv-chip" });
+        const chip = container.createEl("span", { text: displayName, cls: "mv-chip" });
         chip.addEventListener("click", () => {
           this.openPicker(fieldKey, fieldDef);
         });
