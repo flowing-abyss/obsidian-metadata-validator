@@ -71,6 +71,8 @@ export interface ManifestData {
    */
   enforce_folder?: boolean | string;
   fields?: Record<string, ManifestField>;
+  /** Field keys inherited from a parent manifest to exclude in this manifest */
+  exclude?: string[];
   formatting?: {
     property_order?: string[];
   };

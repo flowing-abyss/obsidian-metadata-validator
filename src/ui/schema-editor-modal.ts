@@ -142,6 +142,8 @@ export class SchemaEditorModal extends Modal {
       );
     });
 
+    this.renderInheritedFieldsSection(contentEl);
+
     const footer = new Setting(contentEl);
     footer
       .addButton((btn) =>
@@ -303,6 +305,55 @@ export class SchemaEditorModal extends Modal {
   }
 
   // ── Fields ────────────────────────────────────────────────────────────────
+
+  // ── Inherited fields exclusion ───────────────────────────────────────────
+
+  private renderInheritedFieldsSection(el: HTMLElement): void {
+    if (!this.cache) return;
+
+    // Find parent manifest to get its fields
+    const folder = this.manifestPath.replace(/\/manifest\.md$/, "");
+    let parentManifest = this.data.extends ? this.cache.getByFolder(this.data.extends) : null;
+    if (!parentManifest) {
+      const parentFolder = folder.split("/").slice(0, -1).join("/");
+      parentManifest = parentFolder ? (this.cache.getByFolder(parentFolder) ?? null) : null;
+    }
+    if (!parentManifest) return;
+
+    const parentFields = parentManifest.data.fields ?? {};
+    const inheritedKeys = Object.keys(parentFields).filter(
+      (k) => !(this.data.fields ?? {})[k] // only fields NOT overridden by child
+    );
+    if (inheritedKeys.length === 0) return;
+
+    this.renderCollapsibleSection(el, "Inherited fields", (body) => {
+      body.createEl("p", {
+        text: "Click a field to exclude it from this schema. Excluded fields won't be validated or shown.",
+        cls: "mv-inherited-desc",
+      });
+
+      const excluded = new Set<string>(this.data.exclude ?? []);
+      const listEl = body.createDiv("mv-inherited-list");
+
+      const refresh = () => {
+        listEl.empty();
+        for (const key of inheritedKeys) {
+          const isExcluded = excluded.has(key);
+          const chip = listEl.createEl("button", {
+            cls: `mv-inherited-chip${isExcluded ? " is-excluded" : ""}`,
+            text: key,
+          });
+          chip.addEventListener("click", () => {
+            if (excluded.has(key)) excluded.delete(key);
+            else excluded.add(key);
+            this.data.exclude = excluded.size > 0 ? Array.from(excluded).sort() : undefined;
+            refresh();
+          });
+        }
+      };
+      refresh();
+    });
+  }
 
   private renderFields(fieldsEl: HTMLElement): void {
     fieldsEl.empty();
@@ -852,6 +903,7 @@ export class SchemaEditorModal extends Modal {
     if (d.name) out.name = d.name;
     if (d.priority) out.priority = d.priority;
     if (d.extends) out.extends = d.extends;
+    if (d.exclude?.length) out.exclude = d.exclude;
     if (d.enforce_folder) out.enforce_folder = d.enforce_folder;
 
     const target: ManifestTarget = {};
