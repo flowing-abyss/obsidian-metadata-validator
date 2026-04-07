@@ -1,7 +1,6 @@
 import tseslint from 'typescript-eslint';
 import obsidianmd from "eslint-plugin-obsidianmd";
 import globals from "globals";
-import { globalIgnores } from "eslint/config";
 
 export default tseslint.config(
 	{
@@ -28,16 +27,18 @@ export default tseslint.config(
 			"depend/ban-dependencies": "off",
 		},
 	},
-	globalIgnores([
-		"node_modules",
-		"dist",
-		"esbuild.config.mjs",
-		"eslint.config.js",
-		"version-bump.mjs",
-		"versions.json",
-		"main.js",
-		"vitest.config.ts",
-		"src/**/*.test.ts",
-		"src/__mocks__/**",
-	]),
+	{
+		ignores: [
+			"node_modules",
+			"dist",
+			"esbuild.config.mjs",
+			"eslint.config.js",
+			"version-bump.mjs",
+			"versions.json",
+			"main.js",
+			"vitest.config.ts",
+			"src/**/*.test.ts",
+			"src/__mocks__/**",
+		],
+	},
 );

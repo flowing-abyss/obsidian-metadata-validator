@@ -1,6 +1,6 @@
 import type { ValidationSeverity } from "../../types";
 
-export interface FolderLocationResult {
+interface FolderLocationResult {
   field: "__location__";
   severity: ValidationSeverity;
   message: string;

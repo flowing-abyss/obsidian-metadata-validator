@@ -3,7 +3,7 @@ import type { ValidationResult } from "../types";
 
 export const SIDEBAR_PANEL_TYPE = "mv-sidebar-panel";
 
-export interface VaultStats {
+interface VaultStats {
   total: number;
   errors: number;
   warnings: number;
