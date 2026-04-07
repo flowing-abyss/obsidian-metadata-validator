@@ -223,17 +223,21 @@ export default class MetadataValidatorPlugin extends Plugin {
             return;
           }
 
-          const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as
-            | Record<string, unknown>
-            | undefined;
-          const schema = this.resolver.resolveForNote(file, fm ?? {});
-          if (!schema) return;
+          if (file.extension !== "md") return;
 
           menu.addItem((item) =>
             item
               .setTitle("Edit properties")
               .setIcon("pencil")
               .onClick(() => {
+                const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as
+                  | Record<string, unknown>
+                  | undefined;
+                const schema = this.resolver.resolveForNote(file, fm ?? {});
+                if (!schema) {
+                  new Notice("No schema matches this note.");
+                  return;
+                }
                 const getFields = (p: string) => this.cache.getByPath(p)?.data.fields;
                 new ContextMenuModal(
                   this.app,
@@ -245,12 +249,19 @@ export default class MetadataValidatorPlugin extends Plugin {
               })
           );
 
-          menu.addItem((item) =>
-            item
-              .setTitle("Edit schema")
-              .setIcon("settings-2")
-              .onClick(() => void this.openSchemaEditor(schema.manifestPath))
-          );
+          // "Edit schema" only when there's a schema to edit
+          const fmForSchema = this.app.metadataCache.getFileCache(file)?.frontmatter as
+            | Record<string, unknown>
+            | undefined;
+          const schemaForMenu = this.resolver.resolveForNote(file, fmForSchema ?? {});
+          if (schemaForMenu) {
+            menu.addItem((item) =>
+              item
+                .setTitle("Edit schema")
+                .setIcon("settings-2")
+                .onClick(() => void this.openSchemaEditor(schemaForMenu.manifestPath))
+            );
+          }
         })
       );
 

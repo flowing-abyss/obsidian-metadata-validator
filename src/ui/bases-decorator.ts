@@ -25,15 +25,81 @@ export class BasesDecorator {
     this.settings = settings;
   }
 
+  private boundContextHandler: ((e: MouseEvent) => void) | null = null;
+
   attach(): void {
     this.boundHandler = (e: MouseEvent) => this.onClick(e);
     document.body.addEventListener("click", this.boundHandler, { capture: true });
+
+    this.boundContextHandler = (e: MouseEvent) => this.onContextMenu(e);
+    document.body.addEventListener("contextmenu", this.boundContextHandler, { capture: true });
   }
 
   detach(): void {
     if (this.boundHandler) {
       document.body.removeEventListener("click", this.boundHandler, { capture: true });
       this.boundHandler = null;
+    }
+    if (this.boundContextHandler) {
+      document.body.removeEventListener("contextmenu", this.boundContextHandler, { capture: true });
+      this.boundContextHandler = null;
+    }
+  }
+
+  private onContextMenu(e: MouseEvent): void {
+    if (!this.settings.interceptBases) return;
+
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    if (!target.closest(".bases-view")) return;
+
+    // Only intercept right-click on the cell's empty padding area
+    const cell = target.closest<HTMLElement>(".bases-td[data-property]");
+    if (!cell || target !== cell) return;
+
+    const rawProp = cell.getAttribute("data-property") ?? "";
+    if (!rawProp.startsWith("note.")) return;
+    const fieldKey = rawProp.slice("note.".length);
+    if (!fieldKey) return;
+
+    const row = cell.closest<HTMLElement>(".bases-tr");
+    if (!row) return;
+    const fileCell = row.querySelector<HTMLElement>(".bases-td[data-property='file.name']");
+    const filePath =
+      fileCell?.querySelector<HTMLElement>("[data-href]")?.getAttribute("data-href") ?? null;
+    if (!filePath) return;
+
+    const file = this.app.vault.getAbstractFileByPath(filePath);
+    if (!(file instanceof TFile)) return;
+
+    const cache = this.app.metadataCache.getFileCache(file);
+    const frontmatter = (cache?.frontmatter ?? {}) as Record<string, unknown>;
+    const schema = this.resolver.resolveForNote(file, frontmatter);
+    if (!schema) return;
+
+    const fieldDef = schema.fields[fieldKey];
+    if (!fieldDef) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (PICKER_TYPES.has(fieldDef.type)) {
+      void import("./picker-modal").then((mod: { PickerModal: typeof PickerModalType }) => {
+        new mod.PickerModal(
+          this.app,
+          fieldKey,
+          fieldDef,
+          frontmatter[fieldKey],
+          schema,
+          file
+        ).open();
+      });
+    } else {
+      void import("./quick-edit-modal").then(
+        (mod: { QuickEditModal: typeof QuickEditModalType }) => {
+          new mod.QuickEditModal(this.app, file, fieldKey, fieldDef, frontmatter[fieldKey]).open();
+        }
+      );
     }
   }
 
