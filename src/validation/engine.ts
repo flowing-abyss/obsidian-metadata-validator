@@ -65,6 +65,15 @@ export class ValidationEngine {
   ): Promise<ValidationResult[]> {
     const results: ValidationResult[] = [];
 
+    // Capture the value before auto-fix so we can skip options validation when a
+    // default was inserted into an empty field (user never chose that value).
+    const preFixValue = frontmatter[fieldName];
+    const isEmpty =
+      preFixValue === undefined ||
+      preFixValue === null ||
+      preFixValue === "" ||
+      (Array.isArray(preFixValue) && preFixValue.length === 0);
+
     const wasFixed = applyAutoFix(fieldName, field, frontmatter);
     if (wasFixed) {
       results.push({
@@ -86,8 +95,14 @@ export class ValidationEngine {
     }
 
     if (field.options && Array.isArray(field.options)) {
-      const r = checkOptions(fieldName, value, field.options, manifestPath);
-      if (r) results.push(r);
+      // Skip options check when auto-fix inserted a value into an empty field —
+      // the user never chose this value (it came from `default` or `fixed`),
+      // so reporting it as invalid would be confusing and unactionable.
+      const skipOptions = wasFixed && isEmpty;
+      if (!skipOptions) {
+        const r = checkOptions(fieldName, value, field.options, manifestPath);
+        if (r) results.push(r);
+      }
     }
 
     if (field.type === "number" && (field.min !== undefined || field.max !== undefined)) {
