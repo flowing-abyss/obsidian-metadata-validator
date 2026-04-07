@@ -223,16 +223,66 @@ export class ContextMenuModal extends Modal {
     }
 
     switch (fieldDef.type) {
-      case "text":
-      case "url": {
+      case "text": {
         const input = container.createEl("input", {
-          type: fieldDef.type === "url" ? "url" : "text",
+          type: "text",
           value: typeof currentValue === "string" ? currentValue : "",
         });
-        input.setAttribute("placeholder", `Enter ${fieldDef.type}...`);
+        input.setAttribute("placeholder", "Enter text...");
         input.addEventListener("change", () => {
           this.saveField(fieldKey, input.value || null);
         });
+        break;
+      }
+
+      case "url": {
+        const urlVal = typeof currentValue === "string" ? currentValue : "";
+        const urlWrap = container.createDiv("mv-url-row");
+
+        if (urlVal) {
+          // Show as clickable link; click the link to open, click edit btn to change
+          const link = urlWrap.createEl("a", { cls: "mv-url-link", text: urlVal });
+          link.href = urlVal;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+
+          const editBtn = urlWrap.createEl("button", { cls: "mv-url-edit-btn clickable-icon" });
+          setIcon(editBtn, "pencil");
+          editBtn.setAttribute("aria-label", "Edit URL");
+
+          editBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            urlWrap.empty();
+            const input = urlWrap.createEl("input", {
+              type: "url",
+              value: urlVal,
+              cls: "mv-url-input",
+            });
+            input.addEventListener("change", () => {
+              this.saveField(fieldKey, input.value.trim() || null);
+            });
+            input.addEventListener("blur", () => {
+              this.saveField(fieldKey, input.value.trim() || null);
+            });
+            setTimeout(() => {
+              input.focus();
+              input.select();
+            }, 0);
+          });
+        } else {
+          // Empty — show input directly
+          const input = urlWrap.createEl("input", {
+            type: "url",
+            cls: "mv-url-input",
+          });
+          input.setAttribute("placeholder", "Enter URL...");
+          input.addEventListener("change", () => {
+            this.saveField(fieldKey, input.value.trim() || null);
+          });
+          input.addEventListener("blur", () => {
+            this.saveField(fieldKey, input.value.trim() || null);
+          });
+        }
         break;
       }
 
