@@ -184,17 +184,32 @@ export class PickerModal extends Modal {
   }
 
   /**
-   * Resolve a bare basename to a full-path wikilink [[path/to/name]] using
-   * Obsidian's internal link index. Falls back to [[name]] if not found.
-   * This keeps links consistent with how Obsidian natively stores them.
+   * Generate a wikilink for a selected option value, respecting the user's
+   * Obsidian link format settings (shortest path / absolute path / relative path).
+   * Uses generateMarkdownLink so Obsidian decides when a full path is needed
+   * (e.g. when two files share the same basename).
+   * Always outputs [[...]] format since frontmatter uses wikilinks.
    */
   private toWikilink(basename: string): string {
     const resolved = this.app.metadataCache.getFirstLinkpathDest(basename, this.file.path);
-    if (resolved) {
-      const pathNoExt = resolved.path.replace(/\.md$/, "");
-      return `[[${pathNoExt}]]`;
+    if (!resolved) return `[[${basename}]]`;
+
+    const generated = this.app.fileManager.generateMarkdownLink(resolved, this.file.path);
+
+    // generateMarkdownLink returns [[path]] or [[path|alias]] when wikilinks are on,
+    // or [text](path.md) when markdown links are on.
+    // For frontmatter we always want [[path]] without alias.
+    const wikiMatch = /^\[\[([^\]|]+)(?:\|[^\]]+)?\]\]$/.exec(generated);
+    if (wikiMatch) return `[[${wikiMatch[1]}]]`;
+
+    // Markdown link fallback — extract path, strip .md
+    const mdMatch = /^\[[^\]]*\]\(([^)]+)\)$/.exec(generated);
+    if (mdMatch) {
+      const path = decodeURIComponent(mdMatch[1] ?? "").replace(/\.md$/, "");
+      return `[[${path}]]`;
     }
-    return `[[${basename}]]`;
+
+    return `[[${resolved.path.replace(/\.md$/, "")}]]`;
   }
 
   private persistSelection(): void {
