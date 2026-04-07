@@ -229,9 +229,7 @@ export class PropertyDecorator {
       });
     }
 
-    // Insert inside .metadata-property-key so the button stays anchored to
-    // the label area and doesn't drift to the top on multi-line value rows.
-    nameEl.appendChild(btn);
+    nameEl.after(btn);
   }
 
   private injectValidatorIcon(

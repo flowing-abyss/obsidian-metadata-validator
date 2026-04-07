@@ -104,6 +104,7 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: center;
   width: 20px;
   height: 20px;
   padding: 0;
@@ -134,6 +135,7 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: center;
   width: 20px;
   height: 20px;
   padding: 0;
@@ -164,6 +166,7 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: center;
   width: 20px;
   height: 20px;
   flex-shrink: 0;
@@ -597,7 +600,7 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
 
 .mv-field-row {
   display: grid;
-  grid-template-columns: 130px 1fr 22px;
+  grid-template-columns: 130px 20px 1fr 22px;
   align-items: center;
   gap: 8px;
   padding: 6px 0;
@@ -978,7 +981,7 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
 }
 
 .mv-field-row {
-  grid-template-columns: 130px 1fr 22px;
+  grid-template-columns: 130px 20px 1fr 22px;
   min-height: 28px;
   padding: 4px 0;
 }

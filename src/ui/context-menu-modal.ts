@@ -156,12 +156,15 @@ export class ContextMenuModal extends Modal {
     const labelEl = row.createDiv("mv-field-label");
     labelEl.createEl("span", { text: fieldDef.label ?? fieldKey, cls: "mv-field-label-text" });
 
-    // Value / editor column — icon leads, then the actual editor
-    const valueEl = row.createDiv("mv-field-value");
-    const iconEl = valueEl.createEl("span", {
+    // Type icon column — own grid cell so it stays vertically centred even when
+    // the value column has multi-line content (tags, aliases, etc.)
+    const iconEl = row.createEl("span", {
       cls: "mv-field-type-icon mv-field-type-icon--leading",
     });
     setIcon(iconEl, FIELD_TYPE_ICON[fieldDef.type] ?? "square");
+
+    // Value / editor column
+    const valueEl = row.createDiv("mv-field-value");
 
     const isPickerType = ["select", "multiselect", "link", "multilink"].includes(fieldDef.type);
     if (isPickerType && fieldDef.fixed === undefined) {
