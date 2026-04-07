@@ -352,7 +352,9 @@ export class SchemaEditorModal extends Modal {
 
       const render = () => {
         listEl.empty();
-        const displayKeys = [...ordered, ...excludedKeys];
+        // Recompute excluded keys each render so newly excluded fields appear
+        const currentExcluded = inheritedRaw.filter((k) => excluded.has(k));
+        const displayKeys = [...ordered, ...currentExcluded];
         displayKeys.forEach((key, idx) => {
           const isOwn = ownKeys.includes(key);
           const isExcluded = excluded.has(key);
