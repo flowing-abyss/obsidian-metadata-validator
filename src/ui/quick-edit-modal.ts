@@ -55,12 +55,21 @@ export class QuickEditModal extends Modal {
   private renderInput(container: HTMLElement): void {
     switch (this.fieldDef.type) {
       case "number": {
-        const input = container.createEl("input", { type: "number", cls: "mv-qe-input" });
+        const numWrap = container.createDiv("mv-qe-number-row");
+        const input = numWrap.createEl("input", { type: "number", cls: "mv-qe-input" });
         // Do not set min/max HTML attributes — the browser's native constraint
         // validation would block out-of-range values with a tooltip and could
         // intercept Enter before our keydown handler runs. Range validation is
         // handled by our own engine instead.
         if (typeof this.currentValue === "number") input.value = String(this.currentValue);
+        if (this.fieldDef.min !== undefined || this.fieldDef.max !== undefined) {
+          const minText = this.fieldDef.min !== undefined ? String(this.fieldDef.min) : "\u2026";
+          const maxText = this.fieldDef.max !== undefined ? String(this.fieldDef.max) : "\u2026";
+          numWrap.createEl("span", {
+            text: `${minText}\u2013${maxText}`,
+            cls: "mv-qe-range-hint",
+          });
+        }
         input.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {
             const n = parseFloat(input.value);

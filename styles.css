@@ -1051,6 +1051,24 @@ body.mv-hide-type-icon .metadata-property:has([data-mv-picker]) .metadata-conten
   margin: 0 0 10px;
 }
 
+.mv-qe-number-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mv-qe-number-row .mv-qe-input {
+  flex: 1;
+  width: auto;
+}
+
+.mv-qe-range-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .mv-qe-input {
   width: 100%;
   font-size: 14px;
