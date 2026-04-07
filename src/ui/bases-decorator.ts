@@ -119,9 +119,10 @@ export class BasesDecorator {
     const cell = target.closest<HTMLElement>(".bases-td[data-property]");
     if (!cell) return;
 
-    // Don't intercept clicks on the cell's empty padding area —
-    // only act when the user clicks an actual value element inside the cell
-    if (target === cell) return;
+    // Only intercept left-clicks on actual value elements (chips, spans, text nodes).
+    // Container elements (div, td) mean the user clicked on empty padding — let Bases handle it.
+    const CONTAINERS = new Set(["DIV", "TD", "TR", "TABLE", "TBODY", "THEAD"]);
+    if (CONTAINERS.has(target.tagName)) return;
 
     const rawProp = cell.getAttribute("data-property") ?? "";
     // Skip Bases built-in properties (file.name, file.ctime, etc.)
