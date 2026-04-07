@@ -94,20 +94,27 @@ export class ValidationEngine {
       if (r) results.push(r);
     }
 
-    if (field.options && Array.isArray(field.options)) {
-      // Skip options check when auto-fix inserted a value into an empty field —
-      // the user never chose this value (it came from `default` or `fixed`),
-      // so reporting it as invalid would be confusing and unactionable.
+    if (field.options) {
       const skipOptions = wasFixed && isEmpty;
       if (!skipOptions) {
-        const r = checkOptions(
-          fieldName,
-          value,
-          field.options,
-          manifestPath,
-          field.strict !== false
-        );
-        if (r) results.push(r);
+        let resolvedOptions: import("../types").FieldOption[] | null = null;
+        if (Array.isArray(field.options)) {
+          resolvedOptions = field.options;
+        } else if (field.strict !== false) {
+          // Dynamic options + strict mode: resolve the source to validate against it
+          const src = (field.options as { source: import("../types").FieldSource }).source;
+          if (src) resolvedOptions = await resolveSource(src, this.app, file);
+        }
+        if (resolvedOptions) {
+          const r = checkOptions(
+            fieldName,
+            value,
+            resolvedOptions,
+            manifestPath,
+            field.strict !== false
+          );
+          if (r) results.push(r);
+        }
       }
     }
 
