@@ -1034,11 +1034,11 @@ body.mv-hide-type-icon .metadata-property:has([data-mv-picker]) .metadata-conten
 }
 
 .mv-inherited-chip.is-excluded {
-  background: var(--background-modifier-error);
+  background: transparent;
   border-color: var(--color-red);
   color: var(--color-red);
   text-decoration: line-through;
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
 /* ── Expression input (full width) ───────────────────────── */
