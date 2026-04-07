@@ -120,7 +120,14 @@ export class PropertyDecorator {
     if (!file) return;
 
     const cache = this.app.metadataCache.getFileCache(file);
-    const frontmatter = (cache?.frontmatter ?? {}) as Record<string, unknown>;
+    // Shallow-copy the frontmatter so engine.validate / applyAutoFix mutations
+    // never corrupt the live Obsidian metadata cache object. Without this copy,
+    // subsequent reads of getFileCache(file)?.frontmatter would return mutated
+    // (wrong) values, causing pickers and list modals to open with stale data.
+    const rawFm = (cache?.frontmatter ?? {}) as Record<string, unknown>;
+    const frontmatter: Record<string, unknown> = { ...rawFm };
+    delete frontmatter["position"];
+
     const schema = this.resolver.resolveForNote(file, frontmatter);
     if (!schema) return;
 
