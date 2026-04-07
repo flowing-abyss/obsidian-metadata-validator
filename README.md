@@ -1,6 +1,6 @@
 # Metadata Validator
 
-Manifest-driven metadata validation for Obsidian. Define schemas in `_manifest.md` files — they inherit down the folder tree.
+Manifest-driven metadata validation for Obsidian. Define schemas in `manifest.md` files — they inherit down the folder tree.
 
 ## Install via BRAT
 
@@ -11,21 +11,21 @@ Manifest-driven metadata validation for Obsidian. Define schemas in `_manifest.m
 
 ```
 vault/
-├── _manifest.md          ← base schema (applies everywhere)
+├── manifest.md          ← base schema (applies everywhere)
 │
 ├── sources/
-│   ├── _manifest.md      ← inherits base, adds source-specific fields
+│   ├── manifest.md      ← inherits base, adds source-specific fields
 │   └── books/
-│       └── _manifest.md  ← inherits sources, adds book-specific fields
+│       └── manifest.md  ← inherits sources, adds book-specific fields
 │
 └── people/
-    └── _manifest.md      ← inherits base, adds person-specific fields
+    └── manifest.md      ← inherits base, adds person-specific fields
 ```
 
-Each `_manifest.md` defines fields in its frontmatter. Child manifests extend their parent — fields are merged, child wins on conflict.
+Each `manifest.md` defines fields in its frontmatter. Child manifests extend their parent — fields are merged, child wins on conflict.
 
 ```yaml
-# vault/sources/books/_manifest.md
+# vault/sources/books/manifest.md
 extends: ../  # optional — inferred automatically from folder nesting
 
 fields:
@@ -42,4 +42,4 @@ fields:
     default: to-read
 ```
 
-A note gets the schema of the deepest `_manifest.md` above it in the folder tree.
+A note gets the schema of the deepest `manifest.md` above it in the folder tree.
