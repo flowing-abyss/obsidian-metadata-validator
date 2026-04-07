@@ -142,8 +142,7 @@ export class SchemaEditorModal extends Modal {
       );
     });
 
-    this.renderInheritedFieldsSection(contentEl);
-    this.renderFieldOrderSection(contentEl);
+    this.renderInheritedAndOrderSection(contentEl);
 
     const footer = new Setting(contentEl);
     footer
@@ -307,100 +306,12 @@ export class SchemaEditorModal extends Modal {
 
   // ── Field order (drag-and-drop) ───────────────────────────────────────────
 
-  private renderFieldOrderSection(el: HTMLElement): void {
-    // Collect all field keys: inherited (not excluded) + own
-    const ownKeys = Object.keys(this.data.fields ?? {});
+  // ── Inherited fields + order (unified) ──────────────────────────────────
 
-    let inheritedKeys: string[] = [];
-    if (this.cache) {
-      const folder = this.manifestPath.replace(/\/manifest\.md$/, "");
-      let parentManifest = this.data.extends ? this.cache.getByFolder(this.data.extends) : null;
-      if (!parentManifest) {
-        const parentFolder = folder.split("/").slice(0, -1).join("/");
-        parentManifest = parentFolder ? (this.cache.getByFolder(parentFolder) ?? null) : null;
-      }
-      if (parentManifest) {
-        const excluded = new Set(this.data.exclude ?? []);
-        inheritedKeys = Object.keys(parentManifest.data.fields ?? {}).filter(
-          (k) => !excluded.has(k) && !ownKeys.includes(k)
-        );
-      }
-    }
-
-    const allKeys = [...inheritedKeys, ...ownKeys];
-    // Only show this section when there's a mix of own + inherited fields
-    if (allKeys.length < 2 || (inheritedKeys.length === 0 && ownKeys.length < 2)) return;
-
-    // Build current order: start from saved property_order, fill in any missing keys
-    const saved = this.data.formatting?.property_order ?? [];
-    const ordered: string[] = [
-      ...saved.filter((k) => allKeys.includes(k)),
-      ...allKeys.filter((k) => !saved.includes(k)),
-    ];
-
-    this.renderCollapsibleSection(el, "Field order", (body) => {
-      body.createEl("p", {
-        text: "Drag to set the order fields appear in the note. Own fields are highlighted.",
-        cls: "mv-inherited-desc",
-      });
-
-      const listEl = body.createDiv("mv-order-list");
-      let dragSrc: number | null = null;
-
-      const saveOrder = (keys: string[]) => {
-        this.data.formatting = { ...this.data.formatting, property_order: keys };
-      };
-
-      const render = (keys: string[]) => {
-        listEl.empty();
-        keys.forEach((key, idx) => {
-          const isOwn = ownKeys.includes(key);
-          const chip = listEl.createEl("div", {
-            cls: `mv-order-chip${isOwn ? " is-own" : ""}`,
-            text: key,
-            attr: { draggable: "true" },
-          });
-
-          chip.addEventListener("dragstart", () => {
-            dragSrc = idx;
-            chip.addClass("mv-dragging");
-          });
-          chip.addEventListener("dragend", () => {
-            chip.removeClass("mv-dragging");
-          });
-          chip.addEventListener("dragover", (e) => {
-            e.preventDefault();
-            chip.addClass("mv-drag-over");
-          });
-          chip.addEventListener("dragleave", () => {
-            chip.removeClass("mv-drag-over");
-          });
-          chip.addEventListener("drop", (e) => {
-            e.preventDefault();
-            chip.removeClass("mv-drag-over");
-            if (dragSrc === null || dragSrc === idx) return;
-            const next = [...keys];
-            const [moved] = next.splice(dragSrc, 1);
-            next.splice(idx, 0, moved!);
-            saveOrder(next);
-            render(next);
-          });
-        });
-      };
-
-      render(ordered);
-      saveOrder(ordered);
-    });
-  }
-
-  // ── Fields ────────────────────────────────────────────────────────────────
-
-  // ── Inherited fields exclusion ───────────────────────────────────────────
-
-  private renderInheritedFieldsSection(el: HTMLElement): void {
+  private renderInheritedAndOrderSection(el: HTMLElement): void {
     if (!this.cache) return;
 
-    // Find parent manifest to get its fields
+    const ownKeys = Object.keys(this.data.fields ?? {});
     const folder = this.manifestPath.replace(/\/manifest\.md$/, "");
     let parentManifest = this.data.extends ? this.cache.getByFolder(this.data.extends) : null;
     if (!parentManifest) {
@@ -409,38 +320,98 @@ export class SchemaEditorModal extends Modal {
     }
     if (!parentManifest) return;
 
-    const parentFields = parentManifest.data.fields ?? {};
-    const inheritedKeys = Object.keys(parentFields).filter(
-      (k) => !(this.data.fields ?? {})[k] // only fields NOT overridden by child
-    );
-    if (inheritedKeys.length === 0) return;
+    const allParentKeys = Object.keys(parentManifest.data.fields ?? {});
+    const inheritedRaw = allParentKeys.filter((k) => !ownKeys.includes(k));
+    if (inheritedRaw.length === 0 && ownKeys.length === 0) return;
 
     this.renderCollapsibleSection(el, "Inherited fields", (body) => {
       body.createEl("p", {
-        text: "Click a field to exclude it from this schema. Excluded fields won't be validated or shown.",
+        text: "Drag to reorder. Click an inherited field to exclude it.",
         cls: "mv-inherited-desc",
       });
 
       const excluded = new Set<string>(this.data.exclude ?? []);
-      const listEl = body.createDiv("mv-inherited-list");
 
-      const refresh = () => {
-        listEl.empty();
-        for (const key of inheritedKeys) {
-          const isExcluded = excluded.has(key);
-          const chip = listEl.createEl("button", {
-            cls: `mv-inherited-chip${isExcluded ? " is-excluded" : ""}`,
-            text: key,
-          });
-          chip.addEventListener("click", () => {
-            if (excluded.has(key)) excluded.delete(key);
-            else excluded.add(key);
-            this.data.exclude = excluded.size > 0 ? Array.from(excluded).sort() : undefined;
-            refresh();
-          });
-        }
+      // Build ordered list: saved order first, then any missing keys
+      const allActive = [...inheritedRaw.filter((k) => !excluded.has(k)), ...ownKeys];
+      const saved = this.data.formatting?.property_order ?? [];
+      let ordered: string[] = [
+        ...saved.filter((k) => allActive.includes(k)),
+        ...allActive.filter((k) => !saved.includes(k)),
+      ];
+      // Append excluded at end (they are greyed out / struck)
+      const excludedKeys = inheritedRaw.filter((k) => excluded.has(k));
+
+      const saveState = () => {
+        this.data.exclude = excluded.size > 0 ? Array.from(excluded).sort() : undefined;
+        this.data.formatting = { ...this.data.formatting, property_order: ordered };
       };
-      refresh();
+
+      const listEl = body.createDiv("mv-order-list");
+      let dragSrc: number | null = null;
+
+      const render = () => {
+        listEl.empty();
+        const displayKeys = [...ordered, ...excludedKeys];
+        displayKeys.forEach((key, idx) => {
+          const isOwn = ownKeys.includes(key);
+          const isExcluded = excluded.has(key);
+          let cls = "mv-order-chip";
+          if (isOwn) cls += " is-own";
+          if (isExcluded) cls += " is-excluded";
+
+          const chip = listEl.createEl("div", {
+            cls,
+            text: key,
+            attr: isExcluded ? {} : { draggable: "true" },
+          });
+
+          // Inherited chip: click to toggle exclude
+          if (!isOwn) {
+            chip.addEventListener("click", () => {
+              if (excluded.has(key)) {
+                excluded.delete(key);
+                ordered = [...ordered, key];
+              } else {
+                excluded.add(key);
+                ordered = ordered.filter((k) => k !== key);
+              }
+              saveState();
+              render();
+            });
+          }
+
+          // Drag-and-drop (only for non-excluded chips)
+          if (!isExcluded) {
+            const activeIdx = ordered.indexOf(key);
+            chip.addEventListener("dragstart", () => {
+              dragSrc = activeIdx;
+              chip.addClass("mv-dragging");
+            });
+            chip.addEventListener("dragend", () => chip.removeClass("mv-dragging"));
+            chip.addEventListener("dragover", (e) => {
+              e.preventDefault();
+              chip.addClass("mv-drag-over");
+            });
+            chip.addEventListener("dragleave", () => chip.removeClass("mv-drag-over"));
+            chip.addEventListener("drop", (e) => {
+              e.preventDefault();
+              chip.removeClass("mv-drag-over");
+              if (dragSrc === null || dragSrc === activeIdx) return;
+              const next = [...ordered];
+              const [moved] = next.splice(dragSrc, 1);
+              const dropIdx = ordered.indexOf(key);
+              next.splice(dropIdx, 0, moved!);
+              ordered = next;
+              saveState();
+              render();
+            });
+          }
+        });
+      };
+
+      saveState();
+      render();
     });
   }
 
