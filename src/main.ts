@@ -302,10 +302,7 @@ export default class MetadataValidatorPlugin extends Plugin {
             | undefined;
           const schema = this.resolver.resolveForNote(targetFile, fm ?? {});
 
-          const title =
-            targetFile !== activeFile
-              ? `Edit properties: ${targetFile.basename}`
-              : "Edit properties";
+          const title = "Edit properties";
 
           menu.addItem((item) =>
             item
