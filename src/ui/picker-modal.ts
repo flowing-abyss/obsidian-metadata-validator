@@ -102,11 +102,23 @@ export class PickerModal extends Modal {
     return this.field.type === "link" || this.field.type === "multilink";
   }
 
-  /** Strip [[...]] so stored "[[man]]" compares equal to option value "man". */
+  /**
+   * Normalise a stored wikilink to a bare basename for comparison with option values.
+   * Handles: plain text, [[name]], [[path/name]], [[path/name|alias]]
+   */
   private normalise(v: unknown): string {
     if (v === undefined || v === null || v === "") return "";
     if (typeof v !== "string" && typeof v !== "number" && typeof v !== "boolean") return "";
-    return String(v).trim().replace(/^\[\[/, "").replace(/\]\]$/, "");
+    let s = String(v).trim();
+    if (s.startsWith("[[")) s = s.slice(2);
+    if (s.endsWith("]]")) s = s.slice(0, -2);
+    // Strip alias — keep the link target
+    const pipe = s.indexOf("|");
+    if (pipe !== -1) s = s.slice(0, pipe);
+    // Strip folder path — keep only basename
+    const slash = s.lastIndexOf("/");
+    if (slash !== -1) s = s.slice(slash + 1);
+    return s.trim();
   }
 
   private sortedOptions(options: FieldOption[], query: string): FieldOption[] {
