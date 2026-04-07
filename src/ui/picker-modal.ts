@@ -224,13 +224,14 @@ export class PickerModal extends Modal {
         let savedValue: unknown;
 
         if (this.isMulti) {
-          const managed = Array.from(this.selected).map((v) =>
-            this.isLink ? this.toWikilink(v) : v
-          );
-
           if (!isStrict) {
-            // Keep any existing values that are not in the options list (unmanaged)
             const optionValues = new Set(this.options.map((o) => o.value));
+            // managed = only the selected values that are actually in the options list
+            // (initSelected adds ALL current values to `selected`, including unmanaged ones)
+            const managed = Array.from(this.selected)
+              .filter((v) => optionValues.has(v))
+              .map((v) => (this.isLink ? this.toWikilink(v) : v));
+            // unmanaged = existing field values not in the options list (preserved as-is)
             const existing = Array.isArray(fm[key]) ? (fm[key] as unknown[]) : [];
             const unmanaged = existing.filter((v) => {
               const n = this.normalise(v);
@@ -238,7 +239,9 @@ export class PickerModal extends Modal {
             });
             savedValue = [...managed, ...unmanaged];
           } else {
-            savedValue = managed;
+            savedValue = Array.from(this.selected).map((v) =>
+              this.isLink ? this.toWikilink(v) : v
+            );
           }
         } else {
           const val = Array.from(this.selected)[0];
