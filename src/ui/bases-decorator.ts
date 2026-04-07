@@ -5,7 +5,7 @@
  * Uses pure event delegation: a single capture listener on document.body.
  * PickerModal and QuickEditModal are lazily imported on first click.
  */
-import { App } from "obsidian";
+import { App, TFile } from "obsidian";
 import type { SchemaResolver } from "../schema/resolver";
 import type { PluginSettings } from "../settings";
 import type { PickerModal as PickerModalType } from "./picker-modal";
@@ -66,8 +66,8 @@ export class BasesDecorator {
       fileCell?.querySelector<HTMLElement>("[data-href]")?.getAttribute("data-href") ?? null;
     if (!filePath) return;
 
-    const file = this.app.vault.getMarkdownFiles().find((f) => f.path === filePath);
-    if (!file) return;
+    const file = this.app.vault.getAbstractFileByPath(filePath);
+    if (!(file instanceof TFile)) return;
 
     const cache = this.app.metadataCache.getFileCache(file);
     const frontmatter = (cache?.frontmatter ?? {}) as Record<string, unknown>;
