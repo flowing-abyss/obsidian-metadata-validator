@@ -167,6 +167,11 @@ export default class MetadataValidatorPlugin extends Plugin {
           if (this.settings.enableOnSave) {
             await this.validateAndUpdate(file);
           }
+          // Re-decorate so validator icons reflect the updated value immediately.
+          // MutationObserver alone is not reliable here: Obsidian sometimes updates
+          // property values in-place (no childList mutation) rather than removing and
+          // re-adding the .metadata-property element.
+          this.decorator.decorateNow();
         })
       );
 
