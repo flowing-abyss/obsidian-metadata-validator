@@ -14,6 +14,8 @@ export class PickerModal extends Modal {
   private selected: Set<string> = new Set();
   // For multi-select: defer save to onClose to avoid concurrent processFrontMatter calls
   private dirtyMulti = false;
+  // Keyboard navigation: index of the currently focused option row
+  private focusedIdx = 0;
 
   constructor(
     app: App,
@@ -83,40 +85,40 @@ export class PickerModal extends Modal {
     search.setAttribute("placeholder", "Search...");
 
     const listEl = contentEl.createDiv("mv-picker-list");
+    this.focusedIdx = 0;
     this.renderOptions(listEl, this.options, search.value);
 
     search.addEventListener("input", () => {
+      // Reset focus to first item on every search change
+      this.focusedIdx = 0;
       this.renderOptions(listEl, this.options, search.value);
     });
 
-    // Keyboard navigation
     search.addEventListener("keydown", (e) => {
       const items = Array.from(listEl.querySelectorAll<HTMLElement>(".mv-picker-option"));
       if (items.length === 0) return;
 
-      const focused = listEl.querySelector<HTMLElement>(".mv-picker-option.is-focused");
-      let idx = focused ? items.indexOf(focused) : -1;
-
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        idx = (idx + 1) % items.length;
-        this.focusItem(items, idx);
+        this.focusedIdx = (this.focusedIdx + 1) % items.length;
+        this.applyFocus(items);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        idx = (idx - 1 + items.length) % items.length;
-        this.focusItem(items, idx);
-      } else if (e.key === "Enter" && focused) {
+        this.focusedIdx = (this.focusedIdx - 1 + items.length) % items.length;
+        this.applyFocus(items);
+      } else if (e.key === "Enter") {
         e.preventDefault();
-        focused.click();
+        const target = items[this.focusedIdx];
+        if (target) target.click();
       }
     });
 
     search.focus();
   }
 
-  private focusItem(items: HTMLElement[], idx: number): void {
+  private applyFocus(items: HTMLElement[]): void {
     items.forEach((el) => el.removeClass("is-focused"));
-    const target = items[idx];
+    const target = items[this.focusedIdx];
     if (target) {
       target.addClass("is-focused");
       target.scrollIntoView({ block: "nearest" });
@@ -206,6 +208,7 @@ export class PickerModal extends Modal {
             this.selected.add(opt.value);
           }
           this.dirtyMulti = true;
+          // Re-render but keep focusedIdx so Enter works immediately after
           this.renderOptions(listEl, options, query);
         } else {
           // Single select: save and close immediately
@@ -217,6 +220,11 @@ export class PickerModal extends Modal {
         }
       });
     }
+
+    // Restore keyboard focus after every render (including re-renders after toggle)
+    const items = Array.from(listEl.querySelectorAll<HTMLElement>(".mv-picker-option"));
+    this.focusedIdx = Math.min(this.focusedIdx, items.length - 1);
+    this.applyFocus(items);
   }
 
   /**
