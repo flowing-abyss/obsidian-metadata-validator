@@ -211,7 +211,10 @@ export default class MetadataValidatorPlugin extends Plugin {
 
       // Context menu
       this.registerEvent(
-        this.app.workspace.on("file-menu", (menu, file: TFile) => {
+        this.app.workspace.on("file-menu", (menu, file: TFile, source: string) => {
+          // editor-menu already adds "Edit properties" for editor right-clicks — skip to avoid duplicates
+          if (source === "link-context-menu" || source === "editor") return;
+
           // On manifest.md files — offer schema editor
           if (file.basename === "manifest" && file.extension === "md") {
             menu.addItem((item) =>
