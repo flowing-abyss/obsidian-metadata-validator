@@ -58,7 +58,25 @@ export class PropertyDecorator {
     // MutationObserver catches incremental property row additions (e.g. while
     // Obsidian is still building the properties panel). Short debounce to avoid
     // thrashing — the first paint is handled by decorateNow() called from main.ts.
-    this.observer = new MutationObserver(() => this.onMutation());
+    //
+    // We filter mutation records before scheduling the debounce: only react when
+    // a .metadata-property element was added to the DOM. This prevents unrelated
+    // mutations (sidebar, graph view, menus) from triggering unnecessary decoration
+    // passes on large vaults.
+    this.observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        for (const node of Array.from(m.addedNodes)) {
+          if (
+            node instanceof HTMLElement &&
+            (node.classList.contains("metadata-property") ||
+              node.querySelector(".metadata-property"))
+          ) {
+            this.onMutation();
+            return;
+          }
+        }
+      }
+    });
     this.observer.observe(document.body, { childList: true, subtree: true });
   }
 

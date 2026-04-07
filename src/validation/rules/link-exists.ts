@@ -3,10 +3,10 @@ import type { ValidationResult } from "../../types";
 
 /**
  * Resolve a wikilink / plain basename to a vault file.
- * Handles all common forms:
- *   [[people/man.md]]  [[people/man]]  [[man]]  [[people/man|Display]]  man
+ * Uses metadataCache.getFirstLinkpathDest — an O(1) lookup via Obsidian's
+ * internal link index, so no vault scan is needed.
  */
-function resolveLink(raw: string, app: App): boolean {
+function resolveLink(raw: string, app: App, sourcePath: string): boolean {
   let target = raw.trim();
 
   // Strip [[ ]] wrapper
@@ -21,24 +21,16 @@ function resolveLink(raw: string, app: App): boolean {
   target = target.replace(/\.md$/, "").trim();
   if (!target) return false;
 
-  const files = app.vault.getMarkdownFiles();
-  return files.some((f) => {
-    const pathNoExt = f.path.replace(/\.md$/, "");
-    // Exact path match (e.g. "people/man")
-    if (pathNoExt === target) return true;
-    // Basename match (e.g. "man")
-    if (f.basename === target) return true;
-    // Partial-path suffix match (e.g. "man" → "people/man")
-    if (pathNoExt.endsWith("/" + target)) return true;
-    return false;
-  });
+  return app.metadataCache.getFirstLinkpathDest(target, sourcePath) !== null;
 }
 
 export function checkLinkExists(
   field: string,
   value: unknown,
   app: App,
-  manifestPath: string
+  manifestPath: string,
+  /** Path of the note being validated — used by Obsidian to resolve relative links. */
+  sourcePath: string
 ): ValidationResult | null {
   if (value === undefined || value === null) return null;
 
@@ -48,7 +40,7 @@ export function checkLinkExists(
   for (const v of values) {
     const raw = String(v).trim();
     if (!raw) continue;
-    if (!resolveLink(raw, app)) missing.push(raw);
+    if (!resolveLink(raw, app, sourcePath)) missing.push(raw);
   }
 
   if (missing.length === 0) return null;

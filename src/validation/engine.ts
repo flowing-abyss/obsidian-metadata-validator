@@ -107,7 +107,7 @@ export class ValidationEngine {
     }
 
     if ((field.type === "link" || field.type === "multilink") && field.validate_exists !== false) {
-      const r = checkLinkExists(fieldName, value, this.app, manifestPath);
+      const r = checkLinkExists(fieldName, value, this.app, manifestPath, file.path);
       if (r) results.push(r);
     }
 

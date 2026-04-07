@@ -1,5 +1,17 @@
 import type { ValidationResult } from "../../types";
 
+/** Compiled regex cache — avoids rebuilding the same regex for each validated note. */
+const formatRegexCache = new Map<string, RegExp>();
+
+function getFormatRegex(format: string): RegExp {
+  let re = formatRegexCache.get(format);
+  if (!re) {
+    re = buildFormatRegex(format);
+    formatRegexCache.set(format, re);
+  }
+  return re;
+}
+
 /**
  * Build a regex that matches the structural shape of a date format string.
  * Tokens: YYYY → 4 digits, MM → 2 digits, DD → 2 digits, M/D → 1-2 digits.
@@ -89,7 +101,7 @@ export function checkDateFormat(
   if (!str) return null;
 
   if (format) {
-    const regex = buildFormatRegex(format);
+    const regex = getFormatRegex(format);
     if (!regex.test(str)) {
       return {
         field,

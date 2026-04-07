@@ -125,10 +125,14 @@ export class PickerModal extends Modal {
           (o) => o.value.toLowerCase().includes(q) || (o.label ?? "").toLowerCase().includes(q)
         )
       : options;
-    const sel = filtered.filter((o) => this.selected.has(o.value));
-    const unsel = filtered
-      .filter((o) => !this.selected.has(o.value))
-      .sort((a, b) => (a.label ?? a.value).localeCompare(b.label ?? b.value));
+    // Single-pass partition — avoids iterating filtered twice
+    const sel: FieldOption[] = [];
+    const unsel: FieldOption[] = [];
+    for (const o of filtered) {
+      if (this.selected.has(o.value)) sel.push(o);
+      else unsel.push(o);
+    }
+    unsel.sort((a, b) => (a.label ?? a.value).localeCompare(b.label ?? b.value));
     return [...sel, ...unsel];
   }
 

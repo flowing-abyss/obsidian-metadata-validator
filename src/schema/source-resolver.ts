@@ -39,26 +39,32 @@ function fileMatchesSource(file: TFile, source: FieldSource, app: App): boolean 
   if (source.folder) {
     conditions.push(file.path.startsWith(source.folder));
   }
-  if (source.tag) {
+
+  // Fetch file cache once even when both tag and property conditions are present.
+  if (source.tag || source.property) {
     const cache = app.metadataCache.getFileCache(file);
-    const tags: string[] =
-      (cache as unknown as { tags?: Array<{ tag: string }> })?.tags?.map(
-        (t: { tag: string }) => t.tag
-      ) ?? [];
-    const fmTags = (cache?.frontmatter?.["tags"] as string[] | undefined) ?? [];
-    conditions.push(tags.includes(source.tag) || fmTags.includes(source.tag));
-  }
-  if (source.property) {
-    const fm = (app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<
-      string,
-      string | number | boolean | null | undefined
-    >;
-    const allMatch = Object.entries(source.property).every(([k, v]) => {
-      const fmVal = fm[k];
-      const strVal = fmVal === null || fmVal === undefined ? "" : String(fmVal);
-      return strVal === v;
-    });
-    conditions.push(allMatch);
+
+    if (source.tag) {
+      const tags: string[] =
+        (cache as unknown as { tags?: Array<{ tag: string }> })?.tags?.map(
+          (t: { tag: string }) => t.tag
+        ) ?? [];
+      const fmTags = (cache?.frontmatter?.["tags"] as string[] | undefined) ?? [];
+      conditions.push(tags.includes(source.tag) || fmTags.includes(source.tag));
+    }
+
+    if (source.property) {
+      const fm = (cache?.frontmatter ?? {}) as Record<
+        string,
+        string | number | boolean | null | undefined
+      >;
+      const allMatch = Object.entries(source.property).every(([k, v]) => {
+        const fmVal = fm[k];
+        const strVal = fmVal === null || fmVal === undefined ? "" : String(fmVal);
+        return strVal === v;
+      });
+      conditions.push(allMatch);
+    }
   }
 
   if (conditions.length === 0) return false;
