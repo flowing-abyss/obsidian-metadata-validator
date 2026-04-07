@@ -100,7 +100,13 @@ export class ValidationEngine {
       // so reporting it as invalid would be confusing and unactionable.
       const skipOptions = wasFixed && isEmpty;
       if (!skipOptions) {
-        const r = checkOptions(fieldName, value, field.options, manifestPath);
+        const r = checkOptions(
+          fieldName,
+          value,
+          field.options,
+          manifestPath,
+          field.strict !== false
+        );
         if (r) results.push(r);
       }
     }

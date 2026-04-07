@@ -44,6 +44,12 @@ export interface ManifestField {
   format?: string;
   /** Static options list OR dynamic source */
   options?: FieldOption[] | { source: FieldSource };
+  /**
+   * When true (default): all list values must be from the options list.
+   * When false: only values that are currently in the options list are managed;
+   * extra values are left untouched (no validation error, not replaced on save).
+   */
+  strict?: boolean;
   /** For link/multilink: filter which notes are valid */
   source?: FieldSource;
   validate?: { js: string };

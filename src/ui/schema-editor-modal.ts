@@ -878,6 +878,17 @@ export class SchemaEditorModal extends Modal {
       })
     );
 
+    new Setting(body)
+      .setName("Strict")
+      .setDesc(
+        "On: all values must be from the options list. Off: only options-list values are managed — extra values are left untouched."
+      )
+      .addToggle((t) =>
+        t
+          .setValue(field.strict !== false)
+          .onChange((v) => update({ strict: v ? undefined : false }))
+      );
+
     this.renderDefaultField(body, field, update);
   }
 
@@ -1007,6 +1018,7 @@ export class SchemaEditorModal extends Modal {
         if (Object.keys(src).length) fOut.source = src;
       }
       if (f.validate?.js) fOut.validate = { js: f.validate.js };
+      if (f.strict === false) fOut.strict = false;
       fields[k] = fOut;
     }
     if (Object.keys(fields).length) out.fields = fields;

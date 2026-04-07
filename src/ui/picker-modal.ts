@@ -214,20 +214,40 @@ export class PickerModal extends Modal {
 
   private persistSelection(): void {
     const key = this.fieldKey;
-    let savedValue: unknown;
-
-    if (this.isMulti) {
-      savedValue = Array.from(this.selected).map((v) => (this.isLink ? this.toWikilink(v) : v));
-    } else {
-      const val = Array.from(this.selected)[0];
-      savedValue = val !== undefined ? (this.isLink ? this.toWikilink(val) : val) : null;
-    }
 
     void this.app.fileManager
       .processFrontMatter(this.file, (fm: Record<string, unknown>) => {
+        const isStrict = this.field.strict !== false;
+        let savedValue: unknown;
+
+        if (this.isMulti) {
+          const managed = Array.from(this.selected).map((v) =>
+            this.isLink ? this.toWikilink(v) : v
+          );
+
+          if (!isStrict) {
+            // Keep any existing values that are not in the options list (unmanaged)
+            const optionValues = new Set(this.options.map((o) => o.value));
+            const existing = Array.isArray(fm[key]) ? (fm[key] as unknown[]) : [];
+            const unmanaged = existing.filter((v) => {
+              const n = this.normalise(v);
+              return n !== "" && !optionValues.has(n);
+            });
+            savedValue = [...managed, ...unmanaged];
+          } else {
+            savedValue = managed;
+          }
+        } else {
+          const val = Array.from(this.selected)[0];
+          savedValue = val !== undefined ? (this.isLink ? this.toWikilink(val) : val) : null;
+        }
+
         fm[key] = savedValue;
       })
       .then(() => {
+        const savedValue = this.isMulti
+          ? Array.from(this.selected).map((v) => (this.isLink ? this.toWikilink(v) : v))
+          : (Array.from(this.selected)[0] ?? null);
         this.onSaved?.(savedValue);
       });
   }
