@@ -55,6 +55,9 @@ export class PropertyDecorator {
   }
 
   attach(): void {
+    // MutationObserver catches incremental property row additions (e.g. while
+    // Obsidian is still building the properties panel). Short debounce to avoid
+    // thrashing — the first paint is handled by decorateNow() called from main.ts.
     this.observer = new MutationObserver(() => this.onMutation());
     this.observer.observe(document.body, { childList: true, subtree: true });
   }
@@ -70,9 +73,18 @@ export class PropertyDecorator {
     this.resultCache.delete(filePath);
   }
 
+  /**
+   * Decorate immediately — call this from workspace file-open / active-leaf-change
+   * events so icons appear without any debounce delay.
+   */
+  decorateNow(): void {
+    void this.decorateAll();
+  }
+
   private onMutation(): void {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
-    this.debounceTimer = setTimeout(() => void this.decorateAll(), 300);
+    // 50ms is enough to batch rapid DOM mutations without visible lag
+    this.debounceTimer = setTimeout(() => void this.decorateAll(), 50);
   }
 
   async decorateAll(): Promise<void> {

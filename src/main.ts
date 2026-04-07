@@ -178,9 +178,18 @@ export default class MetadataValidatorPlugin extends Plugin {
       this.registerEvent(
         this.app.workspace.on("file-open", async (file: TFile | null) => {
           if (!file) return;
+          // Decorate immediately — no debounce — so icons appear on first paint
+          this.decorator.decorateNow();
           if (this.settings.enableOnOpen) {
             await this.validateAndUpdate(file);
           }
+        })
+      );
+
+      this.registerEvent(
+        this.app.workspace.on("active-leaf-change", () => {
+          // Also trigger when switching panes/tabs without a full file-open
+          this.decorator.decorateNow();
         })
       );
 
