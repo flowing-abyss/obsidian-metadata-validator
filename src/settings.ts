@@ -4,10 +4,8 @@ import type { SchemaTreeView as SchemaTreeViewType } from "./ui/schema-tree";
 
 export interface PluginSettings {
   schemasRoot: string;
-  enableLiveValidation: boolean;
   enableOnSave: boolean;
   enableOnOpen: boolean;
-  backgroundScanInterval: number;
   hideObsidianTypeIcon: boolean;
   hideObsidianValidator: boolean;
   showInlineErrors: boolean;
@@ -18,10 +16,8 @@ export interface PluginSettings {
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   schemasRoot: "schemas",
-  enableLiveValidation: true,
   enableOnSave: true,
   enableOnOpen: true,
-  backgroundScanInterval: 5,
   hideObsidianTypeIcon: true,
   hideObsidianValidator: true,
   showInlineErrors: true,
@@ -68,16 +64,6 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName("Validation timing").setHeading();
 
-    new Setting(containerEl)
-      .setName("Live validation")
-      .setDesc("Validate as you type (debounced 300ms).")
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.enableLiveValidation).onChange(async (v) => {
-          this.plugin.settings.enableLiveValidation = v;
-          await this.plugin.saveSettings();
-        })
-      );
-
     new Setting(containerEl).setName("Validate on save").addToggle((t) =>
       t.setValue(this.plugin.settings.enableOnSave).onChange(async (v) => {
         this.plugin.settings.enableOnSave = v;
@@ -90,17 +76,6 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
         this.plugin.settings.enableOnOpen = v;
         await this.plugin.saveSettings();
       })
-    );
-
-    new Setting(containerEl).setName("Background scan interval (minutes)").addSlider((s) =>
-      s
-        .setLimits(1, 60, 1)
-        .setValue(this.plugin.settings.backgroundScanInterval)
-        .setDynamicTooltip()
-        .onChange(async (v) => {
-          this.plugin.settings.backgroundScanInterval = v;
-          await this.plugin.saveSettings();
-        })
     );
 
     new Setting(containerEl).setName("UI").setHeading();

@@ -24,7 +24,6 @@ export default class MetadataValidatorPlugin extends Plugin {
   decorator!: PropertyDecorator;
   badges!: ExplorerBadges;
   private settingTab!: MetadataValidatorSettingTab;
-  private backgroundScanTimer: number | null = null;
   /** File resolved from a wikilink right-click — consumed once by editor-menu */
   private _contextMenuLinkTarget: TFile | null = null;
 
@@ -380,8 +379,6 @@ export default class MetadataValidatorPlugin extends Plugin {
         }
       );
 
-      this.startBackgroundScan();
-
       // Decorate and validate the currently active file right away.
       // file-open does not fire for notes that were already open when Obsidian
       // restarted, so we must do this explicitly after layout is ready.
@@ -397,7 +394,6 @@ export default class MetadataValidatorPlugin extends Plugin {
     this.decorator.detach();
     this.cssInjector.remove();
     this.badges.clearAll();
-    if (this.backgroundScanTimer) clearInterval(this.backgroundScanTimer);
   }
 
   async reloadSchemas(): Promise<void> {
@@ -535,21 +531,6 @@ export default class MetadataValidatorPlugin extends Plugin {
     if (!leaf) return;
     await leaf.setViewState({ type: SIDEBAR_PANEL_TYPE });
     await this.app.workspace.revealLeaf(leaf);
-  }
-
-  private startBackgroundScan(): void {
-    if (this.backgroundScanTimer) clearInterval(this.backgroundScanTimer);
-    const intervalMs = this.settings.backgroundScanInterval * 60 * 1000;
-    this.backgroundScanTimer = this.registerInterval(
-      window.setInterval(() => {
-        void (async () => {
-          const files = this.app.vault.getMarkdownFiles();
-          for (const file of files) {
-            await this.validateAndUpdate(file);
-          }
-        })();
-      }, intervalMs)
-    );
   }
 
   /** Open the schema editor for a manifest.md. Pass null to create a new schema. */
