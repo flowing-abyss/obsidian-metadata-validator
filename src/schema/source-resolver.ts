@@ -110,14 +110,30 @@ async function resolveJsSource(
   const dataview = pluginsMap?.["dataview"] as Record<string, unknown> | undefined;
   const dv = dataview?.["api"];
 
+  let currentPage: unknown = null;
+  if (
+    currentFile &&
+    dv &&
+    typeof dv === "object" &&
+    "page" in (dv as Record<string, unknown>) &&
+    typeof (dv as { page?: unknown }).page === "function"
+  ) {
+    try {
+      currentPage = (dv as { page: (path: string) => unknown }).page(currentFile.path);
+    } catch {
+      currentPage = null;
+    }
+  }
+
   try {
     // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    const fn = new Function("app", "dv", "current", code) as (
+    const fn = new Function("app", "dv", "currentFile", "currentPage", code) as (
       app: App,
       dv: unknown,
-      current: TFile | null
+      currentFile: TFile | null,
+      currentPage: unknown
     ) => unknown;
-    const result: unknown = await fn(app, dv, currentFile);
+    const result: unknown = await fn(app, dv, currentFile, currentPage);
     // dv.pages() returns a DataArray (not a plain Array) — convert any iterable
     let items: unknown[];
     if (Array.isArray(result)) {

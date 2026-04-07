@@ -12,9 +12,25 @@ export async function runJsValidator(
   manifestPath: string
 ): Promise<ValidationResult | null> {
   const appRecord = app as unknown as Record<string, unknown>;
-  const plugins = appRecord["plugins"] as Record<string, unknown> | undefined;
-  const dataview = plugins?.["dataview"] as Record<string, unknown> | undefined;
+  const pluginManager = appRecord["plugins"] as Record<string, unknown> | undefined;
+  const pluginsMap = pluginManager?.["plugins"] as Record<string, unknown> | undefined;
+  const dataview =
+    (pluginsMap?.["dataview"] as Record<string, unknown> | undefined) ??
+    (pluginManager?.["dataview"] as Record<string, unknown> | undefined);
   const dv = dataview?.["api"];
+  let currentPage: unknown = null;
+  if (
+    dv &&
+    typeof dv === "object" &&
+    "page" in (dv as Record<string, unknown>) &&
+    typeof (dv as { page?: unknown }).page === "function"
+  ) {
+    try {
+      currentPage = (dv as { page: (path: string) => unknown }).page(currentFile.path);
+    } catch {
+      currentPage = null;
+    }
+  }
 
   const timeoutPromise = new Promise<ValidationResult>((resolve) =>
     setTimeout(
@@ -34,13 +50,14 @@ export async function runJsValidator(
   const runPromise = (async (): Promise<ValidationResult | null> => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-implied-eval
-      const fn = new Function("app", "dv", "current", "value", jsCode) as (
+      const fn = new Function("app", "dv", "currentFile", "currentPage", "value", jsCode) as (
         app: App,
         dv: unknown,
-        current: TFile,
+        currentFile: TFile,
+        currentPage: unknown,
         value: unknown
       ) => unknown;
-      const result: unknown = await fn(app, dv, currentFile, value);
+      const result: unknown = await fn(app, dv, currentFile, currentPage, value);
       if (result === true) return null;
       return {
         field,
