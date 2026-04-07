@@ -403,10 +403,14 @@ export default class MetadataValidatorPlugin extends Plugin {
   ): Promise<void> {
     const content = await this.app.vault.read(file);
     const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
-    if (!fmMatch) return;
-    const afterFrontmatter = content.slice(fmMatch[0].length);
-    // stringifyYaml output always ends with \n
+    // stringifyYaml always ends with \n
     const newYaml = stringifyYaml(frontmatter);
+    if (!fmMatch) {
+      // New file with no frontmatter block — prepend one
+      await this.app.vault.modify(file, `---\n${newYaml}---\n${content}`);
+      return;
+    }
+    const afterFrontmatter = content.slice(fmMatch[0].length);
     await this.app.vault.modify(file, `---\n${newYaml}---\n${afterFrontmatter}`);
   }
 
