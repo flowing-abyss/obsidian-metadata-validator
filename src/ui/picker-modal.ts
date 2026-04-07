@@ -110,14 +110,17 @@ export class PickerModal extends Modal {
     if (v === undefined || v === null || v === "") return "";
     if (typeof v !== "string" && typeof v !== "number" && typeof v !== "boolean") return "";
     let s = String(v).trim();
-    if (s.startsWith("[[")) s = s.slice(2);
+    const wasWikilink = s.startsWith("[[");
+    if (wasWikilink) s = s.slice(2);
     if (s.endsWith("]]")) s = s.slice(0, -2);
     // Strip alias — keep the link target
     const pipe = s.indexOf("|");
     if (pipe !== -1) s = s.slice(0, pipe);
-    // Strip folder path — keep only basename
-    const slash = s.lastIndexOf("/");
-    if (slash !== -1) s = s.slice(slash + 1);
+    // Strip folder path — only for wikilinks; plain values (e.g. tags with slashes) are kept as-is
+    if (wasWikilink) {
+      const slash = s.lastIndexOf("/");
+      if (slash !== -1) s = s.slice(slash + 1);
+    }
     return s.trim();
   }
 
