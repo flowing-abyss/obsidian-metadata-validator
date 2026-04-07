@@ -1,9 +1,9 @@
 /**
- * BasesDecorator — перехватывает клики по ячейкам таблиц Bases и открывает
- * PickerModal / QuickEditModal для полей с определением в схеме.
+ * BasesDecorator — intercepts clicks on Bases table cells and opens
+ * PickerModal / QuickEditModal for fields that have a schema definition.
  *
- * Event delegation: один capture-listener на document.body.
- * PickerModal и QuickEditModal импортируются лениво — только при первом клике.
+ * Uses pure event delegation: a single capture listener on document.body.
+ * PickerModal and QuickEditModal are lazily imported on first click.
  */
 import { App } from "obsidian";
 import type { SchemaResolver } from "../schema/resolver";
@@ -38,26 +38,26 @@ export class BasesDecorator {
   }
 
   private onClick(e: MouseEvent): void {
-    if (!this.settings.showInlineErrors) return;
+    if (!this.settings.interceptBases) return;
 
     const target = e.target as HTMLElement | null;
     if (!target) return;
 
-    // Быстрый выход — только внутри Bases-вида
+    // Quick exit — only process clicks inside a Bases view
     if (!target.closest(".bases-view")) return;
 
-    // Найти ячейку data-property="note.*"
+    // Find the cell with a data-property attribute
     const cell = target.closest<HTMLElement>(".bases-td[data-property]");
     if (!cell) return;
 
     const rawProp = cell.getAttribute("data-property") ?? "";
-    // Пропускаем встроенные свойства Bases (file.name, file.ctime и т.д.)
+    // Skip Bases built-in properties (file.name, file.ctime, etc.)
     if (!rawProp.startsWith("note.")) return;
 
     const fieldKey = rawProp.slice("note.".length);
     if (!fieldKey) return;
 
-    // Путь к файлу — ищем в ячейке file.name той же строки
+    // Resolve file path from the file.name cell in the same row
     const row = cell.closest<HTMLElement>(".bases-tr");
     if (!row) return;
 
@@ -77,7 +77,7 @@ export class BasesDecorator {
     const fieldDef = schema.fields[fieldKey];
     if (!fieldDef) return;
 
-    // Перехватываем клик — открываем наш редактор
+    // Intercept the click — open our editor instead
     e.preventDefault();
     e.stopPropagation();
 

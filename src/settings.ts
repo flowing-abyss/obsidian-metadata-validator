@@ -13,6 +13,7 @@ export interface PluginSettings {
   showInlineErrors: boolean;
   showSidebarPanel: boolean;
   showFileExplorerBadges: boolean;
+  interceptBases: boolean;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   showInlineErrors: true,
   showSidebarPanel: true,
   showFileExplorerBadges: true,
+  interceptBases: true,
 };
 
 export class MetadataValidatorSettingTab extends PluginSettingTab {
@@ -153,6 +155,16 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
           if (v) this.plugin.badges.render();
           else this.plugin.badges.clearAll();
+        })
+      );
+
+    new Setting(containerEl) // eslint-disable-next-line obsidianmd/ui/sentence-case
+      .setName("Intercept Bases clicks") // eslint-disable-next-line obsidianmd/ui/sentence-case
+      .setDesc("Open picker / quick-edit when clicking a schema field in a Bases table.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.interceptBases).onChange(async (v) => {
+          this.plugin.settings.interceptBases = v;
+          await this.plugin.saveSettings();
         })
       );
 
