@@ -294,8 +294,11 @@ export default class MetadataValidatorPlugin extends Plugin {
 
       this.startBackgroundScan();
 
-      // Validate the currently active file right away
+      // Decorate and validate the currently active file right away.
+      // file-open does not fire for notes that were already open when Obsidian
+      // restarted, so we must do this explicitly after layout is ready.
       const activeFile = this.app.workspace.getActiveFile();
+      this.decorator.decorateNow();
       if (activeFile && this.settings.enableOnOpen) {
         await this.validateAndUpdate(activeFile);
       }
