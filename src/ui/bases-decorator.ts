@@ -46,9 +46,16 @@ export class BasesDecorator {
     // Quick exit — only process clicks inside a Bases view
     if (!target.closest(".bases-view")) return;
 
+    // Don't intercept clicks on wikilinks — let Obsidian handle link navigation
+    if (target.closest("a") ?? target.closest("[data-href]")) return;
+
     // Find the cell with a data-property attribute
     const cell = target.closest<HTMLElement>(".bases-td[data-property]");
     if (!cell) return;
+
+    // Don't intercept clicks on the cell's empty padding area —
+    // only act when the user clicks an actual value element inside the cell
+    if (target === cell) return;
 
     const rawProp = cell.getAttribute("data-property") ?? "";
     // Skip Bases built-in properties (file.name, file.ctime, etc.)
