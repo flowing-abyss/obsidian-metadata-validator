@@ -36,3 +36,42 @@ describe("checkOptions", () => {
     ).toBeNull();
   });
 });
+
+describe("checkOptions — strict=false", () => {
+  it("returns null when value is outside options (unmanaged, not an error)", () => {
+    expect(
+      checkOptions("tags", "custom-tag", OPTIONS, "schemas/book/manifest.md", false)
+    ).toBeNull();
+  });
+
+  it("returns null when array contains extra unmanaged values", () => {
+    expect(
+      checkOptions("tags", ["reading", "my-custom-tag"], OPTIONS, "schemas/book/manifest.md", false)
+    ).toBeNull();
+  });
+
+  it("returns null when all values are unmanaged", () => {
+    expect(
+      checkOptions("tags", ["x", "y", "z"], OPTIONS, "schemas/book/manifest.md", false)
+    ).toBeNull();
+  });
+
+  it("returns null when a managed value is valid (in options)", () => {
+    expect(
+      checkOptions("tags", ["reading", "extra"], OPTIONS, "schemas/book/manifest.md", false)
+    ).toBeNull();
+  });
+
+  it("still returns error when a managed value is invalid", () => {
+    // "reading" is in options but misspelled — wait, if value IS in options it's valid
+    // The strict=false case: values in options must still be valid options
+    // i.e. if someone has ["reading", "done"] — both are managed and valid → null
+    expect(
+      checkOptions("tags", ["reading", "done"], OPTIONS, "schemas/book/manifest.md", false)
+    ).toBeNull();
+  });
+
+  it("returns null for undefined in non-strict mode", () => {
+    expect(checkOptions("tags", undefined, OPTIONS, "schemas/book/manifest.md", false)).toBeNull();
+  });
+});

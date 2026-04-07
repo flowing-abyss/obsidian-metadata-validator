@@ -125,7 +125,7 @@ function parseArray(lines: string[], startLine: number, baseIndent: number): Par
       if (i < lines.length) {
         const nextLine = lines[i] ?? "";
         const nextIndent = getIndent(nextLine);
-        if (nextIndent > baseIndent + 2) {
+        if (nextIndent >= baseIndent + 2) {
           const moreResult = parseObject(lines, i, nextIndent);
           arr.push({ ...subVal, ...(moreResult.value as Record<string, unknown>) });
           i = moreResult.nextLine;
