@@ -857,6 +857,11 @@ body.mv-hide-validator .metadata-property[data-property-type="invalid"] .metadat
   align-self: center;
 }
 
+/* Edit input (right-click) — slightly wider to show existing content */
+.mv-list-edit-input {
+  width: 120px;
+}
+
 .mv-context-footer {
   margin-top: 12px;
   padding-top: 8px;

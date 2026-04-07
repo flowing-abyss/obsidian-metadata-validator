@@ -384,6 +384,39 @@ export class ContextMenuModal extends Modal {
           this.saveField(fieldKey, updated.length > 0 ? updated : null);
           refresh(updated);
         });
+
+        // Right-click → inline edit
+        chip.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          // Replace the chip with an edit input pre-filled with the raw value
+          const editInput = document.createElement("input");
+          editInput.type = "text";
+          editInput.value = val;
+          editInput.className = "mv-list-add-input mv-list-edit-input";
+          chip.replaceWith(editInput);
+          editInput.focus();
+          editInput.select();
+          const commitEdit = () => {
+            const newVal = editInput.value.trim();
+            const updated = [...items];
+            if (newVal) {
+              updated[idx] = newVal;
+            } else {
+              updated.splice(idx, 1);
+            }
+            this.saveField(fieldKey, updated.length > 0 ? updated : null);
+            refresh(updated);
+          };
+          editInput.addEventListener("keydown", (ev) => {
+            if (ev.key === "Enter") {
+              ev.preventDefault();
+              commitEdit();
+            } else if (ev.key === "Escape") {
+              refresh(items); // cancel — restore original view
+            }
+          });
+          editInput.addEventListener("blur", commitEdit);
+        });
       });
 
       // "+" button — switches to an inline input on click.
