@@ -183,15 +183,29 @@ export class PickerModal extends Modal {
     }
   }
 
+  /**
+   * Resolve a bare basename to a full-path wikilink [[path/to/name]] using
+   * Obsidian's internal link index. Falls back to [[name]] if not found.
+   * This keeps links consistent with how Obsidian natively stores them.
+   */
+  private toWikilink(basename: string): string {
+    const resolved = this.app.metadataCache.getFirstLinkpathDest(basename, this.file.path);
+    if (resolved) {
+      const pathNoExt = resolved.path.replace(/\.md$/, "");
+      return `[[${pathNoExt}]]`;
+    }
+    return `[[${basename}]]`;
+  }
+
   private persistSelection(): void {
     const key = this.fieldKey;
     let savedValue: unknown;
 
     if (this.isMulti) {
-      savedValue = Array.from(this.selected).map((v) => (this.isLink ? `[[${v}]]` : v));
+      savedValue = Array.from(this.selected).map((v) => (this.isLink ? this.toWikilink(v) : v));
     } else {
       const val = Array.from(this.selected)[0];
-      savedValue = val !== undefined ? (this.isLink ? `[[${val}]]` : val) : null;
+      savedValue = val !== undefined ? (this.isLink ? this.toWikilink(val) : val) : null;
     }
 
     void this.app.fileManager
