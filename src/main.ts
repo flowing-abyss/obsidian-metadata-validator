@@ -25,6 +25,8 @@ export default class MetadataValidatorPlugin extends Plugin {
   badges!: ExplorerBadges;
   private settingTab!: MetadataValidatorSettingTab;
   private backgroundScanTimer: number | null = null;
+  /** File resolved from a wikilink right-click — consumed once by editor-menu */
+  private _contextMenuLinkTarget: TFile | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -253,51 +255,76 @@ export default class MetadataValidatorPlugin extends Plugin {
         })
       );
 
-      // Editor right-click context menu (note body, wikilinks, anywhere in editor)
-      this.registerEvent(
-        this.app.workspace.on("editor-menu", (menu, _editor, info) => {
+      // Capture right-clicked wikilink target *before* editor-menu fires
+      this.registerDomEvent(
+        document,
+        "contextmenu",
+        (e: MouseEvent) => {
+          this._contextMenuLinkTarget = null;
+          const el = e.target as HTMLElement | null;
+          // CodeMirror wraps wikilink parts in .cm-hmd-internal-link spans
+          const linkSpan = el?.closest<HTMLElement>(".cm-hmd-internal-link");
+          if (!linkSpan) return;
+
           const activeFile = this.app.workspace.getActiveFile();
           if (!activeFile) return;
 
-          // Check if the right-click landed on a wikilink token — if so, open
-          // properties for the *linked* note rather than the current one.
-          let targetFile = activeFile;
-          const domEvent = (info as { originalEvent?: MouseEvent }).originalEvent;
-          if (domEvent) {
-            const el = domEvent.target as HTMLElement | null;
-            const linkEl = el?.closest<HTMLElement>(".cm-hmd-internal-link, .internal-link");
-            if (linkEl) {
-              // Extract link text from the token — CodeMirror wraps it in spans
-              const linkText = linkEl.getAttribute("data-href") ?? linkEl.textContent ?? "";
-              const stripped = linkText.replace(/^\[\[/, "").replace(/\]\]$/, "").split("|")[0];
-              const resolved = stripped
-                ? this.app.metadataCache.getFirstLinkpathDest(stripped, activeFile.path)
-                : null;
-              if (resolved instanceof TFile) targetFile = resolved;
-            }
-          }
+          // Collect all sibling spans of the same link group to build the full link text
+          const parent = linkSpan.parentElement;
+          if (!parent) return;
+          const spans = Array.from(parent.querySelectorAll<HTMLElement>(".cm-hmd-internal-link"));
+          const linkText = (
+            spans
+              .map((s) => s.textContent ?? "")
+              .join("")
+              .split("|")[0] ?? ""
+          ).trim();
+          if (!linkText) return;
+
+          const resolved = this.app.metadataCache.getFirstLinkpathDest(linkText, activeFile.path);
+          if (resolved instanceof TFile) this._contextMenuLinkTarget = resolved;
+        },
+        { capture: true }
+      );
+
+      // Editor right-click context menu
+      this.registerEvent(
+        this.app.workspace.on("editor-menu", (menu) => {
+          const activeFile = this.app.workspace.getActiveFile();
+          if (!activeFile) return;
+
+          // Use the link target captured by the contextmenu DOM event (if any)
+          const targetFile = this._contextMenuLinkTarget ?? activeFile;
+          this._contextMenuLinkTarget = null;
 
           const fm = this.app.metadataCache.getFileCache(targetFile)?.frontmatter as
             | Record<string, unknown>
             | undefined;
           const schema = this.resolver.resolveForNote(targetFile, fm ?? {});
-          if (!schema) return;
 
-          const fileForMenu = targetFile;
+          const title =
+            targetFile !== activeFile
+              ? `Edit properties: ${targetFile.basename}`
+              : "Edit properties";
+
           menu.addItem((item) =>
             item
-              .setTitle(
-                fileForMenu === activeFile
-                  ? "Edit properties"
-                  : `Edit properties: ${fileForMenu.basename}`
-              )
+              .setTitle(title)
               .setIcon("pencil")
               .onClick(() => {
                 const getFields = (p: string) => this.cache.getByPath(p)?.data.fields;
                 new ContextMenuModal(
                   this.app,
-                  fileForMenu,
-                  schema,
+                  targetFile,
+                  schema ?? {
+                    fields: {},
+                    manifestPath: "",
+                    name: "",
+                    priority: 0,
+                    target: {},
+                    formatting: {},
+                    inheritanceChain: [],
+                  },
                   getFields,
                   (p) => void this.openSchemaEditor(p)
                 ).open();

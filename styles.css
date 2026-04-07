@@ -1027,31 +1027,6 @@ body.mv-hide-type-icon .metadata-property:has([data-mv-picker]) .metadata-conten
   text-decoration: underline;
 }
 
-.mv-url-edit-btn {
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  padding: 0;
-  border: none;
-  background: none;
-  border-radius: 3px;
-  cursor: pointer;
-  opacity: 0.4;
-  color: var(--text-muted);
-}
-
-.mv-url-edit-btn:hover {
-  opacity: 1;
-  background: var(--background-modifier-hover);
-}
-
-.mv-url-edit-btn svg {
-  width: 11px;
-  height: 11px;
-}
 
 .mv-url-input {
   flex: 1;

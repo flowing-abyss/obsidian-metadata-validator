@@ -264,7 +264,7 @@ export class ContextMenuModal extends Modal {
         };
 
         if (urlVal) {
-          // Show as clickable link; pencil opens inline input
+          // Left-click opens URL, right-click / double-click switches to edit input
           const link = urlWrap.createEl("a", { cls: "mv-url-link", text: label });
           link.href = href;
           link.target = "_blank";
@@ -273,12 +273,8 @@ export class ContextMenuModal extends Modal {
             e.preventDefault();
             window.open(href, "_blank");
           });
-
-          const editBtn = urlWrap.createEl("button", { cls: "mv-url-edit-btn clickable-icon" });
-          setIcon(editBtn, "pencil");
-          editBtn.setAttribute("aria-label", "Edit URL");
-          editBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
+          link.addEventListener("dblclick", (e) => {
+            e.preventDefault();
             showInput();
           });
         } else {
