@@ -568,7 +568,18 @@ export class ContextMenuModal extends Modal {
     const chain = this.schema.inheritanceChain;
 
     if (chain.length <= 1) {
-      footer.createEl("span", { text: `Schema: ${this.schema.name}` });
+      footer.createEl("span", { text: "Schema: ", cls: "mv-footer-label" });
+      const schemaSpan = footer.createEl("span", {
+        text: this.schema.name,
+        cls: "mv-footer-schema-name",
+      });
+      if (this.openSchemaEditor && chain[0]) {
+        const manifestPath = chain[0];
+        schemaSpan.addEventListener("click", () => {
+          this.close();
+          this.openSchemaEditor!(manifestPath);
+        });
+      }
       footer.createEl("span", {
         text: this.file.path,
         cls: "mv-footer-filepath",
