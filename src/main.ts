@@ -132,6 +132,12 @@ export default class MetadataValidatorPlugin extends Plugin {
       callback: () => void this.openSchemaEditor(null),
     });
 
+    this.addCommand({
+      id: "edit-properties",
+      name: "Edit properties",
+      callback: () => this.openPropertiesForActiveFile(),
+    });
+
     // === CRITICAL: wait for vault to be fully indexed before loading schemas ===
     this.app.workspace.onLayoutReady(async () => {
       // Load schemas from vault
@@ -243,6 +249,35 @@ export default class MetadataValidatorPlugin extends Plugin {
               .setTitle("Edit schema")
               .setIcon("settings-2")
               .onClick(() => void this.openSchemaEditor(schema.manifestPath))
+          );
+        })
+      );
+
+      // Editor right-click context menu (note body, wikilinks, anywhere in editor)
+      this.registerEvent(
+        this.app.workspace.on("editor-menu", (menu) => {
+          const file = this.app.workspace.getActiveFile();
+          if (!file) return;
+          const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as
+            | Record<string, unknown>
+            | undefined;
+          const schema = this.resolver.resolveForNote(file, fm ?? {});
+          if (!schema) return;
+
+          menu.addItem((item) =>
+            item
+              .setTitle("Edit properties")
+              .setIcon("pencil")
+              .onClick(() => {
+                const getFields = (p: string) => this.cache.getByPath(p)?.data.fields;
+                new ContextMenuModal(
+                  this.app,
+                  file,
+                  schema,
+                  getFields,
+                  (p) => void this.openSchemaEditor(p)
+                ).open();
+              })
           );
         })
       );
@@ -470,6 +505,27 @@ export default class MetadataValidatorPlugin extends Plugin {
   }
 
   /** Open the schema editor for a manifest.md. Pass null to create a new schema. */
+  private openPropertiesForActiveFile(): void {
+    const file = this.app.workspace.getActiveFile();
+    if (!file) return;
+    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as
+      | Record<string, unknown>
+      | undefined;
+    const schema = this.resolver.resolveForNote(file, fm ?? {});
+    if (!schema) {
+      new Notice("No schema matches this note.");
+      return;
+    }
+    const getFields = (p: string) => this.cache.getByPath(p)?.data.fields;
+    new ContextMenuModal(
+      this.app,
+      file,
+      schema,
+      getFields,
+      (p) => void this.openSchemaEditor(p)
+    ).open();
+  }
+
   async openSchemaEditor(manifestPath: string | null): Promise<void> {
     const { SchemaEditorModal } = (await import("./ui/schema-editor-modal")) as {
       SchemaEditorModal: typeof SchemaEditorModalType;
