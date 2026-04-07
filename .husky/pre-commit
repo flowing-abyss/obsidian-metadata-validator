@@ -1,5 +1,5 @@
 #!/bin/sh
 npm run lint-staged
 npx knip
-npx vitest run --passWithNoTests
+npx vitest run
 npm run build
