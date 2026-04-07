@@ -148,8 +148,12 @@ export default class MetadataValidatorPlugin extends Plugin {
             await this.cache.refresh(file);
             this.resolver.rebuild();
             this.settingTab.refreshTree();
-            // Re-validate active note after schema change
+            // Schema changed — discard stale icons and cached results so the
+            // active note is re-decorated with the new field definitions.
             const active = this.app.workspace.getActiveFile();
+            if (active) this.decorator.invalidate(active.path);
+            this.decorator.clearIcons();
+            this.decorator.decorateNow();
             if (active) await this.validateAndUpdate(active);
           }
         })

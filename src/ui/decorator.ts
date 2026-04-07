@@ -86,9 +86,17 @@ export class PropertyDecorator {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
   }
 
-  /** Invalidate cache for a specific file path when its metadata changes */
+  /** Invalidate cache for a specific file path when its metadata changes. */
   invalidate(filePath: string): void {
     this.resultCache.delete(filePath);
+  }
+
+  /**
+   * Remove all injected picker and validator icons from the current view.
+   * Call this when the schema changes so re-decoration picks up the fresh fieldDefs.
+   */
+  clearIcons(): void {
+    document.querySelectorAll(`[${PICKER_ATTR}],[${VALIDATOR_ATTR}]`).forEach((el) => el.remove());
   }
 
   /**
