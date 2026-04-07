@@ -1039,6 +1039,44 @@ body.mv-hide-type-icon .metadata-property:has([data-mv-picker]) .metadata-conten
   min-width: 0;
 }
 
+/* ── Field order drag-and-drop ───────────────────────────── */
+.mv-order-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mv-order-chip {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: grab;
+  user-select: none;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.mv-order-chip.is-own {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+  font-weight: 500;
+}
+
+.mv-order-chip:hover {
+  background: var(--background-modifier-hover);
+}
+
+.mv-order-chip.mv-dragging {
+  opacity: 0.4;
+}
+
+.mv-order-chip.mv-drag-over {
+  outline: 2px dashed var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
 /* ── Inherited fields exclusion ─────────────────────────── */
 .mv-inherited-desc {
   font-size: 12px;
