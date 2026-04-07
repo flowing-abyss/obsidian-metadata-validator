@@ -39,7 +39,8 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   align-items: center;
 }
 
-.mv-picker-modal .mv-picker-option:hover {
+.mv-picker-modal .mv-picker-option:hover,
+.mv-picker-modal .mv-picker-option.is-focused {
   background: var(--background-modifier-hover);
 }
 

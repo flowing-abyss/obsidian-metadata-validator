@@ -88,6 +88,39 @@ export class PickerModal extends Modal {
     search.addEventListener("input", () => {
       this.renderOptions(listEl, this.options, search.value);
     });
+
+    // Keyboard navigation
+    search.addEventListener("keydown", (e) => {
+      const items = Array.from(listEl.querySelectorAll<HTMLElement>(".mv-picker-option"));
+      if (items.length === 0) return;
+
+      const focused = listEl.querySelector<HTMLElement>(".mv-picker-option.is-focused");
+      let idx = focused ? items.indexOf(focused) : -1;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        idx = (idx + 1) % items.length;
+        this.focusItem(items, idx);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        idx = (idx - 1 + items.length) % items.length;
+        this.focusItem(items, idx);
+      } else if (e.key === "Enter" && focused) {
+        e.preventDefault();
+        focused.click();
+      }
+    });
+
+    search.focus();
+  }
+
+  private focusItem(items: HTMLElement[], idx: number): void {
+    items.forEach((el) => el.removeClass("is-focused"));
+    const target = items[idx];
+    if (target) {
+      target.addClass("is-focused");
+      target.scrollIntoView({ block: "nearest" });
+    }
   }
 
   private get isMulti(): boolean {
