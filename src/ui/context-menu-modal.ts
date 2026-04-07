@@ -239,35 +239,47 @@ export class ContextMenuModal extends Modal {
         const urlVal = typeof currentValue === "string" ? currentValue : "";
         const urlWrap = container.createDiv("mv-url-row");
 
+        // Parse markdown link [label](href) — Obsidian stores URLs this way
+        const mdMatch = /^\[([^\]]*)\]\(([^)]+)\)$/.exec(urlVal);
+        const href = mdMatch ? (mdMatch[2] ?? urlVal) : urlVal;
+        const label = mdMatch ? mdMatch[1] || href : urlVal;
+
+        const showInput = () => {
+          urlWrap.empty();
+          const input = urlWrap.createEl("input", {
+            type: "url",
+            value: urlVal,
+            cls: "mv-url-input",
+          });
+          input.addEventListener("change", () => {
+            this.saveField(fieldKey, input.value.trim() || null);
+          });
+          input.addEventListener("blur", () => {
+            this.saveField(fieldKey, input.value.trim() || null);
+          });
+          setTimeout(() => {
+            input.focus();
+            input.select();
+          }, 0);
+        };
+
         if (urlVal) {
-          // Show as clickable link; click the link to open, click edit btn to change
-          const link = urlWrap.createEl("a", { cls: "mv-url-link", text: urlVal });
-          link.href = urlVal;
+          // Show as clickable link; pencil opens inline input
+          const link = urlWrap.createEl("a", { cls: "mv-url-link", text: label });
+          link.href = href;
           link.target = "_blank";
           link.rel = "noopener noreferrer";
+          link.addEventListener("click", (e) => {
+            e.preventDefault();
+            window.open(href, "_blank");
+          });
 
           const editBtn = urlWrap.createEl("button", { cls: "mv-url-edit-btn clickable-icon" });
           setIcon(editBtn, "pencil");
           editBtn.setAttribute("aria-label", "Edit URL");
-
           editBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            urlWrap.empty();
-            const input = urlWrap.createEl("input", {
-              type: "url",
-              value: urlVal,
-              cls: "mv-url-input",
-            });
-            input.addEventListener("change", () => {
-              this.saveField(fieldKey, input.value.trim() || null);
-            });
-            input.addEventListener("blur", () => {
-              this.saveField(fieldKey, input.value.trim() || null);
-            });
-            setTimeout(() => {
-              input.focus();
-              input.select();
-            }, 0);
+            showInput();
           });
         } else {
           // Empty — show input directly
