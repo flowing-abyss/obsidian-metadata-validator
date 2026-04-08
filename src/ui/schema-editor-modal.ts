@@ -1,6 +1,14 @@
 import { App, Modal, Notice, Setting, TFile, setIcon, stringifyYaml } from "obsidian";
 import type { ManifestCache } from "../manifest/cache";
-import type { FieldOption, FieldType, ManifestData, ManifestField, ManifestTarget } from "../types";
+import { mergeSchemas } from "../schema/merger";
+import type {
+  FieldOption,
+  FieldType,
+  Manifest,
+  ManifestData,
+  ManifestField,
+  ManifestTarget,
+} from "../types";
 
 const FIELD_TYPES: FieldType[] = [
   "text",
@@ -57,26 +65,69 @@ export class SchemaEditorModal extends Modal {
 
   // ── Inheritance navigation ────────────────────────────────────────────────
 
+  private normalizeExtendsFolder(extendsPath: string): string {
+    const trimmed = extendsPath.trim().replace(/\/+$/, "");
+    return trimmed.replace(/\/manifest\.md$/, "");
+  }
+
+  private findParentManifest(manifestPath: string, data: ManifestData): Manifest | null {
+    if (!this.cache) return null;
+
+    if (data.extends) {
+      const explicitFolder = this.normalizeExtendsFolder(data.extends);
+      const explicit = this.cache.getByFolder(explicitFolder);
+      if (explicit) return explicit;
+    }
+
+    const folder = manifestPath.replace(/\/manifest\.md$/, "");
+    const parentFolder = folder.split("/").slice(0, -1).join("/");
+    return parentFolder ? (this.cache.getByFolder(parentFolder) ?? null) : null;
+  }
+
+  private resolveMergedManifestData(
+    manifest: Manifest,
+    visiting: Set<string>
+  ): ManifestData | null {
+    if (visiting.has(manifest.path)) {
+      console.warn(`[MetadataValidator] Circular inheritance detected at ${manifest.path}`);
+      return null;
+    }
+    visiting.add(manifest.path);
+
+    try {
+      const parent = this.findParentManifest(manifest.path, manifest.data);
+      if (!parent) return manifest.data;
+
+      const parentMerged = this.resolveMergedManifestData(parent, visiting);
+      if (!parentMerged) return null;
+
+      return mergeSchemas(parentMerged, manifest.data);
+    } finally {
+      visiting.delete(manifest.path);
+    }
+  }
+
+  private getInheritedFieldKeys(): string[] {
+    if (!this.cache) return [];
+
+    const ownKeys = Object.keys(this.data.fields ?? {});
+    const parentManifest = this.findParentManifest(this.manifestPath, this.data);
+    if (!parentManifest) return [];
+
+    const mergedParent = this.resolveMergedManifestData(parentManifest, new Set());
+    const allParentKeys = Object.keys(mergedParent?.fields ?? {});
+    return allParentKeys.filter((k) => !ownKeys.includes(k));
+  }
+
   private renderInheritanceNav(el: HTMLElement): void {
     if (!this.cache || !this.openOther) return;
 
-    const folder = this.manifestPath.replace(/\/manifest\.md$/, "");
-
-    // Determine parent
-    let parentManifest = this.data.extends ? this.cache.getByFolder(this.data.extends) : null;
-    if (!parentManifest) {
-      const parentFolder = folder.split("/").slice(0, -1).join("/");
-      parentManifest = parentFolder ? (this.cache.getByFolder(parentFolder) ?? null) : null;
-    }
+    const parentManifest = this.findParentManifest(this.manifestPath, this.data);
 
     // Determine children (schemas whose resolved parent == this manifest)
     const children = this.cache.getAll().filter((m) => {
       if (m.path === this.manifestPath) return false;
-      const childFolder = m.folderPath;
-      const childParentFolder = childFolder.split("/").slice(0, -1).join("/");
-      const autoParent = childParentFolder ? this.cache!.getByFolder(childParentFolder) : null;
-      const extendsParent = m.data.extends ? this.cache!.getByFolder(m.data.extends) : null;
-      return (extendsParent ?? autoParent)?.path === this.manifestPath;
+      return this.findParentManifest(m.path, m.data)?.path === this.manifestPath;
     });
 
     if (!parentManifest && children.length === 0) return;
@@ -312,16 +363,7 @@ export class SchemaEditorModal extends Modal {
     if (!this.cache) return;
 
     const ownKeys = Object.keys(this.data.fields ?? {});
-    const folder = this.manifestPath.replace(/\/manifest\.md$/, "");
-    let parentManifest = this.data.extends ? this.cache.getByFolder(this.data.extends) : null;
-    if (!parentManifest) {
-      const parentFolder = folder.split("/").slice(0, -1).join("/");
-      parentManifest = parentFolder ? (this.cache.getByFolder(parentFolder) ?? null) : null;
-    }
-    if (!parentManifest) return;
-
-    const allParentKeys = Object.keys(parentManifest.data.fields ?? {});
-    const inheritedRaw = allParentKeys.filter((k) => !ownKeys.includes(k));
+    const inheritedRaw = this.getInheritedFieldKeys();
     if (inheritedRaw.length === 0 && ownKeys.length === 0) return;
 
     this.renderCollapsibleSection(el, "Inherited fields", (body) => {

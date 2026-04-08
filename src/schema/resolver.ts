@@ -1,8 +1,13 @@
 import type { TFile } from "obsidian";
-import type { Manifest, ManifestData, ResolvedSchema } from "../types";
 import type { ManifestCache } from "../manifest/cache";
+import type { Manifest, ManifestData, ResolvedSchema } from "../types";
 import { mergeSchemas } from "./merger";
 import { evaluateQuery } from "./query";
+
+interface ResolvedNode {
+  schema: ResolvedSchema;
+  mergedData: ManifestData;
+}
 
 export class SchemaResolver {
   private resolved: Map<string, ResolvedSchema> = new Map();
@@ -19,29 +24,39 @@ export class SchemaResolver {
   rebuild(): void {
     this.resolved.clear();
     for (const manifest of this.cache.getAll()) {
-      const schema = this.resolve(manifest, new Set());
-      if (schema) this.resolved.set(manifest.path, schema);
+      const node = this.resolve(manifest, new Set());
+      if (node) this.resolved.set(manifest.path, node.schema);
     }
   }
 
-  private resolve(manifest: Manifest, visiting: Set<string>): ResolvedSchema | null {
+  private resolve(manifest: Manifest, visiting: Set<string>): ResolvedNode | null {
     if (visiting.has(manifest.path)) {
       console.warn(`[MetadataValidator] Circular inheritance detected at ${manifest.path}`);
       return null;
     }
     visiting.add(manifest.path);
 
-    const parent = this.findParent(manifest);
-    if (!parent) {
-      return this.toResolved(manifest, manifest.data, [manifest.path]);
+    try {
+      const parent = this.findParent(manifest);
+      if (!parent) {
+        return {
+          schema: this.toResolved(manifest, manifest.data, [manifest.path]),
+          mergedData: manifest.data,
+        };
+      }
+
+      const parentNode = this.resolve(parent, visiting);
+      if (!parentNode) return null;
+
+      const mergedData = mergeSchemas(parentNode.mergedData, manifest.data);
+      const chain = [...parentNode.schema.inheritanceChain, manifest.path];
+      return {
+        schema: this.toResolved(manifest, mergedData, chain),
+        mergedData,
+      };
+    } finally {
+      visiting.delete(manifest.path);
     }
-
-    const parentSchema = this.resolve(parent, visiting);
-    if (!parentSchema) return null;
-
-    const mergedData = mergeSchemas(parent.data, manifest.data);
-    const chain = [...parentSchema.inheritanceChain, manifest.path];
-    return this.toResolved(manifest, mergedData, chain);
   }
 
   private findParent(manifest: Manifest): Manifest | null {

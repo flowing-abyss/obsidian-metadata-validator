@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
-import { SchemaResolver } from "../resolver";
+import type { App, TFile } from "obsidian";
+import { describe, expect, it, vi } from "vitest";
 import { ManifestCache } from "../../manifest/cache";
 import type { Manifest } from "../../types";
-import type { App, TFile } from "obsidian";
+import { SchemaResolver } from "../resolver";
 
 function makeCache(manifests: Manifest[]): ManifestCache {
   const cache = new ManifestCache({} as App, "schemas");
@@ -112,6 +112,61 @@ describe("SchemaResolver", () => {
     expect(schema?.inheritanceChain).toEqual([
       "schemas/base/manifest.md",
       "schemas/base/book/manifest.md",
+    ]);
+  });
+
+  it("inherits fields across deep folder nesting", () => {
+    const category: Manifest = {
+      path: "schemas/category/manifest.md",
+      folderPath: "schemas/category",
+      data: {
+        name: "category",
+        target: { query: "#taxonomy" },
+        fields: { level0: { type: "text" } },
+      },
+    };
+    const meta: Manifest = {
+      path: "schemas/category/meta/manifest.md",
+      folderPath: "schemas/category/meta",
+      data: {
+        name: "meta",
+        fields: { level1: { type: "number" } },
+      },
+    };
+    const problem: Manifest = {
+      path: "schemas/category/meta/problem/manifest.md",
+      folderPath: "schemas/category/meta/problem",
+      data: {
+        name: "problem",
+        fields: { level2: { type: "date" } },
+      },
+    };
+    const hierarchy: Manifest = {
+      path: "schemas/category/meta/problem/hierarchy/manifest.md",
+      folderPath: "schemas/category/meta/problem/hierarchy",
+      data: {
+        name: "hierarchy",
+        fields: { level3: { type: "boolean" } },
+      },
+    };
+
+    const cache = makeCache([category, meta, problem, hierarchy]);
+    const resolver = new SchemaResolver(cache);
+    resolver.rebuild();
+
+    const file = makeFile("Notes/Deep.md");
+    const schema = resolver.resolveForNote(file, { tags: ["taxonomy"] });
+
+    expect(schema?.name).toBe("hierarchy");
+    expect(schema?.fields["level0"]?.type).toBe("text");
+    expect(schema?.fields["level1"]?.type).toBe("number");
+    expect(schema?.fields["level2"]?.type).toBe("date");
+    expect(schema?.fields["level3"]?.type).toBe("boolean");
+    expect(schema?.inheritanceChain).toEqual([
+      "schemas/category/manifest.md",
+      "schemas/category/meta/manifest.md",
+      "schemas/category/meta/problem/manifest.md",
+      "schemas/category/meta/problem/hierarchy/manifest.md",
     ]);
   });
 
