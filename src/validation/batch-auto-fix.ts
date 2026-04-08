@@ -1,8 +1,8 @@
 import type { App, TFile } from "obsidian";
 import type { SchemaResolver } from "../schema/resolver";
 import type { ValidationEngine } from "./engine";
-import { checkFolderLocation } from "./rules/folder-location";
 import { sanitizeFrontmatter } from "./frontmatter";
+import { checkFolderLocation } from "./rules/folder-location";
 
 type FileValidationStatus = "error" | "warning" | "valid" | "none";
 
