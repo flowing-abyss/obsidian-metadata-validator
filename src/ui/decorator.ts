@@ -2,6 +2,7 @@ import { setIcon, type App, type TFile } from "obsidian";
 import type { FieldType, ResolvedSchema, ValidationResult } from "../types";
 import type { SchemaResolver } from "../schema/resolver";
 import type { ValidationEngine } from "../validation/engine";
+import { sanitizeFrontmatter } from "../validation/frontmatter";
 import type { PluginSettings } from "../settings";
 import type { PickerModal as PickerModalType } from "./picker-modal";
 import type { QuickEditModal as QuickEditModalType } from "./quick-edit-modal";
@@ -91,6 +92,10 @@ export class PropertyDecorator {
     this.resultCache.delete(filePath);
   }
 
+  invalidateAll(): void {
+    this.resultCache.clear();
+  }
+
   /**
    * Remove all injected picker and validator icons from the current view.
    * Call this when the schema changes so re-decoration picks up the fresh fieldDefs.
@@ -119,14 +124,13 @@ export class PropertyDecorator {
     const file = this.app.workspace.getActiveFile();
     if (!file) return;
 
-    const cache = this.app.metadataCache.getFileCache(file);
     // Shallow-copy the frontmatter so engine.validate / applyAutoFix mutations
     // never corrupt the live Obsidian metadata cache object. Without this copy,
     // subsequent reads of getFileCache(file)?.frontmatter would return mutated
     // (wrong) values, causing pickers and list modals to open with stale data.
-    const rawFm = (cache?.frontmatter ?? {}) as Record<string, unknown>;
-    const frontmatter: Record<string, unknown> = { ...rawFm };
-    delete frontmatter["position"];
+    const frontmatter = sanitizeFrontmatter(
+      this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined
+    );
 
     const schema = this.resolver.resolveForNote(file, frontmatter);
     if (!schema) return;

@@ -30,6 +30,8 @@ export default tseslint.config(
 	{
 		ignores: [
 			"node_modules",
+			"coverage/**",
+			"test-vault/**",
 			"dist",
 			"esbuild.config.mjs",
 			"eslint.config.js",

@@ -573,12 +573,22 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
 .mv-field-empty { color: var(--text-muted); font-style: italic; cursor: pointer; }
 
 /* ── Scan vault button ────────────────────────────────────── */
-.mv-scan-btn {
-  font-size: 12px;
-  padding: 4px 8px;
+.mv-sidebar-actions {
+  display: flex;
+  gap: 8px;
   margin-bottom: 8px;
 }
-.mv-scan-btn:disabled {
+
+.mv-sidebar-action-btn {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.mv-scan-btn {
+  margin-bottom: 0;
+}
+
+.mv-sidebar-action-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

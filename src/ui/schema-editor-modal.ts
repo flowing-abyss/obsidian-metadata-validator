@@ -339,8 +339,6 @@ export class SchemaEditorModal extends Modal {
         ...saved.filter((k) => allActive.includes(k)),
         ...allActive.filter((k) => !saved.includes(k)),
       ];
-      // Append excluded at end (they are greyed out / struck)
-      const excludedKeys = inheritedRaw.filter((k) => excluded.has(k));
 
       const saveState = () => {
         this.data.exclude = excluded.size > 0 ? Array.from(excluded).sort() : undefined;

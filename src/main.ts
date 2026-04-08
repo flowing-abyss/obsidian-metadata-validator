@@ -4,6 +4,8 @@ import type { ValidationResult } from "./types";
 import { ManifestCache } from "./manifest/cache";
 import { SchemaResolver } from "./schema/resolver";
 import { ValidationEngine } from "./validation/engine";
+import { applyVaultAutoFixes } from "./validation/batch-auto-fix";
+import { sanitizeFrontmatter } from "./validation/frontmatter";
 import { CssInjector } from "./ui/css-injector";
 import { PropertyDecorator } from "./ui/decorator";
 import { ContextMenuModal } from "./ui/context-menu-modal";
@@ -72,6 +74,9 @@ export default class MetadataValidatorPlugin extends Plugin {
               warnings: warningFiles,
               noSchema: noSchemaFiles,
             });
+          },
+          async () => {
+            await this.applyAutoFixesAcrossVault();
           }
         )
     );
@@ -419,12 +424,9 @@ export default class MetadataValidatorPlugin extends Plugin {
   }
 
   private async validateAndUpdate(file: TFile): Promise<void> {
-    const metaCache = this.app.metadataCache.getFileCache(file);
-    // Obsidian injects a non-YAML 'position' key into the frontmatter cache object.
-    // Strip it before processing so it doesn't get written back to the file.
-    const rawFm = (metaCache?.frontmatter ?? {}) as Record<string, unknown>;
-    const frontmatter: Record<string, unknown> = { ...rawFm };
-    delete frontmatter["position"];
+    const frontmatter = sanitizeFrontmatter(
+      this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined
+    );
     const schema = this.resolver.resolveForNote(file, frontmatter);
 
     if (!schema) {
@@ -512,12 +514,9 @@ export default class MetadataValidatorPlugin extends Plugin {
   private async validateForStats(
     file: TFile
   ): Promise<{ errors: number; warnings: number } | null> {
-    const rawFm = (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}) as Record<
-      string,
-      unknown
-    >;
-    const frontmatter: Record<string, unknown> = { ...rawFm };
-    delete frontmatter["position"];
+    const frontmatter = sanitizeFrontmatter(
+      this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined
+    );
     const schema = this.resolver.resolveForNote(file, frontmatter);
     if (!schema) return null;
     const results = await this.engine.validate(file, frontmatter, schema);
@@ -525,6 +524,43 @@ export default class MetadataValidatorPlugin extends Plugin {
       errors: results.filter((r) => !r.autoFixed && r.severity === "error").length,
       warnings: results.filter((r) => !r.autoFixed && r.severity === "warning").length,
     };
+  }
+
+  private async applyAutoFixesAcrossVault(): Promise<void> {
+    await this.reloadSchemas();
+
+    const summary = await applyVaultAutoFixes({
+      app: this.app,
+      schemasRoot: this.settings.schemasRoot,
+      resolver: this.resolver,
+      engine: this.engine,
+      writeFrontmatter: (file, frontmatter) => this.writeOrderedFrontmatter(file, frontmatter),
+      onFileProcessed: ({ previousPath, filePath, status }) => {
+        if (previousPath !== filePath) this.badges.setStatus(previousPath, "none");
+        this.badges.setStatus(filePath, status);
+      },
+    });
+
+    if (this.settings.showFileExplorerBadges) this.badges.render();
+    this.decorator.invalidateAll();
+    this.decorator.clearIcons();
+    this.decorator.decorateNow();
+
+    const activeFile = this.app.workspace.getActiveFile();
+    if (activeFile) await this.validateAndUpdate(activeFile);
+
+    new Notice(
+      [
+        `Auto-fix complete: ${summary.changed} note(s) changed`,
+        `${summary.autoFixed} fix(es) applied`,
+        `${summary.moved} moved`,
+        `${summary.errors} error(s) remain`,
+        `${summary.warnings} warning(s) remain`,
+        summary.failed > 0 ? `${summary.failed} failed` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    );
   }
 
   /** Return the live SidebarPanel instance, or undefined if none is open. */

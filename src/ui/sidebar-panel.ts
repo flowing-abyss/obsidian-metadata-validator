@@ -15,12 +15,21 @@ export class SidebarPanel extends ItemView {
   private fileName = "";
   private onOpenCallback: (() => void) | null = null;
   private readonly onScanVault: (() => Promise<void>) | null;
+  private readonly onApplyAutoFixes: (() => Promise<void>) | null;
   private vaultStats: VaultStats | null = null;
+  private isScanningVault = false;
+  private isApplyingAutoFixes = false;
 
-  constructor(leaf: WorkspaceLeaf, onOpenCallback?: () => void, onScanVault?: () => Promise<void>) {
+  constructor(
+    leaf: WorkspaceLeaf,
+    onOpenCallback?: () => void,
+    onScanVault?: () => Promise<void>,
+    onApplyAutoFixes?: () => Promise<void>
+  ) {
     super(leaf);
     this.onOpenCallback = onOpenCallback ?? null;
     this.onScanVault = onScanVault ?? null;
+    this.onApplyAutoFixes = onApplyAutoFixes ?? null;
   }
 
   getViewType(): string {
@@ -54,21 +63,25 @@ export class SidebarPanel extends ItemView {
     const { contentEl } = this;
     contentEl.empty();
 
-    // ── Scan vault button ─────────────────────────────────────
-    const scanBtn = contentEl.createEl("button", {
-      text: "Scan vault",
-      cls: "mv-scan-btn",
+    const actions = contentEl.createDiv("mv-sidebar-actions");
+
+    const scanBtn = actions.createEl("button", {
+      text: this.isScanningVault ? "Scanning..." : "Scan vault",
+      cls: "mv-sidebar-action-btn mv-scan-btn",
     });
+    scanBtn.disabled = this.isScanningVault || this.isApplyingAutoFixes || !this.onScanVault;
     scanBtn.addEventListener("click", () => {
-      if (this.onScanVault) {
-        this.vaultStats = null;
-        scanBtn.disabled = true;
-        scanBtn.textContent = "Scanning...";
-        void this.onScanVault().then(() => {
-          scanBtn.disabled = false;
-          scanBtn.textContent = "Scan vault";
-        });
-      }
+      void this.runScanVault();
+    });
+
+    const autoFixBtn = actions.createEl("button", {
+      text: this.isApplyingAutoFixes ? "Applying..." : "Apply auto-fixes",
+      cls: "mv-sidebar-action-btn mv-autofix-btn",
+    });
+    autoFixBtn.disabled =
+      this.isScanningVault || this.isApplyingAutoFixes || !this.onApplyAutoFixes;
+    autoFixBtn.addEventListener("click", () => {
+      void this.runApplyAutoFixes();
     });
 
     // ── Vault health summary (after scan) ─────────────────────
@@ -147,5 +160,34 @@ export class SidebarPanel extends ItemView {
 
   async onClose(): Promise<void> {
     this.contentEl.empty();
+  }
+
+  private async runScanVault(): Promise<void> {
+    if (!this.onScanVault || this.isScanningVault || this.isApplyingAutoFixes) return;
+
+    this.vaultStats = null;
+    this.isScanningVault = true;
+    this.render();
+
+    try {
+      await this.onScanVault();
+    } finally {
+      this.isScanningVault = false;
+      this.render();
+    }
+  }
+
+  private async runApplyAutoFixes(): Promise<void> {
+    if (!this.onApplyAutoFixes || this.isApplyingAutoFixes || this.isScanningVault) return;
+
+    this.isApplyingAutoFixes = true;
+    this.render();
+
+    try {
+      await this.onApplyAutoFixes();
+    } finally {
+      this.isApplyingAutoFixes = false;
+      this.render();
+    }
   }
 }
