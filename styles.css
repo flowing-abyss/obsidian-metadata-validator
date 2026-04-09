@@ -50,6 +50,38 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   padding-left: 7px;
 }
 
+.mv-picker-modal .mv-picker-group {
+  margin-bottom: 10px;
+}
+
+.mv-picker-modal .mv-picker-group:last-child {
+  margin-bottom: 0;
+}
+
+.mv-picker-modal .mv-picker-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 2px 0 6px;
+  padding: 0 2px;
+}
+
+.mv-picker-modal .mv-picker-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.mv-picker-modal .mv-picker-group-type {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
 .mv-picker-modal .mv-picker-value-hint {
   opacity: 0.5;
   font-size: 11px;
@@ -117,7 +149,9 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   cursor: pointer;
   opacity: 0.4;
   color: var(--icon-color, var(--text-muted));
-  transition: opacity 0.15s, background 0.15s;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
 }
 
 .mv-picker-btn:hover {
@@ -148,7 +182,9 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   cursor: pointer;
   color: var(--text-faint);
   opacity: 0.4;
-  transition: opacity 0.15s, background 0.15s;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
 }
 
 .mv-type-icon:hover {
@@ -564,13 +600,23 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
 }
 
 /* ── Utility: number inputs ───────────────────────────────── */
-.mv-input-number-sm { width: 80px; }
-.mv-input-number-md { width: 100px; }
+.mv-input-number-sm {
+  width: 80px;
+}
+.mv-input-number-md {
+  width: 100px;
+}
 
 /* ── Utility: visibility toggle ──────────────────────────── */
-.mv-hidden { display: none; }
+.mv-hidden {
+  display: none;
+}
 
-.mv-field-empty { color: var(--text-muted); font-style: italic; cursor: pointer; }
+.mv-field-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  cursor: pointer;
+}
 
 /* ── Scan vault button ────────────────────────────────────── */
 .mv-sidebar-actions {
@@ -598,7 +644,6 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   padding: 8px 0;
   min-width: 380px;
 }
-
 
 .mv-context-modal h4.mv-context-section-header {
   margin: 8px 0 4px;
@@ -915,10 +960,18 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   text-align: right;
 }
 
-.mv-stat-errors { color: var(--color-red); }
-.mv-stat-warnings { color: var(--color-yellow); }
-.mv-stat-clean { color: var(--color-green); }
-.mv-stat-none { color: var(--text-faint); }
+.mv-stat-errors {
+  color: var(--color-red);
+}
+.mv-stat-warnings {
+  color: var(--color-yellow);
+}
+.mv-stat-clean {
+  color: var(--color-green);
+}
+.mv-stat-none {
+  color: var(--text-faint);
+}
 
 .mv-stat-label {
   color: var(--text-muted);
@@ -1011,7 +1064,10 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
 
 /* ── Suppress Obsidian's type icon when we inject our own ──  */
 /* Only hide when the setting is active (mv-hide-type-icon body class) */
-body.mv-hide-type-icon .metadata-property:has([data-mv-picker]) .metadata-content .metadata-property-icon {
+body.mv-hide-type-icon
+  .metadata-property:has([data-mv-picker])
+  .metadata-content
+  .metadata-property-icon {
   display: none !important;
 }
 
@@ -1037,7 +1093,6 @@ body.mv-hide-type-icon .metadata-property:has([data-mv-picker]) .metadata-conten
 .mv-url-link:hover {
   text-decoration: underline;
 }
-
 
 .mv-url-input {
   flex: 1;
@@ -1066,7 +1121,9 @@ body.mv-hide-type-icon .metadata-property:has([data-mv-picker]) .metadata-conten
   color: var(--text-muted);
   cursor: grab;
   user-select: none;
-  transition: background 0.1s, border-color 0.1s;
+  transition:
+    background 0.1s,
+    border-color 0.1s;
 }
 
 .mv-order-chip.is-own {
@@ -1243,7 +1300,9 @@ body.mv-hide-type-icon .metadata-property:has([data-mv-picker]) .metadata-conten
   cursor: pointer;
   border-radius: 3px;
   padding: 1px;
-  transition: background 0.1s, opacity 0.1s;
+  transition:
+    background 0.1s,
+    opacity 0.1s;
 }
 
 .mv-field-type-icon--clickable:hover {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { evaluateQuery } from "../query";
 
 describe("evaluateQuery", () => {
@@ -41,5 +41,37 @@ describe("evaluateQuery", () => {
   it("property match", () => {
     expect(evaluateQuery("status=reading", "Notes/n.md", [], fm)).toBe(true);
     expect(evaluateQuery("status=done", "Notes/n.md", [], fm)).toBe(false);
+  });
+
+  it("supports unary negation with dash", () => {
+    expect(evaluateQuery("#tag1 AND -#tag2", "Notes/n.md", ["tag1"], fm)).toBe(true);
+    expect(evaluateQuery("#tag1 AND -#tag2", "Notes/n.md", ["tag1", "tag2"], fm)).toBe(false);
+  });
+
+  it("supports unary negation with NOT", () => {
+    expect(evaluateQuery("#tag1 AND NOT #tag2", "Notes/n.md", ["tag1"], fm)).toBe(true);
+    expect(evaluateQuery("#tag1 AND NOT #tag2", "Notes/n.md", ["tag1", "tag2"], fm)).toBe(false);
+  });
+
+  it("supports negation for folders", () => {
+    expect(evaluateQuery('-"Archive/"', "Notes/n.md", [], fm)).toBe(true);
+    expect(evaluateQuery('-"Archive/"', "Archive/n.md", [], fm)).toBe(false);
+  });
+
+  it("supports parentheses grouping", () => {
+    expect(
+      evaluateQuery("(#book OR #article) AND status=reading", "Notes/n.md", ["book"], fm)
+    ).toBe(true);
+    expect(
+      evaluateQuery("(#book OR #article) AND status=reading", "Notes/n.md", ["article"], fm)
+    ).toBe(true);
+    expect(
+      evaluateQuery("(#book OR #article) AND status=reading", "Notes/n.md", ["news"], fm)
+    ).toBe(false);
+  });
+
+  it("supports negation of grouped expressions", () => {
+    expect(evaluateQuery("-(#book OR #article)", "Notes/n.md", ["news"], fm)).toBe(true);
+    expect(evaluateQuery("-(#book OR #article)", "Notes/n.md", ["book"], fm)).toBe(false);
   });
 });

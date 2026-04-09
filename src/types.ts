@@ -16,6 +16,10 @@ export type FieldType =
 export interface FieldOption {
   value: string;
   label?: string;
+  /** Optional UI group label for dynamic picker rendering */
+  group?: string;
+  /** Optional per-group selection mode for dynamic picker rendering */
+  type?: "select" | "multiselect";
 }
 
 export interface FieldSource {

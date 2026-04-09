@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { PickerModal } from "../picker-modal";
 import type { App, TFile } from "obsidian";
-import type { ManifestField, ResolvedSchema } from "../../types";
+import { describe, expect, it } from "vitest";
+import type { FieldOption, ManifestField, ResolvedSchema } from "../../types";
+import { PickerModal } from "../picker-modal";
 
 function makeModal(field: Partial<ManifestField>, currentValue: unknown) {
   const app = {} as App;
@@ -198,6 +198,66 @@ describe("PickerModal", () => {
       const values = result.map((o) => o.value);
       expect(values.indexOf("cherry")).toBeLessThan(values.indexOf("banana"));
       expect(values.indexOf("apple")).toBeLessThan(values.indexOf("banana"));
+    });
+  });
+
+  describe("grouped options", () => {
+    it("groups options and preserves group-level selection mode", () => {
+      const m = makeModal({ type: "multiselect" }, ["published"]);
+      const groupedOptions = (
+        m as unknown as {
+          groupedOptions: (
+            opts: FieldOption[],
+            q: string
+          ) => Array<{
+            label: string;
+            type: "select" | "multiselect";
+            options: FieldOption[];
+          }>;
+        }
+      ).groupedOptions.bind(m);
+
+      const result = groupedOptions(
+        [
+          { value: "draft", label: "Draft", group: "Status", type: "select" },
+          { value: "published", label: "Published", group: "Status", type: "select" },
+          { value: "dev", label: "Dev", group: "Category", type: "multiselect" },
+        ],
+        ""
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0]?.label).toBe("Status");
+      expect(result[0]?.type).toBe("select");
+      expect(result[0]?.options[0]?.value).toBe("published"); // selected first
+      expect(result[1]?.label).toBe("Category");
+      expect(result[1]?.type).toBe("multiselect");
+    });
+
+    it("enforces single selection inside select groups", () => {
+      const m = makeModal({ type: "multiselect" }, []);
+      const modal = m as unknown as {
+        options: FieldOption[];
+        selected: Set<string>;
+        toggleOption: (opt: FieldOption) => void;
+      };
+
+      modal.options = [
+        { value: "draft", label: "Draft", group: "Status", type: "select" },
+        { value: "published", label: "Published", group: "Status", type: "select" },
+        { value: "dev", label: "Dev", group: "Category", type: "multiselect" },
+      ];
+
+      modal.toggleOption(modal.options[0]!);
+      expect(modal.selected.has("draft")).toBe(true);
+
+      modal.toggleOption(modal.options[1]!);
+      expect(modal.selected.has("draft")).toBe(false);
+      expect(modal.selected.has("published")).toBe(true);
+
+      modal.toggleOption(modal.options[2]!);
+      expect(modal.selected.has("published")).toBe(true);
+      expect(modal.selected.has("dev")).toBe(true);
     });
   });
 });

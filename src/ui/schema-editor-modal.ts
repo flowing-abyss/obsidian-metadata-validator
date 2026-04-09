@@ -288,10 +288,10 @@ export class SchemaEditorModal extends Modal {
     new Setting(el)
       .setName("Expression")
       .setDesc(
-        'Logical expression matching notes: "Folder/" AND/OR #tag, key=value' // eslint-disable-line obsidianmd/ui/sentence-case
+        'Logical expression: "Folder/" AND/OR #tag, key=value; NOT/- excludes; (...) groups' // eslint-disable-line obsidianmd/ui/sentence-case
       )
       .addText((t) => {
-        t.inputEl.setAttribute("placeholder", '"Sources/" AND #book'); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.setAttribute("placeholder", '"Sources/" AND #book AND -#archive'); // eslint-disable-line obsidianmd/ui/sentence-case
         t.inputEl.addClass("mv-expression-input");
         t.setValue(this.data.target?.query ?? "").onChange((v) => {
           const trimmed = v.trim();
@@ -697,10 +697,10 @@ export class SchemaEditorModal extends Modal {
     new Setting(body)
       .setName("Expression")
       .setDesc(
-        'Filter notes by expression: "Folder/" AND/OR #tag' // eslint-disable-line obsidianmd/ui/sentence-case
+        'Filter notes by expression: "Folder/" AND/OR #tag, key=value; NOT/- excludes; (...) groups' // eslint-disable-line obsidianmd/ui/sentence-case
       )
       .addText((t) => {
-        t.inputEl.setAttribute("placeholder", '"People/" AND #person'); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.setAttribute("placeholder", '"People/" AND #person AND -#archived'); // eslint-disable-line obsidianmd/ui/sentence-case
         t.inputEl.addClass("mv-expression-input");
         t.setValue(field.source?.query ?? "").onChange((v) => {
           update({ source: { ...field.source, query: v.trim() || undefined } });
@@ -777,11 +777,11 @@ export class SchemaEditorModal extends Modal {
     new Setting(dynamicPanel)
       .setName("Expression")
       .setDesc(
-        'Filter by expression: "Folder/" AND/OR #tag' // eslint-disable-line obsidianmd/ui/sentence-case
+        'Filter by expression: "Folder/" AND/OR #tag, key=value; NOT/- excludes; (...) groups' // eslint-disable-line obsidianmd/ui/sentence-case
       )
       .addText((t) => {
         t.inputEl.addClass("mv-expression-input");
-        t.inputEl.setAttribute("placeholder", '"Sources/" AND #book'); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.setAttribute("placeholder", '"Sources/" AND (#book OR #article) AND -#archive'); // eslint-disable-line obsidianmd/ui/sentence-case
         t.setValue(dynamicSource.query ?? "").onChange((v) => {
           update({
             options: {

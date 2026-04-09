@@ -3,8 +3,10 @@
  *
  * Syntax (case-insensitive operators):
  *   term           →  a single condition
+ *   -term / NOT term → negates a term (highest precedence)
  *   term AND term  →  both must be true (higher precedence)
  *   term OR term   →  either must be true
+ *   ( ... )        →  grouping
  *
  * Terms:
  *   "folder/"   or  folder/   →  note path starts with this prefix
@@ -64,6 +66,43 @@ function evaluateTerm(
   fileTags: string[],
   frontmatter: Record<string, unknown>
 ): boolean {
+  const { term, negate } = consumeNegationPrefixes(raw);
+  if (!term) return false;
+  const matches = evaluateBaseTerm(term, filePath, fileTags, frontmatter);
+  return negate ? !matches : matches;
+}
+
+function consumeNegationPrefixes(raw: string): { term: string; negate: boolean } {
+  let term = raw.trim();
+  let negate = false;
+
+  while (term) {
+    if (term.startsWith("-")) {
+      negate = !negate;
+      term = term.slice(1).trim();
+      continue;
+    }
+
+    if (/^NOT\s+/i.test(term)) {
+      negate = !negate;
+      term = term.slice(3).trim();
+      continue;
+    }
+
+    break;
+  }
+
+  return { term, negate };
+}
+
+function evaluateBaseTerm(
+  raw: string,
+  filePath: string,
+  fileTags: string[],
+  frontmatter: Record<string, unknown>
+): boolean {
+  if (!raw) return false;
+
   // Strip optional outer parentheses
   let term = raw;
   if (term.startsWith("(") && term.endsWith(")")) {

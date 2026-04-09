@@ -94,8 +94,62 @@ function coerceToString(v: unknown): string {
 }
 
 interface JsSourceItem {
+  group?: string | number | boolean;
+  type?: string;
   value?: string | number | boolean;
   label?: string | number | boolean;
+}
+
+interface JsSourceGroup {
+  group?: string | number | boolean;
+  label?: string | number | boolean;
+  type?: string;
+  options?: unknown;
+}
+
+function normalizeSelectionType(raw: unknown): "select" | "multiselect" | undefined {
+  if (typeof raw !== "string") return undefined;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "select") return "select";
+  if (normalized === "multiselect" || normalized === "multi-select") return "multiselect";
+  return undefined;
+}
+
+function optionFromUnknown(
+  item: unknown,
+  group?: string,
+  type?: "select" | "multiselect"
+): FieldOption {
+  if (typeof item === "string") {
+    return {
+      value: item,
+      label: item,
+      group,
+      type,
+    };
+  }
+
+  const typed = item as JsSourceItem;
+  const value = coerceToString(typed.value);
+  const label = coerceToString(typed.label ?? typed.value);
+  const ownGroup = coerceToString(typed.group);
+  const ownType = normalizeSelectionType(typed.type);
+
+  return {
+    value,
+    label,
+    group: ownGroup || group,
+    type: ownType ?? type,
+  };
+}
+
+function toArray(result: unknown): unknown[] {
+  if (Array.isArray(result)) return Array.from(result as unknown[]);
+  if (typeof result === "string") return [];
+  if (result !== null && result !== undefined && Symbol.iterator in Object(result)) {
+    return Array.from(result as Iterable<unknown>);
+  }
+  return [];
 }
 
 async function resolveJsSource(
@@ -134,22 +188,26 @@ async function resolveJsSource(
       currentPage: unknown
     ) => unknown;
     const result: unknown = await fn(app, dv, currentFile, currentPage);
-    // dv.pages() returns a DataArray (not a plain Array) — convert any iterable
-    let items: unknown[];
-    if (Array.isArray(result)) {
-      items = Array.from(result as unknown[]);
-    } else if (result !== null && result !== undefined && Symbol.iterator in Object(result)) {
-      items = Array.from(result as Iterable<unknown>);
-    } else {
-      return [];
+    // dv.pages() returns a DataArray (not a plain Array) — convert any iterable.
+    const items = toArray(result);
+    if (items.length === 0) return [];
+
+    const out: FieldOption[] = [];
+    for (const item of items) {
+      const maybeGroup = item as JsSourceGroup;
+      const nested = toArray(maybeGroup?.options);
+      if (nested.length > 0) {
+        const group = coerceToString(maybeGroup.group ?? maybeGroup.label);
+        const type = normalizeSelectionType(maybeGroup.type);
+        for (const sub of nested) {
+          out.push(optionFromUnknown(sub, group || undefined, type));
+        }
+        continue;
+      }
+
+      out.push(optionFromUnknown(item));
     }
-    return items.map((item) => {
-      if (typeof item === "string") return { value: item, label: item };
-      const typed = item as JsSourceItem;
-      const value = coerceToString(typed.value);
-      const label = coerceToString(typed.label ?? typed.value);
-      return { value, label };
-    });
+    return out;
   } catch (e) {
     console.error("[MetadataValidator] Error in JS source:", e, "\nCode:", code);
     return [];

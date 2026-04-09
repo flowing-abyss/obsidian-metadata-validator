@@ -1,7 +1,16 @@
-import { App, Modal } from "obsidian";
 import type { TFile } from "obsidian";
-import type { FieldOption, FieldSource, ManifestField, ResolvedSchema } from "../types";
+import { App, Modal } from "obsidian";
 import { resolveSource } from "../schema/source-resolver";
+import type { FieldOption, FieldSource, ManifestField, ResolvedSchema } from "../types";
+
+type SelectionMode = "select" | "multiselect";
+
+interface OptionGroupView {
+  key: string;
+  label: string;
+  type: SelectionMode;
+  options: FieldOption[];
+}
 
 export class PickerModal extends Modal {
   private readonly fieldKey: string;
@@ -177,20 +186,114 @@ export class PickerModal extends Modal {
     return [...sel, ...unsel];
   }
 
+  private defaultSelectionMode(): SelectionMode {
+    return this.isMulti ? "multiselect" : "select";
+  }
+
+  private getOptionSelectionMode(opt: FieldOption): SelectionMode {
+    return opt.type === "select" ? "select" : "multiselect";
+  }
+
+  private getOptionGroupKey(opt: FieldOption): string {
+    const group = opt.group?.trim();
+    return group && group.length > 0 ? group : "__default__";
+  }
+
+  private sortGroupOptions(opts: FieldOption[]): FieldOption[] {
+    const sel: FieldOption[] = [];
+    const unsel: FieldOption[] = [];
+    for (const o of opts) {
+      if (this.selected.has(o.value)) sel.push(o);
+      else unsel.push(o);
+    }
+    unsel.sort((a, b) => (a.label ?? a.value).localeCompare(b.label ?? b.value));
+    return [...sel, ...unsel];
+  }
+
+  private groupedOptions(options: FieldOption[], query: string): OptionGroupView[] {
+    const defaultType = this.defaultSelectionMode();
+    const q = query.toLowerCase();
+    const groups = new Map<string, OptionGroupView>();
+
+    for (const raw of options) {
+      const label = raw.label ?? raw.value;
+      if (
+        q &&
+        !raw.value.toLowerCase().includes(q) &&
+        !label.toLowerCase().includes(q) &&
+        !(raw.group ?? "").toLowerCase().includes(q)
+      ) {
+        continue;
+      }
+
+      const key = this.getOptionGroupKey(raw);
+      const groupLabel = raw.group?.trim() ?? "";
+      const mode = raw.type === "select" || raw.type === "multiselect" ? raw.type : defaultType;
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          label: groupLabel,
+          type: mode,
+          options: [],
+        });
+      }
+
+      const group = groups.get(key);
+      if (!group) continue;
+      group.options.push({
+        ...raw,
+        type: mode,
+      });
+    }
+
+    return Array.from(groups.values()).map((group) => ({
+      ...group,
+      options: this.sortGroupOptions(group.options),
+    }));
+  }
+
+  private toggleOption(opt: FieldOption): void {
+    if (!this.isMulti) {
+      this.selected.clear();
+      this.selected.add(opt.value);
+      this.dirtyMulti = false;
+      return;
+    }
+
+    const mode = this.getOptionSelectionMode(opt);
+    if (mode === "select") {
+      const groupKey = this.getOptionGroupKey(opt);
+      for (const candidate of this.options) {
+        if (candidate.value === opt.value) continue;
+        if (this.getOptionGroupKey(candidate) !== groupKey) continue;
+        if (this.getOptionSelectionMode(candidate) !== "select") continue;
+        this.selected.delete(candidate.value);
+      }
+    }
+
+    if (this.selected.has(opt.value)) {
+      this.selected.delete(opt.value);
+    } else {
+      this.selected.add(opt.value);
+    }
+    this.dirtyMulti = true;
+  }
+
   private renderOptions(listEl: HTMLElement, options: FieldOption[], query: string): void {
     listEl.empty();
 
-    const sorted = this.sortedOptions(options, query);
-
-    if (sorted.length === 0) {
+    const groups = this.groupedOptions(options, query);
+    if (groups.length === 0) {
       listEl.createEl("p", { text: "No options available.", cls: "mv-picker-empty" });
       return;
     }
 
-    for (const opt of sorted) {
+    const hasNamedGroups = groups.some((g) => g.label.length > 0);
+    const addOptionRow = (container: HTMLElement, opt: FieldOption) => {
       const isSelected = this.selected.has(opt.value);
 
-      const item = listEl.createDiv({
+      const item = container.createDiv({
         cls: isSelected ? "mv-picker-option is-selected" : "mv-picker-option",
       });
 
@@ -200,25 +303,35 @@ export class PickerModal extends Modal {
       }
 
       item.addEventListener("click", () => {
+        this.toggleOption(opt);
         if (this.isMulti) {
-          // Toggle selection — save deferred to onClose to avoid concurrent saves
-          if (this.selected.has(opt.value)) {
-            this.selected.delete(opt.value);
-          } else {
-            this.selected.add(opt.value);
-          }
-          this.dirtyMulti = true;
-          // Re-render but keep focusedIdx so Enter works immediately after
           this.renderOptions(listEl, options, query);
         } else {
-          // Single select: save and close immediately
-          this.selected.clear();
-          this.selected.add(opt.value);
-          this.dirtyMulti = false;
           this.persistSelection();
           this.close();
         }
       });
+    };
+
+    if (!hasNamedGroups && groups.length === 1) {
+      for (const opt of groups[0]?.options ?? []) addOptionRow(listEl, opt);
+    } else {
+      for (const group of groups) {
+        if (group.options.length === 0) continue;
+        const section = listEl.createDiv("mv-picker-group");
+        const header = section.createDiv("mv-picker-group-header");
+        header.createEl("span", {
+          text: group.label || "Options",
+          cls: "mv-picker-group-title",
+        });
+        header.createEl("span", {
+          text: group.type,
+          cls: "mv-picker-group-type",
+        });
+
+        const groupList = section.createDiv("mv-picker-group-options");
+        for (const opt of group.options) addOptionRow(groupList, opt);
+      }
     }
 
     // Restore keyboard focus after every render (including re-renders after toggle)

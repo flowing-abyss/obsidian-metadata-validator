@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { resolveSource } from "../source-resolver";
 import type { App, TFile } from "obsidian";
+import { describe, expect, it } from "vitest";
+import { resolveSource } from "../source-resolver";
 
 type MockTFile = TFile;
 
@@ -27,6 +27,22 @@ function makeApp(files: Array<{ path: string; tags: string[]; fm: Record<string,
       },
     },
   } as unknown as App;
+}
+
+function makeAppWithDataview(
+  files: Array<{ path: string; tags: string[]; fm: Record<string, unknown> }>
+): App {
+  const app = makeApp(files) as unknown as Record<string, unknown>;
+  app.plugins = {
+    plugins: {
+      dataview: {
+        api: {
+          page: () => null,
+        },
+      },
+    },
+  };
+  return app as unknown as App;
 }
 
 describe("resolveSource", () => {
@@ -74,5 +90,68 @@ describe("resolveSource", () => {
       null
     );
     expect(result.map((r) => r.value)).toEqual(["Alice"]);
+  });
+
+  it("supports grouped JS source output", async () => {
+    const app = makeAppWithDataview([]);
+
+    const result = await resolveSource(
+      {
+        js: `
+          return [
+            {
+              group: "Status",
+              type: "select",
+              options: [
+                { value: "draft", label: "Draft" },
+                { value: "published", label: "Published" }
+              ]
+            },
+            {
+              group: "Category",
+              type: "multiselect",
+              options: [
+                { value: "dev", label: "Dev" }
+              ]
+            }
+          ];
+        `,
+      },
+      app,
+      null
+    );
+
+    expect(result).toEqual([
+      { value: "draft", label: "Draft", group: "Status", type: "select" },
+      { value: "published", label: "Published", group: "Status", type: "select" },
+      { value: "dev", label: "Dev", group: "Category", type: "multiselect" },
+    ]);
+  });
+
+  it("supports mixed grouped and flat JS source output", async () => {
+    const app = makeAppWithDataview([]);
+
+    const result = await resolveSource(
+      {
+        js: `
+          return [
+            { value: "ungrouped", label: "Ungrouped" },
+            {
+              group: "Status",
+              options: [
+                { value: "draft", label: "Draft" }
+              ]
+            }
+          ];
+        `,
+      },
+      app,
+      null
+    );
+
+    expect(result).toEqual([
+      { value: "ungrouped", label: "Ungrouped", group: undefined, type: undefined },
+      { value: "draft", label: "Draft", group: "Status", type: undefined },
+    ]);
   });
 });
