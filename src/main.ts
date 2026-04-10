@@ -1,20 +1,24 @@
 import { Menu, Notice, Plugin, TFile, WorkspaceLeaf, stringifyYaml } from "obsidian";
-import { DEFAULT_SETTINGS, MetadataValidatorSettingTab, type PluginSettings } from "./settings";
-import type { ValidationResult } from "./types";
 import { ManifestCache } from "./manifest/cache";
 import { SchemaResolver } from "./schema/resolver";
-import { ValidationEngine } from "./validation/engine";
-import { applyVaultAutoFixes } from "./validation/batch-auto-fix";
-import { sanitizeFrontmatter } from "./validation/frontmatter";
+import { DEFAULT_SETTINGS, MetadataValidatorSettingTab, type PluginSettings } from "./settings";
+import type { ValidationResult } from "./types";
+import type { BasesDecorator as BasesDecoratorType } from "./ui/bases-decorator";
+import { ContextMenuModal } from "./ui/context-menu-modal";
 import { CssInjector } from "./ui/css-injector";
 import { PropertyDecorator } from "./ui/decorator";
-import { ContextMenuModal } from "./ui/context-menu-modal";
-import { SidebarPanel, SIDEBAR_PANEL_TYPE } from "./ui/sidebar-panel";
 import { ExplorerBadges } from "./ui/explorer-badges";
-import { checkFolderLocation } from "./validation/rules/folder-location";
-import type { BasesDecorator as BasesDecoratorType } from "./ui/bases-decorator";
-import type { ValidationReportModal as ValidationReportModalType } from "./ui/validation-report";
 import type { SchemaEditorModal as SchemaEditorModalType } from "./ui/schema-editor-modal";
+import {
+  SIDEBAR_PANEL_TYPE,
+  SidebarPanel,
+  type VaultIssueNote,
+  type VaultScanReport,
+} from "./ui/sidebar-panel";
+import { applyVaultAutoFixes } from "./validation/batch-auto-fix";
+import { ValidationEngine } from "./validation/engine";
+import { sanitizeFrontmatter } from "./validation/frontmatter";
+import { checkFolderLocation } from "./validation/rules/folder-location";
 
 export default class MetadataValidatorPlugin extends Plugin {
   settings: PluginSettings = { ...DEFAULT_SETTINGS };
@@ -55,25 +59,8 @@ export default class MetadataValidatorPlugin extends Plugin {
             if (file) void this.validateAndUpdate(file);
           },
           async () => {
-            const files = this.app.vault
-              .getMarkdownFiles()
-              .filter((f) => !f.path.startsWith(this.settings.schemasRoot + "/"));
-            let errorFiles = 0;
-            let warningFiles = 0;
-            let noSchemaFiles = 0;
-            for (const f of files) {
-              const stats = await this.validateForStats(f);
-              if (stats === null) noSchemaFiles++;
-              else if (stats.errors > 0) errorFiles++;
-              else if (stats.warnings > 0) warningFiles++;
-            }
-            const panel = this.getSidebarPanel();
-            panel?.showVaultStats({
-              total: files.length,
-              errors: errorFiles,
-              warnings: warningFiles,
-              noSchema: noSchemaFiles,
-            });
+            const report = await this.scanVaultForSidebar();
+            this.getSidebarPanel()?.showVaultScan(report);
           },
           async () => {
             await this.applyAutoFixesAcrossVault();
@@ -99,18 +86,6 @@ export default class MetadataValidatorPlugin extends Plugin {
       id: "open-sidebar-panel",
       name: "Open validation panel",
       callback: () => void this.activateSidebarPanel(),
-    });
-
-    this.addCommand({
-      id: "show-vault-report",
-      name: "Show vault validation report",
-      callback: () => {
-        void import("./ui/validation-report").then(
-          (mod: { ValidationReportModal: typeof ValidationReportModalType }) => {
-            new mod.ValidationReportModal(this.app, this.resolver, this.engine).open();
-          }
-        );
-      },
     });
 
     this.addCommand({
@@ -451,18 +426,7 @@ export default class MetadataValidatorPlugin extends Plugin {
 
     const results = await this.engine.validate(file, frontmatter, schema);
 
-    // Warn when enforce_folder: true (without a path — no-op)
-    if (schema.enforce_folder === true) {
-      results.push({
-        field: "__location__",
-        severity: "warning",
-        message:
-          "enforce_folder: true has no effect on its own. Set enforce_folder to a folder path string.",
-        rule: "enforce_folder",
-        manifestPath: schema.manifestPath,
-        autoFixed: false,
-      });
-    }
+    this.appendLegacyEnforceFolderWarning(results, schema.enforce_folder, schema.manifestPath);
 
     const hasAutoFix = results.some((r) => r.autoFixed);
     if (hasAutoFix) {
@@ -507,22 +471,91 @@ export default class MetadataValidatorPlugin extends Plugin {
     await this.app.vault.modify(file, `---\n${newYaml}---\n${afterFrontmatter}`);
   }
 
-  /**
-   * Validate a file and return raw error/warning counts without touching the UI.
-   * Returns null if no schema matches.
-   */
-  private async validateForStats(
-    file: TFile
-  ): Promise<{ errors: number; warnings: number } | null> {
+  private appendLegacyEnforceFolderWarning(
+    results: ValidationResult[],
+    enforceFolder: boolean | string | undefined,
+    manifestPath: string
+  ): void {
+    if (enforceFolder !== true) return;
+
+    results.push({
+      field: "__location__",
+      severity: "warning",
+      message:
+        "enforce_folder: true has no effect on its own. Set enforce_folder to a folder path string.",
+      rule: "enforce_folder",
+      manifestPath,
+      autoFixed: false,
+    });
+  }
+
+  private async validateForVaultScan(file: TFile): Promise<{
+    manifestPath: string;
+    manifestName: string;
+    errors: number;
+    warnings: number;
+    issues: ValidationResult[];
+  } | null> {
     const frontmatter = sanitizeFrontmatter(
       this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined
     );
     const schema = this.resolver.resolveForNote(file, frontmatter);
     if (!schema) return null;
+
     const results = await this.engine.validate(file, frontmatter, schema);
+    this.appendLegacyEnforceFolderWarning(results, schema.enforce_folder, schema.manifestPath);
+
+    const issues = results.filter((r) => !r.autoFixed);
+
     return {
-      errors: results.filter((r) => !r.autoFixed && r.severity === "error").length,
-      warnings: results.filter((r) => !r.autoFixed && r.severity === "warning").length,
+      manifestPath: schema.manifestPath,
+      manifestName: schema.name,
+      errors: issues.filter((r) => r.severity === "error").length,
+      warnings: issues.filter((r) => r.severity === "warning").length,
+      issues,
+    };
+  }
+
+  private async scanVaultForSidebar(): Promise<VaultScanReport> {
+    const files = this.app.vault
+      .getMarkdownFiles()
+      .filter((file) => !file.path.startsWith(this.settings.schemasRoot + "/"));
+
+    let errorFiles = 0;
+    let warningFiles = 0;
+    let noSchemaFiles = 0;
+    const reports: VaultIssueNote[] = [];
+
+    for (const file of files) {
+      const scan = await this.validateForVaultScan(file);
+      if (!scan) {
+        noSchemaFiles++;
+        continue;
+      }
+
+      if (scan.errors > 0) errorFiles++;
+      else if (scan.warnings > 0) warningFiles++;
+
+      if (scan.issues.length > 0) {
+        reports.push({
+          filePath: file.path,
+          fileName: file.basename,
+          manifestPath: scan.manifestPath,
+          manifestName: scan.manifestName,
+          results: scan.issues,
+        });
+      }
+    }
+
+    return {
+      stats: {
+        total: files.length,
+        errors: errorFiles,
+        warnings: warningFiles,
+        noSchema: noSchemaFiles,
+      },
+      reports,
+      scannedAt: Date.now(),
     };
   }
 

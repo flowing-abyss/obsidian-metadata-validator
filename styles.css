@@ -240,6 +240,11 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
+.mv-vault-issue-row {
+  padding: 3px 0;
+  font-size: 12px;
+}
+
 .mv-error {
   color: var(--color-red, #f38ba8);
 }
@@ -372,35 +377,6 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
 .mv-schema-tree .mv-tree-tag {
   font-size: 11px;
   color: var(--tag-color, #89b4fa);
-}
-
-/* ── Validation report modal ──────────────────────────────── */
-.mv-report-section {
-  margin-bottom: 12px;
-  border-bottom: 1px solid var(--background-modifier-border);
-  padding-bottom: 8px;
-}
-
-.mv-report-file-link {
-  font-weight: bold;
-  cursor: pointer;
-  color: var(--link-color);
-}
-
-.mv-report-row {
-  font-size: 12px;
-  padding: 2px 0;
-}
-
-.mv-report-summary {
-  color: var(--text-muted);
-  margin-bottom: 12px;
-}
-
-.mv-report-footer {
-  font-size: 11px;
-  color: var(--text-faint);
-  margin-top: 8px;
 }
 
 /* ── Schema editor modal ──────────────────────────────────── */
@@ -621,13 +597,15 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
 /* ── Scan vault button ────────────────────────────────────── */
 .mv-sidebar-actions {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   margin-bottom: 8px;
 }
 
 .mv-sidebar-action-btn {
   font-size: 12px;
-  padding: 4px 8px;
+  padding: 6px 8px;
+  text-align: left;
 }
 
 .mv-scan-btn {
@@ -637,6 +615,11 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
 .mv-sidebar-action-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.mv-copy-btn {
+  white-space: normal;
+  line-height: 1.25;
 }
 
 /* ── Context menu modal ───────────────────────────────────── */
@@ -931,6 +914,16 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
 .mv-sidebar-filename {
   margin: 4px 0 8px;
   font-size: 14px;
+  font-weight: 600;
+}
+
+.mv-sidebar-section-title {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
 }
 
 .mv-vault-stats {
@@ -975,6 +968,106 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
 
 .mv-stat-label {
   color: var(--text-muted);
+}
+
+.mv-vault-stats-time {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.mv-vault-issues-title {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.mv-vault-issues-summary {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.mv-vault-issues-empty {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.mv-vault-group {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.mv-vault-group-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  padding: 8px;
+  background: var(--background-secondary);
+}
+
+.mv-vault-group-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.mv-vault-group-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.mv-vault-group-body {
+  padding: 6px 8px 8px;
+}
+
+.mv-vault-note {
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding: 6px 0;
+}
+
+.mv-vault-note:last-child {
+  border-bottom: none;
+}
+
+.mv-vault-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mv-vault-note-link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--link-color);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.mv-vault-note-link:hover {
+  text-decoration: underline;
+}
+
+.mv-vault-note-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.mv-vault-note-path {
+  margin-top: 2px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--text-faint);
+  word-break: break-all;
 }
 
 /* ── Schema editor: collapsed field cards ─────────────────── */
