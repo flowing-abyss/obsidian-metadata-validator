@@ -13,6 +13,7 @@ import {
   SIDEBAR_PANEL_TYPE,
   SidebarPanel,
   type VaultIssueNote,
+  type VaultScanProgress,
   type VaultScanReport,
 } from "./ui/sidebar-panel";
 import { applyVaultAutoFixes } from "./validation/batch-auto-fix";
@@ -58,8 +59,8 @@ export default class MetadataValidatorPlugin extends Plugin {
             const file = this.app.workspace.getActiveFile();
             if (file) void this.validateAndUpdate(file);
           },
-          async () => {
-            const report = await this.scanVaultForSidebar();
+          async (onProgress) => {
+            const report = await this.scanVaultForSidebar(onProgress);
             this.getSidebarPanel()?.showVaultScan(report);
           },
           async () => {
@@ -516,20 +517,31 @@ export default class MetadataValidatorPlugin extends Plugin {
     };
   }
 
-  private async scanVaultForSidebar(): Promise<VaultScanReport> {
+  private async scanVaultForSidebar(
+    onProgress?: (progress: VaultScanProgress) => void
+  ): Promise<VaultScanReport> {
     const files = this.app.vault
       .getMarkdownFiles()
       .filter((file) => !file.path.startsWith(this.settings.schemasRoot + "/"));
+
+    onProgress?.({ processed: 0, total: files.length });
+    await this.yieldScanProgressUi();
 
     let errorFiles = 0;
     let warningFiles = 0;
     let noSchemaFiles = 0;
     const reports: VaultIssueNote[] = [];
 
+    let processed = 0;
     for (const file of files) {
       const scan = await this.validateForVaultScan(file);
       if (!scan) {
         noSchemaFiles++;
+        processed++;
+        onProgress?.({ processed, total: files.length });
+        if (processed % 20 === 0 || processed === files.length) {
+          await this.yieldScanProgressUi();
+        }
         continue;
       }
 
@@ -545,6 +557,12 @@ export default class MetadataValidatorPlugin extends Plugin {
           results: scan.issues,
         });
       }
+
+      processed++;
+      onProgress?.({ processed, total: files.length });
+      if (processed % 20 === 0 || processed === files.length) {
+        await this.yieldScanProgressUi();
+      }
     }
 
     return {
@@ -557,6 +575,12 @@ export default class MetadataValidatorPlugin extends Plugin {
       reports,
       scannedAt: Date.now(),
     };
+  }
+
+  private async yieldScanProgressUi(): Promise<void> {
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
   }
 
   private async applyAutoFixesAcrossVault(): Promise<void> {

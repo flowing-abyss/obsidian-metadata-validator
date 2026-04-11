@@ -1,9 +1,9 @@
 import { setIcon, type App, type TFile } from "obsidian";
-import type { FieldType, ResolvedSchema, ValidationResult } from "../types";
 import type { SchemaResolver } from "../schema/resolver";
+import type { PluginSettings } from "../settings";
+import type { FieldType, ResolvedSchema, ValidationResult } from "../types";
 import type { ValidationEngine } from "../validation/engine";
 import { sanitizeFrontmatter } from "../validation/frontmatter";
-import type { PluginSettings } from "../settings";
 import type { PickerModal as PickerModalType } from "./picker-modal";
 import type { QuickEditModal as QuickEditModalType } from "./quick-edit-modal";
 import type { showValidatorTooltip as showValidatorTooltipType } from "./validator-tooltip";
@@ -32,6 +32,8 @@ interface CachedResult {
   fmHash: string;
   results: ValidationResult[];
 }
+
+type NormalizedKeyMap = Map<string, string | null>;
 
 export class PropertyDecorator {
   private observer: MutationObserver | null = null;
@@ -152,19 +154,58 @@ export class PropertyDecorator {
       resultMap.set(r.field, existing);
     }
 
+    const normalizedSchemaKeys = this.buildNormalizedSchemaKeyMap(schema);
+
     const rows = Array.from(document.querySelectorAll<HTMLElement>(".metadata-property"));
     for (const row of rows) {
-      const key = row.getAttribute("data-property-key");
-      if (!key) continue;
-      const fieldDef = schema.fields[key];
+      const rowKey = row.getAttribute("data-property-key");
+      if (!rowKey) continue;
+      const schemaKey = this.resolveSchemaFieldKey(rowKey, schema, normalizedSchemaKeys);
 
-      this.injectPickerIcon(row, key, schema, file, frontmatter);
-      this.injectValidatorIcon(row, key, resultMap.get(key) ?? []);
-
-      if (!fieldDef) {
+      if (!schemaKey) {
+        this.injectValidatorIcon(row, rowKey, resultMap.get(rowKey) ?? []);
         row.querySelector(`[${PICKER_ATTR}]`)?.remove();
+        continue;
+      }
+
+      this.injectPickerIcon(row, schemaKey, schema, file, frontmatter);
+      this.injectValidatorIcon(row, schemaKey, resultMap.get(schemaKey) ?? []);
+    }
+  }
+
+  private buildNormalizedSchemaKeyMap(schema: ResolvedSchema): NormalizedKeyMap {
+    const map: NormalizedKeyMap = new Map();
+
+    for (const key of Object.keys(schema.fields)) {
+      const normalized = this.normalizePropertyKey(key);
+      const existing = map.get(normalized);
+      if (existing === undefined) {
+        map.set(normalized, key);
+      } else if (existing !== key) {
+        // Ambiguous normalised key: disable fallback for this token.
+        map.set(normalized, null);
       }
     }
+
+    return map;
+  }
+
+  private resolveSchemaFieldKey(
+    rowKey: string,
+    schema: ResolvedSchema,
+    normalizedSchemaKeys: NormalizedKeyMap
+  ): string | null {
+    if (schema.fields[rowKey]) return rowKey;
+
+    const normalized = this.normalizePropertyKey(rowKey);
+    return normalizedSchemaKeys.get(normalized) ?? null;
+  }
+
+  private normalizePropertyKey(key: string): string {
+    return key
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_-]+/g, "");
   }
 
   private injectPickerIcon(

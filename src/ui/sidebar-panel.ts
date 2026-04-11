@@ -24,6 +24,11 @@ export interface VaultScanReport {
   scannedAt: number;
 }
 
+export interface VaultScanProgress {
+  processed: number;
+  total: number;
+}
+
 interface VaultIssueGroup {
   manifestPath: string;
   manifestName: string;
@@ -36,7 +41,9 @@ export class SidebarPanel extends ItemView {
   private results: ValidationResult[] = [];
   private fileName = "";
   private onOpenCallback: (() => void) | null = null;
-  private readonly onScanVault: (() => Promise<void>) | null;
+  private readonly onScanVault:
+    | ((onProgress?: (progress: VaultScanProgress) => void) => Promise<void>)
+    | null;
   private readonly onApplyAutoFixes: (() => Promise<void>) | null;
   private vaultScan: VaultScanReport | null = null;
   private isScanningVault = false;
@@ -46,7 +53,7 @@ export class SidebarPanel extends ItemView {
   constructor(
     leaf: WorkspaceLeaf,
     onOpenCallback?: () => void,
-    onScanVault?: () => Promise<void>,
+    onScanVault?: (onProgress?: (progress: VaultScanProgress) => void) => Promise<void>,
     onApplyAutoFixes?: () => Promise<void>
   ) {
     super(leaf);
@@ -103,7 +110,7 @@ export class SidebarPanel extends ItemView {
 
     const scanBtn = actions.createEl("button", {
       text: this.isScanningVault ? "Scanning..." : "Scan vault",
-      cls: "mv-sidebar-action-btn mv-scan-btn",
+      cls: `mv-sidebar-action-btn mv-scan-btn${this.isScanningVault ? " is-scanning" : ""}`,
     });
     scanBtn.disabled = this.isScanningVault || this.isApplyingAutoFixes || !this.onScanVault;
     scanBtn.addEventListener("click", () => {
@@ -119,6 +126,12 @@ export class SidebarPanel extends ItemView {
     autoFixBtn.addEventListener("click", () => {
       void this.runApplyAutoFixes();
     });
+
+    if (this.isScanningVault) {
+      const scanState = contentEl.createDiv("mv-sidebar-scan-state");
+      scanState.createSpan({ cls: "mv-sidebar-scan-dot" });
+      scanState.createSpan({ text: "Vault scan in progress..." });
+    }
 
     if (this.vaultScan) {
       this.renderVaultStats(contentEl, this.vaultScan);
@@ -232,7 +245,7 @@ export class SidebarPanel extends ItemView {
     const groups = this.groupVaultIssuesByManifest(report.reports);
     for (const group of groups) {
       const details = section.createEl("details", { cls: "mv-vault-group" });
-      details.open = this.groupExpanded.get(group.manifestPath) ?? true;
+      details.open = this.groupExpanded.get(group.manifestPath) ?? false;
       details.addEventListener("toggle", () => {
         this.groupExpanded.set(group.manifestPath, details.open);
       });
@@ -383,13 +396,52 @@ export class SidebarPanel extends ItemView {
     this.vaultScan = null;
     this.isScanningVault = true;
     this.render();
+    const progressNotice = new Notice(this.formatScanNotice({ processed: 0, total: 0 }), 0);
 
     try {
-      await this.onScanVault();
+      await this.nextPaint();
+      await this.onScanVault((progress) => {
+        progressNotice.setMessage(this.formatScanNotice(progress));
+      });
+      progressNotice.setMessage("Vault scan completed.");
+      window.setTimeout(() => progressNotice.hide(), 1200);
+    } catch (error) {
+      console.error("[MetadataValidator] Vault scan failed", error);
+      progressNotice.setMessage("Vault scan failed. Check developer console.");
+      window.setTimeout(() => progressNotice.hide(), 2400);
     } finally {
       this.isScanningVault = false;
       this.render();
     }
+  }
+
+  private formatScanNotice(progress: VaultScanProgress): string {
+    const total = Math.max(0, progress.total);
+    const processed = Math.max(
+      0,
+      total > 0 ? Math.min(progress.processed, total) : progress.processed
+    );
+    const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+    const bar = this.renderProgressBar(processed, total, 14);
+    const totalText = total > 0 ? String(total) : "?";
+    return `Scanning vault ${bar} ${processed}/${totalText} (${percent}%)`;
+  }
+
+  private renderProgressBar(processed: number, total: number, width: number): string {
+    const safeWidth = Math.max(1, width);
+    if (total <= 0) {
+      return `[${".".repeat(safeWidth)}]`;
+    }
+
+    const ratio = Math.max(0, Math.min(1, processed / total));
+    const filled = Math.round(ratio * safeWidth);
+    return `[${"#".repeat(filled)}${".".repeat(safeWidth - filled)}]`;
+  }
+
+  private async nextPaint(): Promise<void> {
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
   }
 
   private async runApplyAutoFixes(): Promise<void> {

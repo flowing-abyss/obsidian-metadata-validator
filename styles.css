@@ -265,6 +265,66 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   opacity: 0.5;
 }
 
+.mv-sidebar-scan-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.mv-sidebar-scan-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--interactive-accent);
+  animation: mv-scan-pulse 1.2s ease-in-out infinite;
+}
+
+.mv-scan-btn.is-scanning {
+  position: relative;
+  padding-left: 28px;
+}
+
+.mv-scan-btn.is-scanning::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border: 2px solid var(--text-faint);
+  border-top-color: var(--interactive-accent);
+  border-radius: 50%;
+  animation: mv-scan-spin 0.8s linear infinite;
+}
+
+@keyframes mv-scan-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+}
+
+@keyframes mv-scan-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ── Context menu modal ───────────────────────────────────── */
 .mv-context-row {
   display: flex;
