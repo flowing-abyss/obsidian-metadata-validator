@@ -9,6 +9,7 @@ import type { QuickEditModal as QuickEditModalType } from "./quick-edit-modal";
 import type { showValidatorTooltip as showValidatorTooltipType } from "./validator-tooltip";
 
 const PICKER_ATTR = "data-mv-picker";
+const PICKER_CONTEXT_ATTR = "data-mv-picker-context";
 const VALIDATOR_ATTR = "data-mv-validator";
 
 /** Lucide icon name for each field type */
@@ -44,6 +45,7 @@ export class PropertyDecorator {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   /** Keyed by file path — avoids re-running validation when frontmatter hasn't changed */
   private readonly resultCache = new Map<string, CachedResult>();
+  private lastDecoratedFilePath: string | null = null;
 
   constructor(
     app: App,
@@ -121,10 +123,23 @@ export class PropertyDecorator {
   }
 
   async decorateAll(): Promise<void> {
-    if (!this.settings.showInlineErrors) return;
+    if (!this.settings.showInlineErrors) {
+      this.lastDecoratedFilePath = null;
+      this.clearIcons();
+      return;
+    }
 
     const file = this.app.workspace.getActiveFile();
-    if (!file) return;
+    if (!file) {
+      this.lastDecoratedFilePath = null;
+      this.clearIcons();
+      return;
+    }
+
+    if (this.lastDecoratedFilePath !== file.path) {
+      this.lastDecoratedFilePath = file.path;
+      this.clearIcons();
+    }
 
     // Shallow-copy the frontmatter so engine.validate / applyAutoFix mutations
     // never corrupt the live Obsidian metadata cache object. Without this copy,
@@ -215,19 +230,23 @@ export class PropertyDecorator {
     file: TFile,
     frontmatter: Record<string, unknown>
   ): void {
-    if (row.querySelector(`[${PICKER_ATTR}]`)) return;
-
     const fieldDef = schema.fields[fieldKey];
     if (!fieldDef) return;
 
     const nameEl = row.querySelector<HTMLElement>(".metadata-property-key");
     if (!nameEl) return;
 
+    const pickerContext = `${file.path}::${schema.manifestPath}::${fieldKey}::${fieldDef.type}`;
+    const existing = row.querySelector<HTMLElement>(`[${PICKER_ATTR}]`);
+    if (existing?.getAttribute(PICKER_CONTEXT_ATTR) === pickerContext) return;
+    existing?.remove();
+
     const iconName = FIELD_TYPE_ICON[fieldDef.type] ?? "square";
     const isPicker = PICKER_TYPES.has(fieldDef.type);
 
     const btn = document.createElement("button");
     btn.setAttribute(PICKER_ATTR, "true");
+    btn.setAttribute(PICKER_CONTEXT_ATTR, pickerContext);
     btn.setAttribute("aria-label", fieldDef.type);
     btn.className = isPicker ? "mv-picker-btn clickable-icon" : "mv-type-icon clickable-icon";
     setIcon(btn, iconName);
