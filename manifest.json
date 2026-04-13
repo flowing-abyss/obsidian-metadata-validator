@@ -1,7 +1,7 @@
 {
   "id": "metadata-validator",
   "name": "Metadata Validator",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "minAppVersion": "1.4.0",
   "description": "Manifest-driven metadata validation, auto-fix, and field picker for Obsidian notes.",
   "author": "flowing-abyss",

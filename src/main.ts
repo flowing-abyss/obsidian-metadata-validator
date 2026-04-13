@@ -455,14 +455,77 @@ export default class MetadataValidatorPlugin extends Plugin {
       }
     }
 
+    // Snapshot before engine mutates frontmatter in place (via applyAutoFix / applyPropertyOrder)
+    const preEngineFrontmatter: Record<string, unknown> = { ...frontmatter };
+
     const results = await this.engine.validate(file, frontmatter, schema);
 
     this.appendLegacyEnforceFolderWarning(results, schema.enforce_folder, schema.manifestPath);
 
     const hasAutoFix = results.some((r) => r.autoFixed);
     if (hasAutoFix) {
-      // Write directly to preserve key insertion order — processFrontMatter may reorder keys
-      await this.writeOrderedFrontmatter(file, frontmatter);
+      // Compute which keys the engine actually changed (value-level diff).
+      // This is critical: we must NOT write the full stale `frontmatter` snapshot because a
+      // concurrent picker save (via processFrontMatter) may have already updated the file
+      // between when we read the cache and now. Writing the whole snapshot would overwrite the
+      // user's new value with the old one (TOCTOU race condition).
+      const engineValueChanges: Record<string, unknown> = {};
+      for (const k of Object.keys(frontmatter)) {
+        if (!(k in preEngineFrontmatter) || preEngineFrontmatter[k] !== frontmatter[k]) {
+          engineValueChanges[k] = frontmatter[k];
+        }
+      }
+      const hasValueChanges = Object.keys(engineValueChanges).length > 0;
+      const hasOrderChange = results.some((r) => r.rule === "property-order");
+
+      if (hasValueChanges) {
+        // Apply only the engine-computed value changes onto the LATEST frontmatter.
+        // processFrontMatter reads the current file state inside its callback, so it is
+        // atomic with respect to other processFrontMatter calls and never races with the picker.
+        const effectiveOrder = schema.formatting.property_order?.length
+          ? schema.formatting.property_order
+          : Object.keys(schema.fields);
+        await this.app.fileManager.processFrontMatter(file, (latestFm) => {
+          const latestFrontmatter = latestFm as Record<string, unknown>;
+          for (const [k, v] of Object.entries(engineValueChanges)) {
+            latestFrontmatter[k] = v;
+          }
+          // Re-apply property ordering to the latest frontmatter in the same atomic write
+          if (hasOrderChange && effectiveOrder.length) {
+            const keys = Object.keys(latestFrontmatter);
+            const orderedKeys = [
+              ...effectiveOrder.filter((ok) => keys.includes(ok)),
+              ...keys.filter((k) => !effectiveOrder.includes(k)),
+            ];
+            if (!orderedKeys.every((k, i) => k === keys[i])) {
+              const copy: Record<string, unknown> = { ...latestFrontmatter };
+              for (const k of keys) Reflect.deleteProperty(latestFrontmatter, k);
+              for (const k of orderedKeys) latestFrontmatter[k] = copy[k];
+            }
+          }
+        });
+      } else if (hasOrderChange) {
+        // Ordering-only change: use processFrontMatter so we read the latest file state.
+        // Writing the stale `frontmatter` snapshot here would overwrite a concurrent picker save.
+        const effectiveOrder2 = schema.formatting.property_order?.length
+          ? schema.formatting.property_order
+          : Object.keys(schema.fields);
+        if (effectiveOrder2.length) {
+          await this.app.fileManager.processFrontMatter(file, (latestFm) => {
+            const latestFrontmatter = latestFm as Record<string, unknown>;
+            const keys = Object.keys(latestFrontmatter);
+            const orderedKeys = [
+              ...effectiveOrder2.filter((ok) => keys.includes(ok)),
+              ...keys.filter((k) => !effectiveOrder2.includes(k)),
+            ];
+            if (!orderedKeys.every((k, i) => k === keys[i])) {
+              const copy: Record<string, unknown> = { ...latestFrontmatter };
+              for (const k of keys) Reflect.deleteProperty(latestFrontmatter, k);
+              for (const k of orderedKeys) latestFrontmatter[k] = copy[k];
+            }
+          });
+        }
+      }
     }
 
     const errors = results.filter((r) => !r.autoFixed && r.severity === "error");
