@@ -1,5 +1,5 @@
-import { App, Modal, setIcon } from "obsidian";
 import type { EventRef, TFile } from "obsidian";
+import { App, Modal, setIcon } from "obsidian";
 import type { FieldType, ManifestField, ResolvedSchema, ValidationResult } from "../types";
 import { ValidationEngine } from "../validation/engine";
 import { PickerModal } from "./picker-modal";
@@ -89,6 +89,58 @@ export class ContextMenuModal extends Modal {
     return map;
   }
 
+  private getSuperchargedLinksPlugin():
+    | ({
+        updateContainer: (container: HTMLElement, plugin: unknown, selector?: string) => void;
+      } & Record<string, unknown>)
+    | null {
+    const pluginsHost = (
+      this.app as App & {
+        plugins?: { plugins?: Record<string, unknown> };
+      }
+    ).plugins;
+    const pluginCandidate = pluginsHost?.plugins?.["supercharged-links-obsidian"];
+    if (!pluginCandidate) return null;
+
+    const plugin = pluginCandidate as {
+      updateContainer?: (container: HTMLElement, plugin: unknown, selector?: string) => void;
+    };
+    if (typeof plugin.updateContainer !== "function") return null;
+
+    return plugin as {
+      updateContainer: (container: HTMLElement, plugin: unknown, selector?: string) => void;
+    } & Record<string, unknown>;
+  }
+
+  private refreshSuperchargedLinks(container: HTMLElement): void {
+    const sl = this.getSuperchargedLinksPlugin();
+    if (!sl) return;
+
+    const apply = () => {
+      if (!container.isConnected) return;
+      sl.updateContainer(container, sl, "[data-href], [data-link-path]");
+    };
+
+    apply();
+    // Some link widgets settle asynchronously; run once more shortly after render.
+    window.setTimeout(apply, 60);
+  }
+
+  private decorateInternalLink(el: HTMLAnchorElement, target: string): void {
+    const linkTarget = target.trim();
+    if (!linkTarget) return;
+    el.addClass("internal-link");
+    el.setAttribute("href", linkTarget);
+    el.setAttribute("data-href", linkTarget);
+    el.setAttribute("data-link-path", linkTarget);
+  }
+
+  private isLikelyInternalLink(target: string): boolean {
+    const value = target.trim();
+    if (!value) return false;
+    return !/^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(value);
+  }
+
   private render(
     frontmatter: Record<string, unknown>,
     resultMap: Map<string, ValidationResult[]>
@@ -139,6 +191,7 @@ export class ContextMenuModal extends Modal {
 
     // Footer: schema chain with hover-highlight
     this.renderFooter(contentEl, resultMap);
+    this.refreshSuperchargedLinks(contentEl);
   }
 
   private renderFieldRow(
@@ -416,8 +469,11 @@ export class ContextMenuModal extends Modal {
       }
 
       if (isLink) {
-        const link = container.createEl("a", { cls: "mv-wikilink", text: displayName });
-        link.setAttribute("data-href", linkTarget);
+        const link = container.createEl("a", {
+          cls: "mv-wikilink",
+          text: displayName,
+        });
+        this.decorateInternalLink(link, linkTarget);
         link.addEventListener("click", (e) => {
           e.preventDefault();
           void this.app.workspace.openLinkText(linkTarget, this.file.path, true);
@@ -447,15 +503,29 @@ export class ContextMenuModal extends Modal {
         const mdLink = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(val);
         const wikiLink = /^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/.exec(val);
         if (mdLink) {
-          const a = chip.createEl("a", { text: mdLink[1] ?? val, cls: "mv-chip-link" });
-          a.href = mdLink[2] ?? "";
-          a.target = "_blank";
-          a.rel = "noopener noreferrer";
+          const target = mdLink[2] ?? "";
+          const label = mdLink[1] ?? val;
+          if (this.isLikelyInternalLink(target)) {
+            const a = chip.createEl("a", {
+              text: label,
+              cls: "mv-chip-link mv-wikilink",
+            });
+            this.decorateInternalLink(a, target);
+            a.addEventListener("click", (e) => {
+              e.preventDefault();
+              void this.app.workspace.openLinkText(target, this.file.path, false);
+            });
+          } else {
+            const a = chip.createEl("a", { text: label, cls: "mv-chip-link" });
+            a.href = target;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+          }
         } else if (wikiLink) {
           const display = wikiLink[2] ?? wikiLink[1] ?? val;
           const target = wikiLink[1] ?? "";
           const a = chip.createEl("a", { text: display, cls: "mv-chip-link mv-wikilink" });
-          a.setAttribute("data-href", target);
+          this.decorateInternalLink(a, target);
           a.addEventListener("click", (e) => {
             e.preventDefault();
             void this.app.workspace.openLinkText(target, this.file.path, false);
@@ -532,6 +602,8 @@ export class ContextMenuModal extends Modal {
         addInput.addEventListener("blur", commit);
         addInput.focus();
       });
+
+      this.refreshSuperchargedLinks(chipsEl);
     };
 
     refresh(values);
