@@ -836,14 +836,26 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   display: inline-block;
   font-size: 12px;
   padding: 2px 8px;
-  background: var(--background-modifier-border);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
   border-radius: 10px;
   cursor: pointer;
   user-select: none;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .mv-chip:hover {
   background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+
+.mv-chip--tags {
+  color: var(--text-accent);
+  border-color: var(--interactive-accent);
 }
 
 .mv-chip-edit {
@@ -926,15 +938,22 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   line-height: 1;
   padding: 0;
   border-radius: 6px;
-  border: 1px dashed var(--background-modifier-border);
-  background: transparent;
-  color: var(--text-muted);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-faint);
   cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s,
+    transform 0.15s;
 }
 
 .mv-list-add-btn:hover {
   border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
   color: var(--interactive-accent);
+  transform: translateY(-1px);
 }
 
 /* Inline text input shown after clicking the "+" button */

@@ -479,7 +479,11 @@ export class ContextMenuModal extends Modal {
           void this.app.workspace.openLinkText(linkTarget, this.file.path, true);
         });
       } else {
-        const chip = container.createEl("span", { text: displayName, cls: "mv-chip" });
+        const chipClasses = ["mv-chip"];
+        if (fieldKey.trim().toLowerCase() === "tags") {
+          chipClasses.push("mv-chip--tags");
+        }
+        const chip = container.createEl("span", { text: displayName, cls: chipClasses.join(" ") });
         chip.addEventListener("click", () => {
           this.openPicker(fieldKey, fieldDef);
         });
