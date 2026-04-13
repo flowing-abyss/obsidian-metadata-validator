@@ -33,6 +33,8 @@ export default class MetadataValidatorPlugin extends Plugin {
   private settingTab!: MetadataValidatorSettingTab;
   /** File resolved from a wikilink right-click — consumed once by editor-menu */
   private _contextMenuLinkTarget: TFile | null = null;
+  /** True when the right-click came from an internal-link inside an embedded Bases view */
+  private _contextMenuFromBases = false;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -195,8 +197,17 @@ export default class MetadataValidatorPlugin extends Plugin {
         this.app.workspace.on("file-menu", (menu, file: TFile, source: string) => {
           // editor-menu fires alongside file-menu in editor context — skip to avoid duplicates.
           // In non-editor views (Bases, file explorer), editor-menu never fires, so we must not skip.
+          // Exception: links inside embedded Bases views (![[*.base]]) set _contextMenuFromBases — we
+          // must handle them here because editor-menu either doesn't fire or targets the wrong file.
           if (source === "editor") return;
-          if (source === "link-context-menu" && this.app.workspace.activeEditor != null) return;
+          const fromBases = this._contextMenuFromBases;
+          this._contextMenuFromBases = false;
+          if (
+            source === "link-context-menu" &&
+            this.app.workspace.activeEditor != null &&
+            !fromBases
+          )
+            return;
 
           // On manifest.md files — offer schema editor
           if (file.basename === "manifest" && file.extension === "md") {
@@ -257,7 +268,26 @@ export default class MetadataValidatorPlugin extends Plugin {
         "contextmenu",
         (e: MouseEvent) => {
           this._contextMenuLinkTarget = null;
+          this._contextMenuFromBases = false;
           const el = e.target as HTMLElement | null;
+
+          // Internal links rendered inside embedded Bases views (![[*.base]])
+          const basesLinkEl = el?.closest<HTMLElement>(
+            ".internal-link[data-link-path], .internal-link[data-href]"
+          );
+          if (basesLinkEl?.closest(".bases-view")) {
+            const href =
+              basesLinkEl.getAttribute("data-link-path") ?? basesLinkEl.getAttribute("data-href");
+            if (href) {
+              const basesFile = this.app.vault.getAbstractFileByPath(href);
+              if (basesFile instanceof TFile) {
+                this._contextMenuLinkTarget = basesFile;
+                this._contextMenuFromBases = true;
+              }
+            }
+            return;
+          }
+
           // CodeMirror wraps wikilink parts in .cm-hmd-internal-link spans
           const linkSpan = el?.closest<HTMLElement>(".cm-hmd-internal-link");
           if (!linkSpan) return;
