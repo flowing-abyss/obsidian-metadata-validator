@@ -42,7 +42,7 @@ export interface ManifestField {
   /** Always overwrite with this value (auto-fix) */
   fixed?: unknown;
   validate_exists?: boolean;
-  sort?: "alphabetical";
+  sort?: "alphabetical" | "alphabetical-desc";
   min?: number;
   max?: number;
   format?: string;

@@ -48,4 +48,19 @@ describe("applyAutoFix", () => {
     const changed = applyAutoFix("tags", field, fm);
     expect(changed).toBe(false);
   });
+
+  it("sorts multiselect reverse-alphabetically when sort: alphabetical-desc", () => {
+    const field: ManifestField = { type: "multiselect", sort: "alphabetical-desc" };
+    const fm: Record<string, unknown> = { tags: ["a", "b", "c"] };
+    const changed = applyAutoFix("tags", field, fm);
+    expect(fm["tags"]).toEqual(["c", "b", "a"]);
+    expect(changed).toBe(true);
+  });
+
+  it("does not mark changed when multiselect already sorted desc", () => {
+    const field: ManifestField = { type: "multiselect", sort: "alphabetical-desc" };
+    const fm: Record<string, unknown> = { tags: ["c", "b", "a"] };
+    const changed = applyAutoFix("tags", field, fm);
+    expect(changed).toBe(false);
+  });
 });

@@ -59,10 +59,16 @@ export function applyAutoFix(
     changed = true;
   }
 
-  // sort: alphabetical
-  if (field.sort === "alphabetical" && Array.isArray(frontmatter[fieldName])) {
+  // sort: alphabetical / alphabetical-desc
+  if (
+    (field.sort === "alphabetical" || field.sort === "alphabetical-desc") &&
+    Array.isArray(frontmatter[fieldName])
+  ) {
     const arr = frontmatter[fieldName] as unknown[];
-    const sorted = [...arr].sort((a, b) => String(a).localeCompare(String(b)));
+    const asc = field.sort === "alphabetical";
+    const sorted = [...arr].sort((a, b) =>
+      asc ? String(a).localeCompare(String(b)) : String(b).localeCompare(String(a))
+    );
     if (sorted.some((v, i) => v !== arr[i])) {
       frontmatter[fieldName] = sorted;
       changed = true;

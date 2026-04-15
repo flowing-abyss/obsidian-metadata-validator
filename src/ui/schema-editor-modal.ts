@@ -637,12 +637,19 @@ export class SchemaEditorModal extends Modal {
 
     if (field.type === "multiselect" || field.type === "list" || field.type === "multilink") {
       new Setting(body)
-        .setName("Sort alphabetically")
-        .setDesc("Auto-sort values a to z on save.")
-        .addToggle((t) =>
-          t
-            .setValue(field.sort === "alphabetical")
-            .onChange((v) => update({ sort: v ? "alphabetical" : undefined }))
+        .setName("Sort order")
+        .setDesc("Auto-sort values on save.")
+        .addDropdown((d) =>
+          d
+            .addOption("", "None")
+            .addOption("alphabetical", "A → z")
+            .addOption("alphabetical-desc", "Z → a")
+            .setValue(field.sort ?? "")
+            .onChange((v) =>
+              update({
+                sort: v === "alphabetical" || v === "alphabetical-desc" ? v : undefined,
+              })
+            )
         );
     }
 
