@@ -146,7 +146,7 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl) // eslint-disable-next-line obsidianmd/ui/sentence-case
-      .setName("Show validation errors in Bases")  
+      .setName("Show validation errors in Bases")
       .setDesc("Highlight invalid cells with a subtle border and hover tooltip.")
       .addToggle((t) =>
         t.setValue(this.plugin.settings.showBasesErrors).onChange(async (v) => {
