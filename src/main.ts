@@ -156,7 +156,6 @@ export default class MetadataValidatorPlugin extends Plugin {
           if (file.path.startsWith(this.settings.schemasRoot + "/")) return;
           // Invalidate the decorator's result cache so stale icons don't linger
           this.decorator.invalidate(file.path);
-          this.basesValidator?.invalidate(file.path);
           if (this.settings.enableOnSave) {
             await this.validateAndUpdate(file);
           }
