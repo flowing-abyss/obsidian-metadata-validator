@@ -4,6 +4,7 @@ import { SchemaResolver } from "./schema/resolver";
 import { DEFAULT_SETTINGS, MetadataValidatorSettingTab, type PluginSettings } from "./settings";
 import type { ValidationResult } from "./types";
 import type { BasesDecorator as BasesDecoratorType } from "./ui/bases-decorator";
+import type { BasesValidator as BasesValidatorType } from "./ui/bases-validator";
 import { ContextMenuModal } from "./ui/context-menu-modal";
 import { CssInjector } from "./ui/css-injector";
 import { PropertyDecorator } from "./ui/decorator";
@@ -35,6 +36,7 @@ export default class MetadataValidatorPlugin extends Plugin {
   private _contextMenuLinkTarget: TFile | null = null;
   /** True when the right-click came from an internal-link inside an embedded Bases view */
   private _contextMenuFromBases = false;
+  private basesValidator: BasesValidatorType | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -154,6 +156,7 @@ export default class MetadataValidatorPlugin extends Plugin {
           if (file.path.startsWith(this.settings.schemasRoot + "/")) return;
           // Invalidate the decorator's result cache so stale icons don't linger
           this.decorator.invalidate(file.path);
+          this.basesValidator?.invalidate(file.path);
           if (this.settings.enableOnSave) {
             await this.validateAndUpdate(file);
           }
@@ -402,6 +405,20 @@ export default class MetadataValidatorPlugin extends Plugin {
         }
       );
 
+      // Bases validator (lazy import)
+      void import("./ui/bases-validator").then(
+        (mod: { BasesValidator: typeof BasesValidatorType }) => {
+          this.basesValidator = new mod.BasesValidator(
+            this.app,
+            this.resolver,
+            this.engine,
+            this.settings
+          );
+          if (this.settings.showBasesErrors) this.basesValidator.attach();
+          this.register(() => this.basesValidator?.detach());
+        }
+      );
+
       // Decorate and validate the currently active file right away.
       // file-open does not fire for notes that were already open when Obsidian
       // restarted, so we must do this explicitly after layout is ready.
@@ -411,6 +428,14 @@ export default class MetadataValidatorPlugin extends Plugin {
         await this.validateAndUpdate(activeFile);
       }
     });
+  }
+
+  toggleBasesValidator(enabled: boolean): void {
+    if (enabled) {
+      this.basesValidator?.attach();
+    } else {
+      this.basesValidator?.detach();
+    }
   }
 
   onunload(): void {
