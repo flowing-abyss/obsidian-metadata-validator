@@ -12,6 +12,7 @@ export interface PluginSettings {
   showSidebarPanel: boolean;
   showFileExplorerBadges: boolean;
   interceptBases: boolean;
+  showBasesErrors: boolean;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -24,6 +25,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   showSidebarPanel: true,
   showFileExplorerBadges: true,
   interceptBases: true,
+  showBasesErrors: true,
 };
 
 export class MetadataValidatorSettingTab extends PluginSettingTab {
@@ -140,6 +142,19 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
         t.setValue(this.plugin.settings.interceptBases).onChange(async (v) => {
           this.plugin.settings.interceptBases = v;
           await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl) // eslint-disable-next-line obsidianmd/ui/sentence-case
+      .setName("Show validation errors in Bases")  
+      .setDesc("Highlight invalid cells with a subtle border and hover tooltip.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.showBasesErrors).onChange(async (v) => {
+          this.plugin.settings.showBasesErrors = v;
+          await this.plugin.saveSettings();
+          (
+            this.plugin as unknown as { toggleBasesValidator?: (v: boolean) => void }
+          ).toggleBasesValidator?.(v);
         })
       );
 
