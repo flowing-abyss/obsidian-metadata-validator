@@ -1,43 +1,44 @@
+
 # Test Vault — Metadata Validator
 
-Тестовое хранилище для прямого функционального тестирования плагина.
+This is a test vault for direct functional testing of the plugin.
 
-## Быстрый старт
+## Quick Start
 
-1. Собери и установи плагин:
+1. Build and install the plugin:
    ```bash
    npm run build:vault
    ```
-2. Открой эту папку (`test-vault/`) как vault в Obsidian.
-3. Включи плагин: **Settings → Community plugins → Metadata Validator → Enable**.
+2. Open this folder (`test-vault/`) as a vault in Obsidian.
+3. Enable the plugin: **Settings → Community plugins → Metadata Validator → Enable**.
 
-## Структура схем
+## Schema Structure
 
 ```
 schemas/
-├── manifest.md          ← Base (все заметки, приоритет 0)
+├── manifest.md          ← Base (all notes, priority 0)
 ├── sources/
-│   └── manifest.md      ← Source (папка sources/, приоритет 10)
+│   └── manifest.md      ← Source (folder sources/, priority 10)
 ├── books/
-│   └── manifest.md      ← Book extends Source (папка books/, приоритет 20)
+│   └── manifest.md      ← Book extends Source (folder books/, priority 20)
 └── articles/
-    └── manifest.md      ← Article extends Source (sources/ + тег article, приоритет 15)
+    └── manifest.md      ← Article extends Source (sources/ + tag article, priority 15)
 ```
 
-## Тест-кейсы
+## Test Cases
 
-| Файл | Сценарий | Ожидаемый результат |
+| File | Scenario | Expected Result |
 |------|----------|---------------------|
-| `sources/valid-source.md` | Все поля корректны | Зелёный бейдж |
-| `sources/missing-author.md` | Нет обязательного `author` | Красный бейдж, ошибка в sidebar |
-| `sources/invalid-rating.md` | `rating: 2000` (допустимо 1–10) | Красный бейдж, ошибка диапазона |
-| `sources/invalid-status.md` | `status: kek` (нет в options) | Красный бейдж, ошибка опции |
-| `sources/no-status-gets-autofix.md` | Нет поля `status` | Авто-фикс: добавляется `status: new` |
-| `books/clean-code.md` | Книга, все поля верны | Зелёный бейдж |
-| `books/missing-author-book.md` | Книга без `author` | Красный бейдж |
-| `notes/unschemaed-note.md` | Нет подходящей схемы | Нет бейджа |
+| `sources/valid-source.md` | All fields are correct | Green badge |
+| `sources/missing-author.md` | Missing required `author` | Red badge, error in sidebar |
+| `sources/invalid-rating.md` | `rating: 2000` (allowed 1–10) | Red badge, range error |
+| `sources/invalid-status.md` | `status: kek` (not in options) | Red badge, option error |
+| `sources/no-status-gets-autofix.md` | No `status` field | Auto-fix: adds `status: new` |
+| `books/clean-code.md` | Book, all fields correct | Green badge |
+| `books/missing-author-book.md` | Book without `author` | Red badge |
+| `notes/unschemaed-note.md` | No matching schema | No badge |
 
-## Обновить плагин после изменений в коде
+## Update the plugin after code changes
 
 ```bash
 npm run build:vault
