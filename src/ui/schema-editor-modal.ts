@@ -635,6 +635,17 @@ export class SchemaEditorModal extends Modal {
         t.setValue(field.hidden ?? false).onChange((v) => update({ hidden: v || undefined }))
       );
 
+    if (field.type === "multiselect" || field.type === "list" || field.type === "multilink") {
+      new Setting(body)
+        .setName("Sort alphabetically")
+        .setDesc("Auto-sort values a to z on save.")
+        .addToggle((t) =>
+          t
+            .setValue(field.sort === "alphabetical")
+            .onChange((v) => update({ sort: v ? "alphabetical" : undefined }))
+        );
+    }
+
     // ── Type-specific ─────────────────────────────────────────
     switch (field.type) {
       case "number":
