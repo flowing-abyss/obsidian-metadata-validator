@@ -115,6 +115,8 @@ export class BasesValidator {
       if (!filePath) continue;
 
       const file = this.app.vault.getAbstractFileByPath(filePath);
+      // Duck-type check: "extension" is present on TFile but not TFolder.
+      // Using "in" instead of instanceof so unit test plain-object mocks pass.
       if (!file || !("extension" in file)) continue;
       // eslint-disable-next-line obsidianmd/no-tfile-tfolder-cast
       const tfile = file as TFile;
@@ -173,7 +175,7 @@ export class BasesValidator {
     if (hasError) cell.classList.add("mv-bases-error");
     else if (hasWarning) cell.classList.add("mv-bases-warning");
 
-    if (results.length > 0) {
+    if (hasError || hasWarning) {
       const enter: EventListener = () => {
         void import("./validator-tooltip").then(
           (mod: { showValidatorTooltip: typeof showValidatorTooltipType }) => {
