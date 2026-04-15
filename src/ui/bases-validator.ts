@@ -53,10 +53,19 @@ export class BasesValidator {
   attach(): void {
     this.observer = new MutationObserver((mutations) => {
       for (const m of mutations) {
+        // Attribute changes on elements inside a bases-view catch virtual-scroll
+        // row reuse (Bases changes data-href in-place rather than removing nodes).
+        if (m.type === "attributes" && (m.target as HTMLElement).closest?.(".bases-view")) {
+          this.scheduleDecorate();
+          return;
+        }
+        // childList: detect .bases-view being added OR rows added inside one.
         for (const node of Array.from(m.addedNodes)) {
           if (
             node instanceof HTMLElement &&
-            (node.classList.contains("bases-view") || node.querySelector?.(".bases-view") !== null)
+            (node.classList.contains("bases-view") ||
+              node.querySelector?.(".bases-view") !== null ||
+              node.closest?.(".bases-view") !== null)
           ) {
             this.scheduleDecorate();
             return;
@@ -64,7 +73,12 @@ export class BasesValidator {
         }
       }
     });
-    this.observer.observe(document.body, { childList: true, subtree: true });
+    this.observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-href", "data-property"],
+    });
 
     this.cacheRef = this.app.metadataCache.on("changed", (file: TFile) => {
       this.resultCache.delete(file.path);
@@ -105,8 +119,18 @@ export class BasesValidator {
     this.debounceTimer = setTimeout(() => void this.decorateBases(), 50);
   }
 
+  /** Decorate immediately without debounce — call from workspace leaf-change events. */
+  decorateNow(): void {
+    void this.decorateBases();
+  }
+
   async decorateBases(): Promise<void> {
     if (!this.settings.showBasesErrors) return;
+
+    // Always clear stale indicators first. Virtual-scroll row reuse means the
+    // same DOM node can represent a different file between decoration passes —
+    // clearAll() prevents leftover classes and tooltip closures from persisting.
+    this.clearAll();
 
     const rows = Array.from(document.querySelectorAll<HTMLElement>(".bases-view .bases-tr"));
 

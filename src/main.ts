@@ -191,6 +191,7 @@ export default class MetadataValidatorPlugin extends Plugin {
         this.app.workspace.on("active-leaf-change", () => {
           // Also trigger when switching panes/tabs without a full file-open
           this.decorator.decorateNow();
+          this.basesValidator?.decorateNow();
         })
       );
 
