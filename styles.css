@@ -1231,6 +1231,16 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   padding: 4px 16px 12px;
 }
 
+/* Obsidian wraps titleEl in a .modal-header div with margin-bottom that
+   creates wasted space even when the title is empty. */
+.modal:has(.modal-content.mv-context-modal) .modal-header {
+  display: none;
+}
+
+.mv-hidden {
+  display: none;
+}
+
 .mv-context-section {
   margin-bottom: 8px;
 }

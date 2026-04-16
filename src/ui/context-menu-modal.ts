@@ -148,6 +148,7 @@ export class ContextMenuModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("mv-context-modal");
+    this.titleEl.addClass("mv-hidden");
 
     const entries = Object.entries(this.schema.fields).filter(([, def]) => !def.hidden);
     const required = entries.filter(([, def]) => def.required === true);
