@@ -42,7 +42,7 @@ export class PropertyDecorator {
   private readonly resolver: SchemaResolver;
   private readonly engine: ValidationEngine;
   private readonly settings: PluginSettings;
-  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private debounceTimer: ReturnType<typeof activeWindow.setTimeout> | null = null;
   /** Keyed by file path — avoids re-running validation when frontmatter hasn't changed */
   private readonly resultCache = new Map<string, CachedResult>();
   private lastDecoratedFilePath: string | null = null;
@@ -72,7 +72,7 @@ export class PropertyDecorator {
       for (const m of mutations) {
         for (const node of Array.from(m.addedNodes)) {
           if (
-            node instanceof HTMLElement &&
+            node.instanceOf(HTMLElement) &&
             (node.classList.contains("metadata-property") ||
               node.querySelector(".metadata-property"))
           ) {
@@ -82,13 +82,13 @@ export class PropertyDecorator {
         }
       }
     });
-    this.observer.observe(document.body, { childList: true, subtree: true });
+    this.observer.observe(activeDocument.body, { childList: true, subtree: true });
   }
 
   detach(): void {
     this.observer?.disconnect();
     this.observer = null;
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    if (this.debounceTimer) activeWindow.clearTimeout(this.debounceTimer);
   }
 
   /** Invalidate cache for a specific file path when its metadata changes. */
@@ -105,7 +105,9 @@ export class PropertyDecorator {
    * Call this when the schema changes so re-decoration picks up the fresh fieldDefs.
    */
   clearIcons(): void {
-    document.querySelectorAll(`[${PICKER_ATTR}],[${VALIDATOR_ATTR}]`).forEach((el) => el.remove());
+    activeDocument
+      .querySelectorAll(`[${PICKER_ATTR}],[${VALIDATOR_ATTR}]`)
+      .forEach((el) => el.remove());
   }
 
   /**
@@ -117,9 +119,9 @@ export class PropertyDecorator {
   }
 
   private onMutation(): void {
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    if (this.debounceTimer) activeWindow.clearTimeout(this.debounceTimer);
     // 50ms is enough to batch rapid DOM mutations without visible lag
-    this.debounceTimer = setTimeout(() => void this.decorateAll(), 50);
+    this.debounceTimer = activeWindow.setTimeout(() => void this.decorateAll(), 50);
   }
 
   async decorateAll(): Promise<void> {
@@ -145,9 +147,7 @@ export class PropertyDecorator {
     // never corrupt the live Obsidian metadata cache object. Without this copy,
     // subsequent reads of getFileCache(file)?.frontmatter would return mutated
     // (wrong) values, causing pickers and list modals to open with stale data.
-    const frontmatter = sanitizeFrontmatter(
-      this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined
-    );
+    const frontmatter = sanitizeFrontmatter(this.app.metadataCache.getFileCache(file)?.frontmatter);
 
     const schema = this.resolver.resolveForNote(file, frontmatter);
     if (!schema) return;
@@ -171,7 +171,7 @@ export class PropertyDecorator {
 
     const normalizedSchemaKeys = this.buildNormalizedSchemaKeyMap(schema);
 
-    const rows = Array.from(document.querySelectorAll<HTMLElement>(".metadata-property"));
+    const rows = Array.from(activeDocument.querySelectorAll<HTMLElement>(".metadata-property"));
     for (const row of rows) {
       const rowKey = row.getAttribute("data-property-key");
       if (!rowKey) continue;
@@ -228,7 +228,7 @@ export class PropertyDecorator {
     fieldKey: string,
     schema: ResolvedSchema,
     file: TFile,
-    frontmatter: Record<string, unknown>
+    _frontmatter: Record<string, unknown>
   ): void {
     const fieldDef = schema.fields[fieldKey];
     if (!fieldDef) return;
@@ -244,7 +244,8 @@ export class PropertyDecorator {
     const iconName = FIELD_TYPE_ICON[fieldDef.type] ?? "square";
     const isPicker = PICKER_TYPES.has(fieldDef.type);
 
-    const btn = document.createElement("button");
+    // eslint-disable-next-line obsidianmd/prefer-create-el
+    const btn = activeDocument.createElement("button");
     btn.setAttribute(PICKER_ATTR, "true");
     btn.setAttribute(PICKER_CONTEXT_ATTR, pickerContext);
     btn.setAttribute("aria-label", fieldDef.type);
@@ -273,6 +274,7 @@ export class PropertyDecorator {
           unknown
         >;
         const newVal = fresh[fieldKey] !== true;
+        // eslint-disable-next-line obsidianmd/no-unsupported-api
         void this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
           fm[fieldKey] = newVal;
         });
@@ -306,7 +308,7 @@ export class PropertyDecorator {
     const errors = results.filter((r) => !r.autoFixed);
     if (errors.length === 0) return;
 
-    const icon = document.createElement("span");
+    const icon = activeDocument.createSpan();
     icon.setAttribute(VALIDATOR_ATTR, "true");
     icon.className = "mv-validator-icon clickable-icon";
     setIcon(icon, "triangle-alert");

@@ -67,7 +67,7 @@ export class SchemaTreeView {
     const children = childrenOf.get(manifestPath) ?? [];
     if (children.length > 0) {
       // Start expanded so the user sees the hierarchy immediately
-      const toggle = row.createEl("span", { text: "▾", cls: "mv-tree-toggle" });
+      const toggle = row.createSpan({ text: "▾", cls: "mv-tree-toggle" });
       const childUl = li.createEl("ul", { cls: "mv-tree-children" });
 
       toggle.addEventListener("click", (e) => {
@@ -81,7 +81,7 @@ export class SchemaTreeView {
         this.renderNode(child.path, childrenOf, childUl);
       }
     } else {
-      row.createEl("span", { text: "·", cls: "mv-tree-leaf" });
+      row.createSpan({ text: "·", cls: "mv-tree-leaf" });
     }
 
     const displayName =
@@ -89,17 +89,17 @@ export class SchemaTreeView {
         ? manifest.data.name
         : (manifest.folderPath.split("/").pop() ?? "unknown");
 
-    row.createEl("span", {
+    row.createSpan({
       text: displayName,
       cls: "mv-tree-name",
     });
 
     const fieldCount = Object.keys(manifest.data.fields ?? {}).length;
-    row.createEl("span", { text: `${fieldCount} fields`, cls: "mv-tree-count" });
+    row.createSpan({ text: `${fieldCount} fields`, cls: "mv-tree-count" });
 
     const targetQuery = manifest.data.target?.query;
     if (typeof targetQuery === "string") {
-      row.createEl("span", {
+      row.createSpan({
         text: targetQuery,
         cls: "mv-tree-query",
       });

@@ -43,6 +43,7 @@ export class QuickEditModal extends Modal {
   }
 
   private save(value: unknown): void {
+    // eslint-disable-next-line obsidianmd/no-unsupported-api
     void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
       if (value === null || value === undefined) {
         delete fm[this.fieldKey];
@@ -65,7 +66,7 @@ export class QuickEditModal extends Modal {
         if (this.fieldDef.min !== undefined || this.fieldDef.max !== undefined) {
           const minText = this.fieldDef.min !== undefined ? String(this.fieldDef.min) : "\u2026";
           const maxText = this.fieldDef.max !== undefined ? String(this.fieldDef.max) : "\u2026";
-          numWrap.createEl("span", {
+          numWrap.createSpan({
             text: `${minText}\u2013${maxText}`,
             cls: "mv-qe-range-hint",
           });
@@ -84,7 +85,7 @@ export class QuickEditModal extends Modal {
           this.save(isNaN(n) ? null : n);
           this.close();
         });
-        setTimeout(() => input.focus(), 0);
+        activeWindow.setTimeout(() => input.focus(), 0);
         break;
       }
 
@@ -98,7 +99,7 @@ export class QuickEditModal extends Modal {
         input.addEventListener("keydown", (e) => {
           if (e.key === "Escape") this.close();
         });
-        setTimeout(() => {
+        activeWindow.setTimeout(() => {
           input.focus();
           input.showPicker?.();
         }, 0);
@@ -124,7 +125,7 @@ export class QuickEditModal extends Modal {
           this.save(input.value.trim() || null);
           this.close();
         });
-        setTimeout(() => {
+        activeWindow.setTimeout(() => {
           input.focus();
           input.select();
         }, 0);

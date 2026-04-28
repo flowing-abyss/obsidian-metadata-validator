@@ -216,8 +216,8 @@ export class SchemaEditorModal extends Modal {
   ): void {
     const wrapper = el.createDiv("mv-collapsible");
     const header = wrapper.createDiv("mv-collapsible-header");
-    const chevron = header.createEl("span", { cls: "mv-collapsible-chevron", text: "›" });
-    header.createEl("span", { text: title, cls: "mv-collapsible-title" });
+    const chevron = header.createSpan({ cls: "mv-collapsible-chevron", text: "›" });
+    header.createSpan({ text: title, cls: "mv-collapsible-title" });
     const body = wrapper.createDiv("mv-collapsible-body");
     body.addClass("mv-collapsible-body--collapsed");
     let rendered = false;
@@ -274,6 +274,7 @@ export class SchemaEditorModal extends Modal {
 
     new Setting(el)
       .setName("Extends")
+      // eslint-disable-next-line obsidianmd/ui/sentence-case
       .setDesc("Parent schema folder path (e.g. schemas/base).")
       .addText((t) => {
         t.inputEl.setAttribute("placeholder", "Schemas/base");
@@ -395,14 +396,14 @@ export class SchemaEditorModal extends Modal {
         // Recompute excluded keys each render so newly excluded fields appear
         const currentExcluded = inheritedRaw.filter((k) => excluded.has(k));
         const displayKeys = [...ordered, ...currentExcluded];
-        displayKeys.forEach((key, idx) => {
+        displayKeys.forEach((key, _idx) => {
           const isOwn = ownKeys.includes(key);
           const isExcluded = excluded.has(key);
           let cls = "mv-order-chip";
           if (isOwn) cls += " is-own";
           if (isExcluded) cls += " is-excluded";
 
-          const chip = listEl.createEl("div", {
+          const chip = listEl.createDiv({
             cls,
             text: key,
             attr: isExcluded ? {} : { draggable: "true" },
@@ -503,7 +504,7 @@ export class SchemaEditorModal extends Modal {
     // ── Card header ───────────────────────────────────────────
     const header = card.createDiv("mv-field-card-header");
 
-    const collapseToggle = header.createEl("span", { cls: "mv-field-collapse-toggle" });
+    const collapseToggle = header.createSpan({ cls: "mv-field-collapse-toggle" });
     setIcon(collapseToggle, "chevron-right");
 
     const keyInput = header.createEl("input", { type: "text", cls: "mv-field-key-input" });
@@ -804,11 +805,9 @@ export class SchemaEditorModal extends Modal {
           update({
             options: {
               source: {
-                ...(field.options && !Array.isArray(field.options)
-                  ? (field.options as { source: object }).source
-                  : {}),
+                ...(field.options && !Array.isArray(field.options) ? field.options.source : {}),
                 query: v.trim() || undefined,
-              } as { query?: string; js?: string },
+              },
             },
           });
         });
@@ -825,11 +824,9 @@ export class SchemaEditorModal extends Modal {
           update({
             options: {
               source: {
-                ...(field.options && !Array.isArray(field.options)
-                  ? (field.options as { source: object }).source
-                  : {}),
+                ...(field.options && !Array.isArray(field.options) ? field.options.source : {}),
                 js: v.trim() || undefined,
-              } as { query?: string; js?: string },
+              },
             },
           });
         });
@@ -899,7 +896,7 @@ export class SchemaEditorModal extends Modal {
         valInput.value = opt.value;
         valInput.setAttribute("placeholder", "Value");
 
-        row.createEl("span", { text: "→", cls: "mv-option-arrow" });
+        row.createSpan({ text: "→", cls: "mv-option-arrow" });
 
         const labelInput = row.createEl("input", {
           type: "text",
@@ -966,6 +963,7 @@ export class SchemaEditorModal extends Modal {
   ): void {
     new Setting(body)
       .setName("Format")
+      // eslint-disable-next-line obsidianmd/ui/sentence-case
       .setDesc("Expected date format, e.g. YYYY-MM-DD or DD/MM/YYYY")
       .addText((t) => {
         t.inputEl.setAttribute("placeholder", "YYYY-MM-DD"); // eslint-disable-line obsidianmd/ui/sentence-case

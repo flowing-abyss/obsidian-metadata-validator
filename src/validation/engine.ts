@@ -102,7 +102,7 @@ export class ValidationEngine {
           resolvedOptions = field.options;
         } else if (field.strict !== false) {
           // Dynamic options + strict mode: resolve the source to validate against it
-          const src = (field.options as { source: import("../types").FieldSource }).source;
+          const src = field.options.source;
           if (src) resolvedOptions = await resolveSource(src, this.app, file);
         }
         if (resolvedOptions) {

@@ -8,12 +8,12 @@ export class CssInjector {
   }
 
   update(): void {
-    document.body.toggleClass("mv-hide-type-icon", this.settings.hideObsidianTypeIcon);
-    document.body.toggleClass("mv-hide-validator", this.settings.hideObsidianValidator);
+    activeDocument.body.toggleClass("mv-hide-type-icon", this.settings.hideObsidianTypeIcon);
+    activeDocument.body.toggleClass("mv-hide-validator", this.settings.hideObsidianValidator);
   }
 
   remove(): void {
-    document.body.removeClass("mv-hide-type-icon");
-    document.body.removeClass("mv-hide-validator");
+    activeDocument.body.removeClass("mv-hide-type-icon");
+    activeDocument.body.removeClass("mv-hide-validator");
   }
 }

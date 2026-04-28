@@ -63,9 +63,7 @@ export async function applyVaultAutoFixes(
     try {
       let file = originalFile;
       const frontmatter = sanitizeFrontmatter(
-        deps.app.metadataCache.getFileCache(file)?.frontmatter as
-          | Record<string, unknown>
-          | undefined
+        deps.app.metadataCache.getFileCache(file)?.frontmatter
       );
       let schema = deps.resolver.resolveForNote(file, frontmatter);
 

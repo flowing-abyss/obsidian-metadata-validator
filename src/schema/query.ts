@@ -129,7 +129,7 @@ function evaluateBaseTerm(
       .replace(/^["']|["']$/g, "");
     const fmVal = frontmatter[key];
     return (
-      (fmVal === null || fmVal === undefined ? "" : String(fmVal as string | number | boolean)) ===
+      (fmVal === null || fmVal === undefined ? "" : String(fmVal)) === // eslint-disable-line @typescript-eslint/no-base-to-string
       val
     );
   }

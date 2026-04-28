@@ -25,7 +25,7 @@ export class BasesValidator {
   private readonly resolver: SchemaResolver;
   private readonly engine: ValidationEngine;
   private readonly settings: PluginSettings;
-  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private debounceTimer: ReturnType<typeof activeWindow.setTimeout> | null = null;
   private readonly resultCache = new Map<string, CachedResult>();
   private cacheRef: EventRef | null = null;
 
@@ -62,7 +62,7 @@ export class BasesValidator {
         // childList: detect .bases-view being added OR rows added inside one.
         for (const node of Array.from(m.addedNodes)) {
           if (
-            node instanceof HTMLElement &&
+            node.instanceOf(HTMLElement) &&
             (node.classList.contains("bases-view") ||
               node.querySelector?.(".bases-view") !== null ||
               node.closest?.(".bases-view") !== null)
@@ -73,7 +73,7 @@ export class BasesValidator {
         }
       }
     });
-    this.observer.observe(document.body, {
+    this.observer.observe(activeDocument.body, {
       childList: true,
       subtree: true,
       attributes: true,
@@ -92,7 +92,7 @@ export class BasesValidator {
   detach(): void {
     this.observer?.disconnect();
     this.observer = null;
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    if (this.debounceTimer) activeWindow.clearTimeout(this.debounceTimer);
     if (this.cacheRef) {
       this.app.metadataCache.offref(this.cacheRef);
       this.cacheRef = null;
@@ -107,16 +107,18 @@ export class BasesValidator {
 
   /** Remove all indicator classes and tooltip listeners from the DOM. */
   clearAll(): void {
-    document.querySelectorAll<HTMLElement>(".mv-bases-error, .mv-bases-warning").forEach((el) => {
-      this.removeTooltipListeners(el);
-      el.classList.remove("mv-bases-error", "mv-bases-warning");
-    });
-    document.getElementById("mv-validator-tooltip")?.remove();
+    activeDocument
+      .querySelectorAll<HTMLElement>(".mv-bases-error, .mv-bases-warning")
+      .forEach((el) => {
+        this.removeTooltipListeners(el);
+        el.classList.remove("mv-bases-error", "mv-bases-warning");
+      });
+    activeDocument.getElementById("mv-validator-tooltip")?.remove();
   }
 
   private scheduleDecorate(): void {
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
-    this.debounceTimer = setTimeout(() => void this.decorateBases(), 50);
+    if (this.debounceTimer) activeWindow.clearTimeout(this.debounceTimer);
+    this.debounceTimer = activeWindow.setTimeout(() => void this.decorateBases(), 50);
   }
 
   /** Decorate immediately without debounce — call from workspace leaf-change events. */
@@ -132,7 +134,7 @@ export class BasesValidator {
     // clearAll() prevents leftover classes and tooltip closures from persisting.
     this.clearAll();
 
-    const rows = Array.from(document.querySelectorAll<HTMLElement>(".bases-view .bases-tr"));
+    const rows = Array.from(activeDocument.querySelectorAll<HTMLElement>(".bases-view .bases-tr"));
 
     for (const row of rows) {
       const filePath = this.resolveFilePath(row);
@@ -146,9 +148,7 @@ export class BasesValidator {
       const tfile = file as TFile;
 
       const cache = this.app.metadataCache.getFileCache(tfile);
-      const frontmatter = sanitizeFrontmatter(
-        cache?.frontmatter as Record<string, unknown> | undefined
-      );
+      const frontmatter = sanitizeFrontmatter(cache?.frontmatter);
 
       const schema = this.resolver.resolveForNote(tfile, frontmatter);
       if (!schema) continue;
@@ -208,7 +208,7 @@ export class BasesValidator {
         );
       };
       const leave: EventListener = () => {
-        document.getElementById("mv-validator-tooltip")?.remove();
+        activeDocument.getElementById("mv-validator-tooltip")?.remove();
       };
       cell.addEventListener("mouseenter", enter);
       cell.addEventListener("mouseleave", leave);

@@ -17,13 +17,13 @@ export class ExplorerBadges {
 
   clearAll(): void {
     this.badgeMap.clear();
-    Array.from(document.querySelectorAll(`.${BADGE_CLASS}`)).forEach((el) => el.remove());
+    Array.from(activeDocument.querySelectorAll(`.${BADGE_CLASS}`)).forEach((el) => el.remove());
   }
 
   render(): void {
     // In different Obsidian versions data-path may be on the title element itself
     // or on a parent .nav-file / .tree-item ancestor. Try both.
-    const fileItems = Array.from(document.querySelectorAll<HTMLElement>(".nav-file-title"));
+    const fileItems = Array.from(activeDocument.querySelectorAll<HTMLElement>(".nav-file-title"));
     for (const item of fileItems) {
       const filePath =
         item.getAttribute("data-path") ??
@@ -43,7 +43,7 @@ export class ExplorerBadges {
         // Only update the class — avoids DOM removal + insertion
         existing.className = targetClass;
       } else {
-        const badge = document.createElement("span");
+        const badge = activeDocument.createSpan();
         badge.className = targetClass;
         item.prepend(badge);
       }

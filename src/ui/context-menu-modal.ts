@@ -51,7 +51,7 @@ export class ContextMenuModal extends Modal {
 
   async onOpen(): Promise<void> {
     const cache = this.app.metadataCache.getFileCache(this.file);
-    this.localFrontmatter = { ...(cache?.frontmatter ?? {}) } as Record<string, unknown>;
+    this.localFrontmatter = { ...(cache?.frontmatter ?? {}) };
     delete this.localFrontmatter["position"];
     const results = await this.validateForDisplay();
     this.render(this.localFrontmatter, this.buildResultMap(results));
@@ -167,11 +167,11 @@ export class ContextMenuModal extends Modal {
     if (optional.length > 0) {
       const wrapper = contentEl.createDiv("mv-context-section");
       const header = wrapper.createDiv("mv-collapsible-header");
-      const chevron = header.createEl("span", {
+      const chevron = header.createSpan({
         cls: "mv-collapsible-chevron",
         text: this.optionalExpanded ? "\u25BE" : "\u203A",
       });
-      header.createEl("span", {
+      header.createSpan({
         text: `Optional fields (${String(optional.length)})`,
         cls: "mv-collapsible-title",
       });
@@ -208,11 +208,11 @@ export class ContextMenuModal extends Modal {
 
     // Label column: field name only
     const labelEl = row.createDiv("mv-field-label");
-    labelEl.createEl("span", { text: fieldDef.label ?? fieldKey, cls: "mv-field-label-text" });
+    labelEl.createSpan({ text: fieldDef.label ?? fieldKey, cls: "mv-field-label-text" });
 
     // Type icon column — own grid cell so it stays vertically centred even when
     // the value column has multi-line content (tags, aliases, etc.)
-    const iconEl = row.createEl("span", {
+    const iconEl = row.createSpan({
       cls: "mv-field-type-icon mv-field-type-icon--leading",
     });
     setIcon(iconEl, FIELD_TYPE_ICON[fieldDef.type] ?? "square");
@@ -290,7 +290,7 @@ export class ContextMenuModal extends Modal {
               typeof fieldDef.fixed === "boolean"
             ? String(fieldDef.fixed)
             : "";
-      container.createEl("span", { text: `Fixed: ${fixedDisplay}`, cls: "mv-field-fixed" });
+      container.createSpan({ text: `Fixed: ${fixedDisplay}`, cls: "mv-field-fixed" });
       return;
     }
 
@@ -329,7 +329,7 @@ export class ContextMenuModal extends Modal {
           input.addEventListener("blur", () => {
             this.saveField(fieldKey, input.value.trim() || null);
           });
-          setTimeout(() => {
+          activeWindow.setTimeout(() => {
             input.focus();
             input.select();
           }, 0);
@@ -386,7 +386,7 @@ export class ContextMenuModal extends Modal {
         if (fieldDef.min !== undefined || fieldDef.max !== undefined) {
           const minText = fieldDef.min !== undefined ? String(fieldDef.min) : "\u2026";
           const maxText = fieldDef.max !== undefined ? String(fieldDef.max) : "\u2026";
-          numRow.createEl("span", {
+          numRow.createSpan({
             text: `${minText}\u2013${maxText}`,
             cls: "mv-field-range-hint",
           });
@@ -447,7 +447,7 @@ export class ContextMenuModal extends Modal {
         : [];
 
     if (values.length === 0) {
-      const noneEl = container.createEl("span", { text: "None", cls: "mv-field-empty" });
+      const noneEl = container.createSpan({ text: "None", cls: "mv-field-empty" });
       noneEl.addEventListener("click", () => {
         this.openPicker(fieldKey, fieldDef);
       });
@@ -466,7 +466,7 @@ export class ContextMenuModal extends Modal {
 
       // Separator between items
       if (i > 0) {
-        container.createEl("span", { text: " \u2022 ", cls: "mv-chip-sep" });
+        container.createSpan({ text: " \u2022 ", cls: "mv-chip-sep" });
       }
 
       if (isLink) {
@@ -484,7 +484,7 @@ export class ContextMenuModal extends Modal {
         if (fieldKey.trim().toLowerCase() === "tags") {
           chipClasses.push("mv-chip--tags");
         }
-        const chip = container.createEl("span", { text: displayName, cls: chipClasses.join(" ") });
+        const chip = container.createSpan({ text: displayName, cls: chipClasses.join(" ") });
         chip.addEventListener("click", () => {
           this.openPicker(fieldKey, fieldDef);
         });
@@ -503,7 +503,7 @@ export class ContextMenuModal extends Modal {
     const refresh = (items: string[]) => {
       chipsEl.empty();
       items.forEach((val, idx) => {
-        const chip = chipsEl.createEl("span", { cls: "mv-chip mv-chip--removable" });
+        const chip = chipsEl.createSpan({ cls: "mv-chip mv-chip--removable" });
         // Render value: markdown link [text](url), wikilink [[...]], or plain text
         const mdLink = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(val);
         const wikiLink = /^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/.exec(val);
@@ -536,9 +536,9 @@ export class ContextMenuModal extends Modal {
             void this.app.workspace.openLinkText(target, this.file.path, false);
           });
         } else {
-          chip.createEl("span", { text: val });
+          chip.createSpan({ text: val });
         }
-        const rem = chip.createEl("span", { text: "\u00D7", cls: "mv-chip-remove" });
+        const rem = chip.createSpan({ text: "\u00D7", cls: "mv-chip-remove" });
         rem.addEventListener("click", () => {
           const updated = items.filter((_, i) => i !== idx);
           this.saveField(fieldKey, updated.length > 0 ? updated : null);
@@ -549,7 +549,8 @@ export class ContextMenuModal extends Modal {
         chip.addEventListener("contextmenu", (e) => {
           e.preventDefault();
           // Replace the chip with an edit input pre-filled with the raw value
-          const editInput = document.createElement("input");
+          // eslint-disable-next-line obsidianmd/prefer-create-el
+          const editInput = activeDocument.createElement("input");
           editInput.type = "text";
           editInput.value = val;
           editInput.className = "mv-list-add-input mv-list-edit-input";
@@ -686,6 +687,7 @@ export class ContextMenuModal extends Modal {
    */
   private toggleBoolean(fieldKey: string, newValue: boolean): void {
     this.localFrontmatter[fieldKey] = newValue;
+    // eslint-disable-next-line obsidianmd/no-unsupported-api
     void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
       fm[fieldKey] = newValue;
     });
@@ -706,6 +708,7 @@ export class ContextMenuModal extends Modal {
     );
 
     // Persist to file (fire and forget)
+    // eslint-disable-next-line obsidianmd/no-unsupported-api
     void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
       if (value === null || value === undefined) {
         delete fm[fieldKey];
@@ -730,8 +733,8 @@ export class ContextMenuModal extends Modal {
     const chain = this.schema.inheritanceChain;
 
     if (chain.length <= 1) {
-      footer.createEl("span", { text: "Schema: ", cls: "mv-footer-label" });
-      const schemaSpan = footer.createEl("span", {
+      footer.createSpan({ text: "Schema: ", cls: "mv-footer-label" });
+      const schemaSpan = footer.createSpan({
         text: this.schema.name,
         cls: "mv-footer-schema-name",
       });
@@ -742,26 +745,26 @@ export class ContextMenuModal extends Modal {
           this.openSchemaEditor!(manifestPath);
         });
       }
-      footer.createEl("span", {
+      footer.createSpan({
         text: this.file.path,
         cls: "mv-footer-filepath",
       });
       return;
     }
 
-    footer.createEl("span", { text: "Schema: ", cls: "mv-footer-label" });
+    footer.createSpan({ text: "Schema: ", cls: "mv-footer-label" });
 
     // Show chain left-to-right: root → parent → child (current is last in chain)
     chain.forEach((manifestPath, i) => {
       if (i > 0) {
-        footer.createEl("span", { text: " \u2192 ", cls: "mv-footer-arrow" });
+        footer.createSpan({ text: " \u2192 ", cls: "mv-footer-arrow" });
       }
 
       // Extract a friendly name from the path
       const parts = manifestPath.split("/");
       const name = parts.length >= 2 ? (parts[parts.length - 2] ?? manifestPath) : manifestPath;
 
-      const schemaSpan = footer.createEl("span", {
+      const schemaSpan = footer.createSpan({
         text: name,
         cls: "mv-footer-schema-name",
       });
@@ -800,14 +803,14 @@ export class ContextMenuModal extends Modal {
       totalErrors += rs.filter((r) => !r.autoFixed && r.severity === "error").length;
     });
     if (totalErrors > 0) {
-      footer.createEl("span", {
+      footer.createSpan({
         text: ` \u00B7 ${totalErrors} error${totalErrors > 1 ? "s" : ""}`,
         cls: "mv-footer-errors",
       });
     }
 
     // File path at the very end of the footer
-    footer.createEl("span", {
+    footer.createSpan({
       text: this.file.path,
       cls: "mv-footer-filepath",
     });

@@ -9,7 +9,7 @@ import { ContextMenuModal } from "./ui/context-menu-modal";
 import { CssInjector } from "./ui/css-injector";
 import { PropertyDecorator } from "./ui/decorator";
 import { ExplorerBadges } from "./ui/explorer-badges";
-import type { SchemaEditorModal as SchemaEditorModalType } from "./ui/schema-editor-modal";
+
 import {
   SIDEBAR_PANEL_TYPE,
   SidebarPanel,
@@ -230,9 +230,7 @@ export default class MetadataValidatorPlugin extends Plugin {
               .setTitle("Edit properties")
               .setIcon("pencil")
               .onClick(() => {
-                const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as
-                  | Record<string, unknown>
-                  | undefined;
+                const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
                 const schema = this.resolver.resolveForNote(file, fm ?? {});
                 if (!schema) {
                   new Notice("No schema matches this note.");
@@ -250,9 +248,7 @@ export default class MetadataValidatorPlugin extends Plugin {
           );
 
           // "Edit schema" only when there's a schema to edit
-          const fmForSchema = this.app.metadataCache.getFileCache(file)?.frontmatter as
-            | Record<string, unknown>
-            | undefined;
+          const fmForSchema = this.app.metadataCache.getFileCache(file)?.frontmatter;
           const schemaForMenu = this.resolver.resolveForNote(file, fmForSchema ?? {});
           if (schemaForMenu) {
             menu.addItem((item) =>
@@ -267,7 +263,7 @@ export default class MetadataValidatorPlugin extends Plugin {
 
       // Capture right-clicked wikilink target *before* editor-menu fires
       this.registerDomEvent(
-        document,
+        activeDocument,
         "contextmenu",
         (e: MouseEvent) => {
           this._contextMenuLinkTarget = null;
@@ -326,9 +322,7 @@ export default class MetadataValidatorPlugin extends Plugin {
           const targetFile = this._contextMenuLinkTarget ?? activeFile;
           this._contextMenuLinkTarget = null;
 
-          const fm = this.app.metadataCache.getFileCache(targetFile)?.frontmatter as
-            | Record<string, unknown>
-            | undefined;
+          const fm = this.app.metadataCache.getFileCache(targetFile)?.frontmatter;
           const schema = this.resolver.resolveForNote(targetFile, fm ?? {});
 
           const title = "Edit properties";
@@ -356,7 +350,7 @@ export default class MetadataValidatorPlugin extends Plugin {
       );
 
       // Right-click on wikilinks in properties panel → "Edit properties"
-      this.registerDomEvent(document, "contextmenu", (e: MouseEvent) => {
+      this.registerDomEvent(activeDocument, "contextmenu", (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         // Only act on internal-link elements inside a metadata-property value
         const linkEl = target.closest<HTMLElement>(
@@ -370,9 +364,7 @@ export default class MetadataValidatorPlugin extends Plugin {
         const activeFile = this.app.workspace.getActiveFile();
         if (!activeFile) return;
 
-        const fm = this.app.metadataCache.getFileCache(activeFile)?.frontmatter as
-          | Record<string, unknown>
-          | undefined;
+        const fm = this.app.metadataCache.getFileCache(activeFile)?.frontmatter;
         const schema = this.resolver.resolveForNote(activeFile, fm ?? {});
         if (!schema) return;
 
@@ -455,9 +447,7 @@ export default class MetadataValidatorPlugin extends Plugin {
   }
 
   private async validateAndUpdate(file: TFile): Promise<void> {
-    const frontmatter = sanitizeFrontmatter(
-      this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined
-    );
+    const frontmatter = sanitizeFrontmatter(this.app.metadataCache.getFileCache(file)?.frontmatter);
     const schema = this.resolver.resolveForNote(file, frontmatter);
 
     if (!schema) {
@@ -510,6 +500,7 @@ export default class MetadataValidatorPlugin extends Plugin {
         const effectiveOrder = schema.formatting.property_order?.length
           ? schema.formatting.property_order
           : Object.keys(schema.fields);
+        // eslint-disable-next-line obsidianmd/no-unsupported-api
         await this.app.fileManager.processFrontMatter(file, (latestFm) => {
           const latestFrontmatter = latestFm as Record<string, unknown>;
           for (const [k, v] of Object.entries(engineValueChanges)) {
@@ -536,6 +527,7 @@ export default class MetadataValidatorPlugin extends Plugin {
           ? schema.formatting.property_order
           : Object.keys(schema.fields);
         if (effectiveOrder2.length) {
+          // eslint-disable-next-line obsidianmd/no-unsupported-api
           await this.app.fileManager.processFrontMatter(file, (latestFm) => {
             const latestFrontmatter = latestFm as Record<string, unknown>;
             const keys = Object.keys(latestFrontmatter);
@@ -615,9 +607,7 @@ export default class MetadataValidatorPlugin extends Plugin {
     warnings: number;
     issues: ValidationResult[];
   } | null> {
-    const frontmatter = sanitizeFrontmatter(
-      this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined
-    );
+    const frontmatter = sanitizeFrontmatter(this.app.metadataCache.getFileCache(file)?.frontmatter);
     const schema = this.resolver.resolveForNote(file, frontmatter);
     if (!schema) return null;
 
@@ -747,12 +737,14 @@ export default class MetadataValidatorPlugin extends Plugin {
   private async activateSidebarPanel(): Promise<void> {
     const existing = this.app.workspace.getLeavesOfType(SIDEBAR_PANEL_TYPE);
     if (existing.length > 0) {
+      // eslint-disable-next-line obsidianmd/no-unsupported-api
       await this.app.workspace.revealLeaf(existing[0] as WorkspaceLeaf);
       return;
     }
     const leaf = this.app.workspace.getRightLeaf(false);
     if (!leaf) return;
     await leaf.setViewState({ type: SIDEBAR_PANEL_TYPE });
+    // eslint-disable-next-line obsidianmd/no-unsupported-api
     await this.app.workspace.revealLeaf(leaf);
   }
 
@@ -760,9 +752,7 @@ export default class MetadataValidatorPlugin extends Plugin {
   private openPropertiesForActiveFile(): void {
     const file = this.app.workspace.getActiveFile();
     if (!file) return;
-    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as
-      | Record<string, unknown>
-      | undefined;
+    const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
     const schema = this.resolver.resolveForNote(file, fm ?? {});
     if (!schema) {
       new Notice("No schema matches this note.");
@@ -779,9 +769,7 @@ export default class MetadataValidatorPlugin extends Plugin {
   }
 
   async openSchemaEditor(manifestPath: string | null): Promise<void> {
-    const { SchemaEditorModal } = (await import("./ui/schema-editor-modal")) as {
-      SchemaEditorModal: typeof SchemaEditorModalType;
-    };
+    const { SchemaEditorModal } = await import("./ui/schema-editor-modal");
 
     let path = manifestPath;
     let data = {};

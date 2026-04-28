@@ -1,7 +1,7 @@
 import type { TFile } from "obsidian";
 import { App, Modal } from "obsidian";
 import { resolveSource } from "../schema/source-resolver";
-import type { FieldOption, FieldSource, ManifestField, ResolvedSchema } from "../types";
+import type { FieldOption, ManifestField, ResolvedSchema } from "../types";
 
 type SelectionMode = "select" | "multiselect";
 
@@ -69,7 +69,7 @@ export class PickerModal extends Modal {
       return resolveSource(this.field.source, this.app, this.file);
     }
     if (this.field.options && !Array.isArray(this.field.options)) {
-      const src = (this.field.options as { source: FieldSource }).source;
+      const src = this.field.options.source;
       if (src) return resolveSource(src, this.app, this.file);
     }
     return [];
@@ -82,7 +82,7 @@ export class PickerModal extends Modal {
 
     const header = contentEl.createDiv("mv-picker-header");
     header.createEl("strong", { text: this.fieldKey });
-    header.createEl("span", {
+    header.createSpan({
       text: ` · ${this.field.type}${this.field.required === true ? " · required" : ""}`,
       cls: "mv-picker-meta",
     });
@@ -297,9 +297,9 @@ export class PickerModal extends Modal {
         cls: isSelected ? "mv-picker-option is-selected" : "mv-picker-option",
       });
 
-      item.createEl("span", { text: opt.label ?? opt.value });
+      item.createSpan({ text: opt.label ?? opt.value });
       if (opt.label && opt.label !== opt.value) {
-        item.createEl("span", { text: opt.value, cls: "mv-picker-value-hint" });
+        item.createSpan({ text: opt.value, cls: "mv-picker-value-hint" });
       }
 
       item.addEventListener("click", () => {
@@ -320,11 +320,11 @@ export class PickerModal extends Modal {
         if (group.options.length === 0) continue;
         const section = listEl.createDiv("mv-picker-group");
         const header = section.createDiv("mv-picker-group-header");
-        header.createEl("span", {
+        header.createSpan({
           text: group.label || "Options",
           cls: "mv-picker-group-title",
         });
-        header.createEl("span", {
+        header.createSpan({
           text: group.type,
           cls: "mv-picker-group-type",
         });
@@ -372,6 +372,7 @@ export class PickerModal extends Modal {
   private persistSelection(): void {
     const key = this.fieldKey;
 
+    // eslint-disable-next-line obsidianmd/no-unsupported-api
     void this.app.fileManager
       .processFrontMatter(this.file, (fm: Record<string, unknown>) => {
         const isStrict = this.field.strict !== false;

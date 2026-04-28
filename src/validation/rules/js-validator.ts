@@ -33,7 +33,7 @@ export async function runJsValidator(
   }
 
   const timeoutPromise = new Promise<ValidationResult>((resolve) =>
-    setTimeout(
+    activeWindow.setTimeout(
       () =>
         resolve({
           field,

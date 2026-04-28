@@ -30,10 +30,12 @@ export class BasesDecorator {
 
   attach(): void {
     this.boundHandler = (e: MouseEvent) => this.onClick(e);
-    document.body.addEventListener("click", this.boundHandler, { capture: true });
+    activeDocument.body.addEventListener("click", this.boundHandler, { capture: true });
 
     this.boundContextHandler = (e: MouseEvent) => this.onContextMenu(e);
-    document.body.addEventListener("contextmenu", this.boundContextHandler, { capture: true });
+    activeDocument.body.addEventListener("contextmenu", this.boundContextHandler, {
+      capture: true,
+    });
 
     // Intercept right-click mousedown at WINDOW level (above document in the capture chain).
     // Bases is a built-in plugin loaded before us, so its document-level capture handlers
@@ -47,11 +49,13 @@ export class BasesDecorator {
 
   detach(): void {
     if (this.boundHandler) {
-      document.body.removeEventListener("click", this.boundHandler, { capture: true });
+      activeDocument.body.removeEventListener("click", this.boundHandler, { capture: true });
       this.boundHandler = null;
     }
     if (this.boundContextHandler) {
-      document.body.removeEventListener("contextmenu", this.boundContextHandler, { capture: true });
+      activeDocument.body.removeEventListener("contextmenu", this.boundContextHandler, {
+        capture: true,
+      });
       this.boundContextHandler = null;
     }
     if (this.boundMouseDownHandler) {
@@ -139,7 +143,7 @@ export class BasesDecorator {
     // Bases may have started an inline edit session on mousedown (before contextmenu fired).
     // Dispatching Escape to any focused element inside the Bases view cancels that session
     // without committing the old value — exactly as if the user pressed Escape themselves.
-    const focused = document.activeElement as HTMLElement | null;
+    const focused = activeDocument.activeElement as HTMLElement | null;
     if (focused?.closest(".bases-view")) {
       focused.dispatchEvent(
         new KeyboardEvent("keydown", {
@@ -205,6 +209,7 @@ export class BasesDecorator {
           } else if (seenCorrect) {
             // Value was correct but has been overwritten (Bases committed old value).
             cleanup();
+            // eslint-disable-next-line obsidianmd/no-unsupported-api
             void app.fileManager.processFrontMatter(file, (latestFm) => {
               const latestFrontmatter = latestFm as Record<string, unknown>;
               latestFrontmatter[fieldKey] = savedValue;
