@@ -3,7 +3,7 @@ import type { ValidationResult } from "../types";
 
 export const SIDEBAR_PANEL_TYPE = "mv-sidebar-panel";
 
-export interface VaultStats {
+interface VaultStats {
   total: number;
   errors: number;
   warnings: number;
@@ -162,8 +162,8 @@ export class SidebarPanel extends ItemView {
 
     for (const row of rows) {
       const rowEl = section.createDiv("mv-stat-row");
-      rowEl.createEl("span", { text: String(row.count), cls: `mv-stat-count ${row.cls}` });
-      rowEl.createEl("span", { text: " " + row.label, cls: "mv-stat-label" });
+      rowEl.createSpan({ text: String(row.count), cls: `mv-stat-count ${row.cls}` });
+      rowEl.createSpan({ text: " " + row.label, cls: "mv-stat-label" });
     }
 
     section.createDiv({
@@ -191,7 +191,7 @@ export class SidebarPanel extends ItemView {
 
     if (errors.length === 0 && warnings.length === 0) {
       const ok = container.createDiv("mv-sidebar-ok");
-      ok.createEl("span", { text: "✓ " });
+      ok.createSpan({ text: "✓ " });
       ok.appendText(
         autoFixed.length > 0 ? `all valid, auto-fixed: ${autoFixed.length}` : "all valid"
       );
@@ -251,8 +251,8 @@ export class SidebarPanel extends ItemView {
       });
 
       const summary = details.createEl("summary", { cls: "mv-vault-group-summary" });
-      summary.createEl("span", { text: group.manifestName, cls: "mv-vault-group-title" });
-      summary.createEl("span", {
+      summary.createSpan({ text: group.manifestName, cls: "mv-vault-group-title" });
+      summary.createSpan({
         text: `${group.reports.length} notes · ${group.errors} errors · ${group.warnings} warnings`,
         cls: "mv-vault-group-meta",
       });
@@ -272,7 +272,7 @@ export class SidebarPanel extends ItemView {
 
         const noteErrors = note.results.filter((result) => result.severity === "error").length;
         const noteWarnings = note.results.filter((result) => result.severity === "warning").length;
-        noteHeader.createEl("span", {
+        noteHeader.createSpan({
           text: `${noteErrors} / ${noteWarnings}`,
           cls: "mv-vault-note-meta",
         });
@@ -288,12 +288,12 @@ export class SidebarPanel extends ItemView {
 
   private renderIssueRow(container: HTMLElement, result: ValidationResult, rowClass: string): void {
     const row = container.createDiv(rowClass);
-    row.createEl("span", {
+    row.createSpan({
       text: result.severity === "error" ? "⚠ " : "ℹ ",
       cls: result.severity === "error" ? "mv-error" : "mv-warning",
     });
     row.createEl("strong", { text: result.field + ": " });
-    row.createEl("span", { text: result.message });
+    row.createSpan({ text: result.message });
   }
 
   private groupVaultIssuesByManifest(reports: VaultIssueNote[]): VaultIssueGroup[] {
