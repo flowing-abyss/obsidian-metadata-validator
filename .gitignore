@@ -1,5 +1,5 @@
 # vscode
-.vscode 
+.vscode
 
 # Intellij
 *.iml
@@ -24,6 +24,10 @@ data.json
 # Internal docs (specs, plans) — not part of distributed plugin
 docs/
 .superpowers/
+
+.pi/
+.pi-lens/
+progress.md
 
 # Test vault — keep schemas and notes, ignore Obsidian workspace state and compiled plugin
 test-vault/.obsidian/workspace
