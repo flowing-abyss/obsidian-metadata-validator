@@ -68,6 +68,13 @@ describe("checkLinkExists", () => {
     expect(checkLinkExists("authors", ["Alice", "Bob"], app, PATH, SOURCE)).toBeNull();
   });
 
+  it("returns error when wikilink target is empty after stripping", () => {
+    const app = makeApp({});
+    const r = checkLinkExists("author", "[[|]]", app, PATH, SOURCE);
+    expect(r?.rule).toBe("link-exists");
+    expect(r?.message).toContain("author");
+  });
+
   it("includes field name and manifestPath in the result", () => {
     const app = makeApp({});
     const r = checkLinkExists("creator", "Unknown", app, PATH, SOURCE);

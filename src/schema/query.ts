@@ -101,8 +101,6 @@ function evaluateBaseTerm(
   fileTags: string[],
   frontmatter: Record<string, unknown>
 ): boolean {
-  if (!raw) return false;
-
   // Strip optional outer parentheses
   let term = raw;
   if (term.startsWith("(") && term.endsWith(")")) {
