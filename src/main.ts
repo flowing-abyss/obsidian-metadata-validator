@@ -1,4 +1,13 @@
-import { Menu, Notice, Plugin, TFile, WorkspaceLeaf, stringifyYaml } from "obsidian";
+import {
+  Menu,
+  MenuItem,
+  Notice,
+  Plugin,
+  TAbstractFile,
+  TFile,
+  WorkspaceLeaf,
+  stringifyYaml,
+} from "obsidian";
 import { ManifestCache } from "./manifest/cache";
 import { SchemaResolver } from "./schema/resolver";
 import { DEFAULT_SETTINGS, MetadataValidatorSettingTab, type PluginSettings } from "./settings";
@@ -135,8 +144,8 @@ export default class MetadataValidatorPlugin extends Plugin {
 
       // Register vault event watchers
       this.registerEvent(
-        this.app.vault.on("modify", async (file: TFile) => {
-          if (file.basename === "manifest" && file.extension === "md") {
+        this.app.vault.on("modify", async (file: TAbstractFile) => {
+          if (file instanceof TFile && file.basename === "manifest" && file.extension === "md") {
             await this.cache.refresh(file);
             this.resolver.rebuild();
             this.settingTab.refreshTree();
@@ -168,8 +177,8 @@ export default class MetadataValidatorPlugin extends Plugin {
       );
 
       this.registerEvent(
-        this.app.vault.on("delete", (file: TFile) => {
-          if (file.basename === "manifest" && file.extension === "md") {
+        this.app.vault.on("delete", (file: TAbstractFile) => {
+          if (file instanceof TFile && file.basename === "manifest" && file.extension === "md") {
             this.cache.delete(file.path);
             this.resolver.rebuild();
           }
@@ -197,7 +206,7 @@ export default class MetadataValidatorPlugin extends Plugin {
 
       // Context menu
       this.registerEvent(
-        this.app.workspace.on("file-menu", (menu, file: TFile, source: string) => {
+        this.app.workspace.on("file-menu", (menu: Menu, file: TAbstractFile, source: string) => {
           // editor-menu fires alongside file-menu in editor context — skip to avoid duplicates.
           // In non-editor views (Bases, file explorer), editor-menu never fires, so we must not skip.
           // Exception: links inside embedded Bases views (![[*.base]]) set _contextMenuFromBases — we
@@ -213,7 +222,7 @@ export default class MetadataValidatorPlugin extends Plugin {
             return;
 
           // On manifest.md files — offer schema editor
-          if (file.basename === "manifest" && file.extension === "md") {
+          if (file instanceof TFile && file.basename === "manifest" && file.extension === "md") {
             menu.addItem((item) =>
               item
                 .setTitle("Edit schema")
@@ -223,7 +232,7 @@ export default class MetadataValidatorPlugin extends Plugin {
             return;
           }
 
-          if (file.extension !== "md") return;
+          if (!(file instanceof TFile) || file.extension !== "md") return;
 
           menu.addItem((item) =>
             item

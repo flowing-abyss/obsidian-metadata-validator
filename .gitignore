@@ -27,6 +27,7 @@ docs/
 
 .pi/
 .pi-lens/
+.forge/
 progress.md
 
 # Test vault — keep schemas and notes, ignore Obsidian workspace state and compiled plugin
