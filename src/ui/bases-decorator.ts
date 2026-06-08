@@ -229,7 +229,8 @@ export class BasesDecorator {
             freshFm[capturedFieldKey],
             capturedSchema,
             capturedFile,
-            buildOnSaved(capturedFieldKey, capturedFile)
+            buildOnSaved(capturedFieldKey, capturedFile),
+            this.settings.enableJsExecution
           ).open();
         });
       } else {
@@ -308,7 +309,9 @@ export class BasesDecorator {
           fieldDef,
           frontmatter[fieldKey],
           schema,
-          file
+          file,
+          undefined,
+          this.settings.enableJsExecution
         ).open();
       });
     } else {

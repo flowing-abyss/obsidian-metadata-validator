@@ -261,7 +261,16 @@ export class PropertyDecorator {
           unknown
         >;
         void import("./picker-modal").then((mod: { PickerModal: typeof PickerModalType }) => {
-          new mod.PickerModal(this.app, fieldKey, fieldDef, fresh[fieldKey], schema, file).open();
+          new mod.PickerModal(
+            this.app,
+            fieldKey,
+            fieldDef,
+            fresh[fieldKey],
+            schema,
+            file,
+            undefined,
+            this.settings.enableJsExecution
+          ).open();
         });
       });
     } else if (fieldDef.type === "boolean") {

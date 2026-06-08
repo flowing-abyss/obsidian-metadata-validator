@@ -1,5 +1,6 @@
 import type { App, TFile } from "obsidian";
 import type { ManifestField, ResolvedSchema, ValidationResult } from "../types";
+import type { PluginSettings } from "../settings";
 import { applyAutoFix } from "./auto-fix";
 import { checkRequired } from "./rules/required";
 import { checkOptions } from "./rules/options";
@@ -12,9 +13,11 @@ import { resolveSource } from "../schema/source-resolver";
 
 export class ValidationEngine {
   private readonly app: App;
+  private readonly settings: Pick<PluginSettings, "enableJsExecution">;
 
-  constructor(app: App) {
+  constructor(app: App, settings: Pick<PluginSettings, "enableJsExecution">) {
     this.app = app;
+    this.settings = settings;
   }
 
   async validate(
@@ -103,7 +106,13 @@ export class ValidationEngine {
         } else if (field.strict !== false) {
           // Dynamic options + strict mode: resolve the source to validate against it
           const src = field.options.source;
-          if (src) resolvedOptions = await resolveSource(src, this.app, file);
+          if (src)
+            resolvedOptions = await resolveSource(
+              src,
+              this.app,
+              file,
+              this.settings.enableJsExecution
+            );
         }
         if (resolvedOptions) {
           const r = checkOptions(
@@ -129,7 +138,12 @@ export class ValidationEngine {
     }
 
     if ((field.type === "link" || field.type === "multilink") && field.source) {
-      const allowedOptions = await resolveSource(field.source, this.app, file);
+      const allowedOptions = await resolveSource(
+        field.source,
+        this.app,
+        file,
+        this.settings.enableJsExecution
+      );
       const r = checkLinkSource(fieldName, value, allowedOptions, manifestPath);
       if (r) results.push(r);
     }
@@ -146,7 +160,8 @@ export class ValidationEngine {
         field.validate.js,
         this.app,
         file,
-        manifestPath
+        manifestPath,
+        this.settings.enableJsExecution
       );
       if (r) results.push(r);
     }

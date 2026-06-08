@@ -13,6 +13,7 @@ export interface PluginSettings {
   showFileExplorerBadges: boolean;
   interceptBases: boolean;
   showBasesErrors: boolean;
+  enableJsExecution: boolean;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   showFileExplorerBadges: true,
   interceptBases: true,
   showBasesErrors: true,
+  enableJsExecution: false,
 };
 
 export class MetadataValidatorSettingTab extends PluginSettingTab {
@@ -155,6 +157,20 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
           (
             this.plugin as unknown as { toggleBasesValidator?: (v: boolean) => void }
           ).toggleBasesValidator?.(v);
+        })
+      );
+
+    new Setting(containerEl).setName("Security").setHeading();
+
+    new Setting(containerEl)
+      .setName("Allow JavaScript execution")
+      .setDesc(
+        "Enables custom JavaScript sources and validators in schemas. Warning: this executes JavaScript code written in your schema files. Only enable if you trust the code in your vault."
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.enableJsExecution).onChange(async (v) => {
+          this.plugin.settings.enableJsExecution = v;
+          await this.plugin.saveSettings();
         })
       );
 

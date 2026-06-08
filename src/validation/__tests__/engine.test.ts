@@ -91,7 +91,7 @@ const JS_SCHEMA: ResolvedSchema = {
 describe("ValidationEngine", () => {
   it("auto-inserts null for required field that is absent (no error shown)", async () => {
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: false });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter: Record<string, unknown> = { rating: 3 };
 
@@ -107,7 +107,7 @@ describe("ValidationEngine", () => {
 
   it("returns error for value not in options", async () => {
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter = { status: "draft", rating: 3 };
 
@@ -118,7 +118,7 @@ describe("ValidationEngine", () => {
 
   it("applies auto-fix for fixed field and marks autoFixed", async () => {
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter: Record<string, unknown> = {
       status: "reading",
@@ -134,7 +134,7 @@ describe("ValidationEngine", () => {
 
   it("returns no errors for fully valid frontmatter", async () => {
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter = { status: "reading", rating: 4, icon: "📚" };
 
@@ -161,7 +161,7 @@ describe("ValidationEngine", () => {
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter: Record<string, unknown> = {};
 
@@ -172,7 +172,7 @@ describe("ValidationEngine", () => {
 
   it("validates date format when field type is date", async () => {
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Events/A.md", basename: "A" } as TFile;
     const frontmatter = { date: "not-a-date" };
 
@@ -184,7 +184,7 @@ describe("ValidationEngine", () => {
 
   it("validates link source and existence for link fields", async () => {
     const app = makeAppWithFiles([{ path: "People/Alice.md", basename: "Alice" }]);
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter = { author: "Bob" };
 
@@ -197,7 +197,7 @@ describe("ValidationEngine", () => {
 
   it("accepts valid link values", async () => {
     const app = makeAppWithFiles([{ path: "People/Alice.md", basename: "Alice" }]);
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter = { author: "Alice" };
 
@@ -208,7 +208,7 @@ describe("ValidationEngine", () => {
 
   it("runs JS validator when field.validate.js is set", async () => {
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Custom/A.md", basename: "A" } as TFile;
     const frontmatter = { value: "bad" };
 
@@ -220,7 +220,7 @@ describe("ValidationEngine", () => {
 
   it("passes JS validator when value is valid", async () => {
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Custom/A.md", basename: "A" } as TFile;
     const frontmatter = { value: "ok" };
 
@@ -246,7 +246,7 @@ describe("ValidationEngine", () => {
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter = { status: "whatever" };
 
@@ -271,7 +271,7 @@ describe("ValidationEngine", () => {
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter = { status: "whatever" };
 
@@ -296,7 +296,7 @@ describe("ValidationEngine", () => {
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter = { status: "whatever" };
 
@@ -319,7 +319,7 @@ describe("ValidationEngine", () => {
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter: Record<string, unknown> = { z: 1, a: 2 };
 
@@ -344,7 +344,7 @@ describe("ValidationEngine", () => {
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter: Record<string, unknown> = { a: 1, z: 2 };
 
@@ -364,7 +364,7 @@ describe("ValidationEngine", () => {
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter: Record<string, unknown> = { a: 1 };
 
@@ -390,7 +390,7 @@ describe("ValidationEngine", () => {
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter: Record<string, unknown> = { status: [] };
 
@@ -414,7 +414,7 @@ describe("ValidationEngine", () => {
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter = { count: 999 };
 
@@ -425,7 +425,7 @@ describe("ValidationEngine", () => {
 
   it("returns no date error for valid date", async () => {
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Events/A.md", basename: "A" } as TFile;
     const frontmatter = { date: "2024-03-15" };
 
@@ -436,7 +436,7 @@ describe("ValidationEngine", () => {
 
   it("returns error when number is outside min/max range", async () => {
     const app = makeApp();
-    const engine = new ValidationEngine(app);
+    const engine = new ValidationEngine(app, { enableJsExecution: true });
     const file = { path: "Books/A.md", basename: "A" } as TFile;
     const frontmatter = { status: "reading", rating: 10 };
 
@@ -444,5 +444,18 @@ describe("ValidationEngine", () => {
     const range = results.find((r) => r.rule === "number-range");
     expect(range).toBeDefined();
     expect(range?.field).toBe("rating");
+  });
+
+  it("skips JS validator when enableJsExecution is false", async () => {
+    const app = makeApp();
+    const engine = new ValidationEngine(app, { enableJsExecution: false });
+    const file = { path: "Custom/A.md", basename: "A" } as TFile;
+    const frontmatter = { value: "bad" };
+
+    const results = await engine.validate(file, frontmatter, JS_SCHEMA);
+    const jsResult = results.find((r) => r.rule === "js-validator");
+    expect(jsResult).toBeDefined();
+    expect(jsResult?.severity).toBe("warning");
+    expect(jsResult?.message).toContain("JS validation disabled");
   });
 });

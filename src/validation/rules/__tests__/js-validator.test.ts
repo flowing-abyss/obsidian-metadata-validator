@@ -32,7 +32,8 @@ describe("runJsValidator", () => {
       "return true;",
       makeApp(),
       makeFile("Notes/A.md"),
-      MANIFEST
+      MANIFEST,
+      true
     );
     expect(result).toBeNull();
   });
@@ -44,7 +45,8 @@ describe("runJsValidator", () => {
       'return "Custom error";',
       makeApp(),
       makeFile("Notes/A.md"),
-      MANIFEST
+      MANIFEST,
+      true
     );
     expect(result).not.toBeNull();
     expect(result?.severity).toBe("error");
@@ -59,7 +61,8 @@ describe("runJsValidator", () => {
       "return false;",
       makeApp(),
       makeFile("Notes/A.md"),
-      MANIFEST
+      MANIFEST,
+      true
     );
     expect(result?.message).toBe('"custom" failed custom JS validation.');
   });
@@ -71,7 +74,8 @@ describe("runJsValidator", () => {
       "return 42;",
       makeApp(),
       makeFile("Notes/A.md"),
-      MANIFEST
+      MANIFEST,
+      true
     );
     expect(result?.message).toBe('"custom" failed custom JS validation.');
   });
@@ -83,7 +87,8 @@ describe("runJsValidator", () => {
       'throw new Error("boom");',
       makeApp(),
       makeFile("Notes/A.md"),
-      MANIFEST
+      MANIFEST,
+      true
     );
     expect(result?.severity).toBe("error");
     expect(result?.message).toContain("boom");
@@ -105,7 +110,8 @@ describe("runJsValidator", () => {
       code,
       makeApp(dv),
       makeFile("Notes/A.md"),
-      MANIFEST
+      MANIFEST,
+      true
     );
     expect(result).toBeNull();
   });
@@ -118,7 +124,8 @@ describe("runJsValidator", () => {
       "return true;",
       makeApp(dv),
       makeFile("Notes/A.md"),
-      MANIFEST
+      MANIFEST,
+      true
     );
     expect(result).toBeNull();
   });
@@ -135,7 +142,8 @@ describe("runJsValidator", () => {
       "return true;",
       makeApp(dv),
       makeFile("Notes/A.md"),
-      MANIFEST
+      MANIFEST,
+      true
     );
     expect(result).toBeNull();
   });
@@ -152,7 +160,8 @@ describe("runJsValidator", () => {
       "return true;",
       app,
       makeFile("Notes/A.md"),
-      MANIFEST
+      MANIFEST,
+      true
     );
     expect(result).toBeNull();
   });
@@ -165,7 +174,8 @@ describe("runJsValidator", () => {
       "return new Promise(() => {})",
       makeApp(),
       makeFile("Notes/A.md"),
-      MANIFEST
+      MANIFEST,
+      true
     );
     vi.advanceTimersByTime(3000);
     const result = await promise;
@@ -175,6 +185,22 @@ describe("runJsValidator", () => {
     expect(result?.field).toBe(FIELD);
     expect(result?.manifestPath).toBe(MANIFEST);
     expect(result?.autoFixed).toBe(false);
+    expect(result?.rule).toBe("js-validator");
+  });
+
+  it("returns warning when JS execution is disabled", async () => {
+    const result = await runJsValidator(
+      FIELD,
+      VALUE,
+      "return true;",
+      makeApp(),
+      makeFile("Notes/A.md"),
+      MANIFEST,
+      false
+    );
+    expect(result).not.toBeNull();
+    expect(result?.severity).toBe("warning");
+    expect(result?.message).toContain("JS validation disabled");
     expect(result?.rule).toBe("js-validator");
   });
 });

@@ -1,7 +1,6 @@
 import type { App, TFile } from "obsidian";
 import type { ValidationResult } from "../../types";
-
-const JS_TIMEOUT_MS = 2000;
+import { executeJsValidator, JsDisabledError } from "../../utils/js-exec";
 
 export async function runJsValidator(
   field: string,
@@ -9,7 +8,8 @@ export async function runJsValidator(
   jsCode: string,
   app: App,
   currentFile: TFile,
-  manifestPath: string
+  manifestPath: string,
+  enableJs = false
 ): Promise<ValidationResult | null> {
   const appRecord = app as unknown as Record<string, unknown>;
   const pluginManager = appRecord["plugins"] as Record<string, unknown> | undefined;
@@ -32,52 +32,53 @@ export async function runJsValidator(
     }
   }
 
-  const timeoutPromise = new Promise<ValidationResult>((resolve) =>
-    activeWindow.setTimeout(
-      () =>
-        resolve({
-          field,
-          severity: "error",
-          message: `"${field}" JS validator timed out after ${JS_TIMEOUT_MS}ms.`,
-          rule: "js-validator",
-          manifestPath,
-          autoFixed: false,
-        }),
-      JS_TIMEOUT_MS
-    )
-  );
-
-  const runPromise = (async (): Promise<ValidationResult | null> => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-implied-eval -- Intentional: executes user-provided JS code for custom validation rules. Users opt-in by writing JS in their schema.
-      const fn = new Function("app", "dv", "currentFile", "currentPage", "value", jsCode) as (
-        app: App,
-        dv: unknown,
-        currentFile: TFile,
-        currentPage: unknown,
-        value: unknown
-      ) => unknown;
-      const result: unknown = await fn(app, dv, currentFile, currentPage, value);
-      if (result === true) return null;
+  try {
+    const result: unknown = await executeJsValidator(
+      jsCode,
+      app,
+      dv,
+      currentFile,
+      currentPage,
+      value,
+      enableJs
+    );
+    if (result === true) return null;
+    return {
+      field,
+      severity: "error",
+      message: typeof result === "string" ? result : `"${field}" failed custom JS validation.`,
+      rule: "js-validator",
+      manifestPath,
+      autoFixed: false,
+    };
+  } catch (e) {
+    if (e instanceof JsDisabledError) {
       return {
         field,
-        severity: "error",
-        message: typeof result === "string" ? result : `"${field}" failed custom JS validation.`,
-        rule: "js-validator",
-        manifestPath,
-        autoFixed: false,
-      };
-    } catch (e) {
-      return {
-        field,
-        severity: "error",
-        message: `"${field}" JS validator threw: ${String(e)}`,
+        severity: "warning",
+        message: `JS validation disabled. Enable "Allow JavaScript execution" in settings to run "${field}" validator.`,
         rule: "js-validator",
         manifestPath,
         autoFixed: false,
       };
     }
-  })();
-
-  return Promise.race([runPromise, timeoutPromise]);
+    if (e instanceof Error && e.message === "JS validator timed out") {
+      return {
+        field,
+        severity: "error",
+        message: `"${field}" JS validator timed out after 2000ms.`,
+        rule: "js-validator",
+        manifestPath,
+        autoFixed: false,
+      };
+    }
+    return {
+      field,
+      severity: "error",
+      message: `"${field}" JS validator threw: ${String(e)}`,
+      rule: "js-validator",
+      manifestPath,
+      autoFixed: false,
+    };
+  }
 }

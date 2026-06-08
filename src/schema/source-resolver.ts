@@ -1,14 +1,16 @@
 import type { App, TFile } from "obsidian";
 import type { FieldOption, FieldSource } from "../types";
+import { executeJsSource, JsDisabledError } from "../utils/js-exec";
 import { evaluateQuery } from "./query";
 
 export async function resolveSource(
   source: FieldSource,
   app: App,
-  currentFile: TFile | null
+  currentFile: TFile | null,
+  enableJs = false
 ): Promise<FieldOption[]> {
   if (source.js) {
-    return resolveJsSource(source.js, app, currentFile);
+    return resolveJsSource(source.js, app, currentFile, enableJs);
   }
 
   const files = app.vault.getMarkdownFiles();
@@ -155,7 +157,8 @@ function toArray(result: unknown): unknown[] {
 async function resolveJsSource(
   code: string,
   app: App,
-  currentFile: TFile | null
+  currentFile: TFile | null,
+  enableJs: boolean
 ): Promise<FieldOption[]> {
   const appRecord = app as unknown as Record<string, unknown>;
   // DataView API lives at app.plugins.plugins.dataview.api
@@ -180,14 +183,14 @@ async function resolveJsSource(
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval -- Intentional: executes user-provided JS code for custom data sources. Users opt-in by writing JS in their schema.
-    const fn = new Function("app", "dv", "currentFile", "currentPage", code) as (
-      app: App,
-      dv: unknown,
-      currentFile: TFile | null,
-      currentPage: unknown
-    ) => unknown;
-    const result: unknown = await fn(app, dv, currentFile, currentPage);
+    const result: unknown = await executeJsSource(
+      code,
+      app,
+      dv,
+      currentFile,
+      currentPage,
+      enableJs
+    );
     // dv.pages() returns a DataArray (not a plain Array) — convert any iterable.
     const items = toArray(result);
     if (items.length === 0) return [];
@@ -209,6 +212,10 @@ async function resolveJsSource(
     }
     return out;
   } catch (e) {
+    if (e instanceof JsDisabledError) {
+      console.warn("[MetadataValidator] JS source skipped: enableJsExecution is disabled.");
+      return [];
+    }
     console.error("[MetadataValidator] Error in JS source:", e, "\nCode:", code);
     return [];
   }

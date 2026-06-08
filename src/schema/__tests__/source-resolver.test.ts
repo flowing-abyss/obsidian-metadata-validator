@@ -53,7 +53,7 @@ describe("resolveSource", () => {
       { path: "Books/Dune.md", tags: [], fm: {} },
     ]);
 
-    const result = await resolveSource({ folder: "People/" }, app, null);
+    const result = await resolveSource({ folder: "People/" }, app, null, true);
     expect(result.map((r) => r.value).sort()).toEqual(["Alice", "Bob"]);
   });
 
@@ -63,7 +63,7 @@ describe("resolveSource", () => {
       { path: "Notes/B.md", tags: ["#book"], fm: {} },
     ]);
 
-    const result = await resolveSource({ tag: "#person" }, app, null);
+    const result = await resolveSource({ tag: "#person" }, app, null, true);
     expect(result.map((r) => r.value)).toEqual(["A"]);
   });
 
@@ -77,7 +77,7 @@ describe("resolveSource", () => {
       { path: "People/Bob.md", tags: [], fm: { type: "org" } },
     ]);
 
-    const result = await resolveSource({ property: { type: "person" } }, app, null);
+    const result = await resolveSource({ property: { type: "person" } }, app, null, true);
     expect(result.map((r) => r.value)).toEqual(["Alice"]);
   });
 
@@ -91,7 +91,8 @@ describe("resolveSource", () => {
     const result = await resolveSource(
       { folder: "People/", property: { type: "person" } },
       app,
-      null
+      null,
+      true
     );
     expect(result.map((r) => r.value)).toEqual(["Alice"]);
   });
@@ -122,7 +123,8 @@ describe("resolveSource", () => {
         `,
       },
       app,
-      null
+      null,
+      true
     );
 
     expect(result).toEqual([
@@ -155,7 +157,8 @@ describe("resolveSource", () => {
         `,
       },
       app,
-      null
+      null,
+      true
     );
 
     expect(result).toEqual([
@@ -175,14 +178,14 @@ describe("resolveSource", () => {
       { path: "Notes/B.md", tags: ["#book"], fm: {} },
     ]);
 
-    const result = await resolveSource({ query: "#article" }, app, null);
+    const result = await resolveSource({ query: "#article" }, app, null, true);
     expect(result.map((r) => r.value)).toEqual(["A"]);
   });
 
   it("returns empty array when source has no matching conditions", async () => {
     const app = makeApp([{ path: "Notes/A.md", tags: [], fm: {} }]);
 
-    const result = await resolveSource({}, app, null);
+    const result = await resolveSource({}, app, null, true);
     expect(result).toEqual([]);
   });
 
@@ -190,7 +193,7 @@ describe("resolveSource", () => {
     const app = makeAppWithDataview([]);
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const result = await resolveSource({ js: "throw new Error('bad')" }, app, null);
+    const result = await resolveSource({ js: "throw new Error('bad')" }, app, null, true);
     expect(result).toEqual([]);
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();
@@ -204,7 +207,8 @@ describe("resolveSource", () => {
         js: `return ["a", "b", "c"];`,
       },
       app,
-      null
+      null,
+      true
     );
 
     expect(result).toEqual([
@@ -222,7 +226,8 @@ describe("resolveSource", () => {
         js: `return "just a string";`,
       },
       app,
-      null
+      null,
+      true
     );
 
     expect(result).toEqual([]);
@@ -236,7 +241,8 @@ describe("resolveSource", () => {
         js: `return new Set(["a", "b"]);`,
       },
       app,
-      null
+      null,
+      true
     );
 
     expect(result.map((r) => r.value).sort()).toEqual(["a", "b"]);
@@ -250,7 +256,8 @@ describe("resolveSource", () => {
         js: `return [{ value: 42, label: true }];`,
       },
       app,
-      null
+      null,
+      true
     );
 
     expect(result).toEqual([{ value: "42", label: "true", group: undefined, type: undefined }]);
@@ -264,7 +271,8 @@ describe("resolveSource", () => {
         js: `return [{ value: "a", type: "unknown" }];`,
       },
       app,
-      null
+      null,
+      true
     );
 
     expect(result[0]?.type).toBeUndefined();
@@ -278,7 +286,8 @@ describe("resolveSource", () => {
         js: `return [{ label: "OnlyLabel" }];`,
       },
       app,
-      null
+      null,
+      true
     );
 
     expect(result[0]?.value).toBe("");
@@ -302,7 +311,8 @@ describe("resolveSource", () => {
     const result = await resolveSource(
       { js: `return ["a"];` },
       app as unknown as App,
-      makeTFile("Notes/A.md")
+      makeTFile("Notes/A.md"),
+      true
     );
     expect(result.map((r) => r.value)).toEqual(["a"]);
   });
@@ -315,7 +325,8 @@ describe("resolveSource", () => {
         js: `return [{ value: null, label: undefined }];`,
       },
       app,
-      null
+      null,
+      true
     );
 
     expect(result[0]?.value).toBe("");
@@ -330,7 +341,8 @@ describe("resolveSource", () => {
         js: `return [{ value: { path: "People/Alice.md" } }];`,
       },
       app,
-      null
+      null,
+      true
     );
 
     expect(result[0]?.value).toBe("Alice");
@@ -344,9 +356,20 @@ describe("resolveSource", () => {
         js: `return [{ value: { foo: "bar" } }];`,
       },
       app,
-      null
+      null,
+      true
     );
 
     expect(result[0]?.value).toBe("");
+  });
+
+  it("returns empty array when JS source is disabled", async () => {
+    const app = makeAppWithDataview([]);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await resolveSource({ js: `return ["a"];` }, app, null, false);
+    expect(result).toEqual([]);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

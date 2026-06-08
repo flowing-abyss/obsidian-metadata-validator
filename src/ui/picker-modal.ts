@@ -18,6 +18,7 @@ export class PickerModal extends Modal {
   private readonly schema: ResolvedSchema;
   private readonly file: TFile;
   private readonly onSaved: ((value: unknown) => void) | null;
+  private readonly enableJs: boolean;
   private options: FieldOption[] = [];
   // Mutable selection state — normalised values (no [[]])
   private selected: Set<string> = new Set();
@@ -33,7 +34,8 @@ export class PickerModal extends Modal {
     currentValue: unknown,
     schema: ResolvedSchema,
     file: TFile,
-    onSaved?: (value: unknown) => void
+    onSaved?: (value: unknown) => void,
+    enableJs = false
   ) {
     super(app);
     this.fieldKey = fieldKey;
@@ -41,6 +43,7 @@ export class PickerModal extends Modal {
     this.schema = schema;
     this.file = file;
     this.onSaved = onSaved ?? null;
+    this.enableJs = enableJs;
     this.initSelected(currentValue);
   }
 
@@ -66,11 +69,11 @@ export class PickerModal extends Modal {
       return this.field.options;
     }
     if (this.field.source) {
-      return resolveSource(this.field.source, this.app, this.file);
+      return resolveSource(this.field.source, this.app, this.file, this.enableJs);
     }
     if (this.field.options && !Array.isArray(this.field.options)) {
       const src = this.field.options.source;
-      if (src) return resolveSource(src, this.app, this.file);
+      if (src) return resolveSource(src, this.app, this.file, this.enableJs);
     }
     return [];
   }

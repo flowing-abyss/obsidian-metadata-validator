@@ -44,7 +44,7 @@ export default class MetadataValidatorPlugin extends Plugin {
     // Initialize all layers — but don't load vault files yet (vault not ready)
     this.cache = new ManifestCache(this.app, this.settings.schemasRoot);
     this.resolver = new SchemaResolver(this.cache);
-    this.engine = new ValidationEngine(this.app);
+    this.engine = new ValidationEngine(this.app, this.settings);
     this.cssInjector = new CssInjector(this.settings);
     this.decorator = new PropertyDecorator(this.app, this.resolver, this.engine, this.settings);
     this.badges = new ExplorerBadges();
@@ -242,7 +242,8 @@ export default class MetadataValidatorPlugin extends Plugin {
                   file,
                   schema,
                   getFields,
-                  (p) => void this.openSchemaEditor(p)
+                  (p) => void this.openSchemaEditor(p),
+                  this.settings.enableJsExecution
                 ).open();
               })
           );
@@ -342,7 +343,8 @@ export default class MetadataValidatorPlugin extends Plugin {
                   targetFile,
                   schema,
                   getFields,
-                  (p) => void this.openSchemaEditor(p)
+                  (p) => void this.openSchemaEditor(p),
+                  this.settings.enableJsExecution
                 ).open();
               })
           );
@@ -381,7 +383,8 @@ export default class MetadataValidatorPlugin extends Plugin {
                 activeFile,
                 schema,
                 getFields,
-                (p) => void this.openSchemaEditor(p)
+                (p) => void this.openSchemaEditor(p),
+                this.settings.enableJsExecution
               ).open();
             })
         );
@@ -760,7 +763,8 @@ export default class MetadataValidatorPlugin extends Plugin {
       file,
       schema,
       getFields,
-      (p) => void this.openSchemaEditor(p)
+      (p) => void this.openSchemaEditor(p),
+      this.settings.enableJsExecution
     ).open();
   }
 

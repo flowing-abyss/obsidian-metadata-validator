@@ -34,17 +34,21 @@ export class ContextMenuModal extends Modal {
   /** EventRef for metadataCache sync — unregistered on close */
   private cacheEventRef: EventRef | null = null;
 
+  private readonly enableJs: boolean;
+
   constructor(
     app: App,
     file: TFile,
     schema: ResolvedSchema,
     getManifestFields?: (path: string) => Record<string, ManifestField> | undefined,
-    openSchemaEditor?: (manifestPath: string) => void
+    openSchemaEditor?: (manifestPath: string) => void,
+    enableJs = false
   ) {
     super(app);
     this.file = file;
     this.schema = schema;
-    this.engine = new ValidationEngine(app);
+    this.enableJs = enableJs;
+    this.engine = new ValidationEngine(app, { enableJsExecution: enableJs });
     this.getManifestFields = getManifestFields ?? null;
     this.openSchemaEditor = openSchemaEditor ?? null;
   }
@@ -623,7 +627,8 @@ export class ContextMenuModal extends Modal {
       this.localFrontmatter[fieldKey],
       this.schema,
       this.file,
-      (savedValue) => this.applyLocalChange(fieldKey, savedValue)
+      (savedValue) => this.applyLocalChange(fieldKey, savedValue),
+      this.enableJs
     ).open();
   }
 
