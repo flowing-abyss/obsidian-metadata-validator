@@ -1,4 +1,4 @@
-import type { App, TFile } from "obsidian";
+import { type App, TFile } from "obsidian";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PluginSettings } from "../../settings";
 import type { ResolvedSchema, ValidationResult } from "../../types";
@@ -9,7 +9,8 @@ import { BasesValidator } from "../bases-validator";
 // ── DOM helpers ──────────────────────────────────────────────
 
 function makeFile(path: string): TFile {
-  return { path, basename: path.split("/").pop()!.replace(/\.md$/, ""), extension: "md" } as TFile;
+  const mockVault = {} as any;
+  return TFile.create__(mockVault, path);
 }
 
 function makeSchema(): ResolvedSchema {

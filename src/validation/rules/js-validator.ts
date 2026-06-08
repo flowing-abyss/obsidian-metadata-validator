@@ -49,7 +49,7 @@ export async function runJsValidator(
 
   const runPromise = (async (): Promise<ValidationResult | null> => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval -- Intentional: executes user-provided JS code for custom validation rules. Users opt-in by writing JS in their schema.
       const fn = new Function("app", "dv", "currentFile", "currentPage", "value", jsCode) as (
         app: App,
         dv: unknown,

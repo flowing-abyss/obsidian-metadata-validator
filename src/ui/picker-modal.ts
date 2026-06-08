@@ -372,7 +372,6 @@ export class PickerModal extends Modal {
   private persistSelection(): void {
     const key = this.fieldKey;
 
-    // eslint-disable-next-line obsidianmd/no-unsupported-api
     void this.app.fileManager
       .processFrontMatter(this.file, (fm: Record<string, unknown>) => {
         const isStrict = this.field.strict !== false;

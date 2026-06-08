@@ -141,16 +141,12 @@ export class BasesValidator {
       if (!filePath) continue;
 
       const file = this.app.vault.getAbstractFileByPath(filePath);
-      // Duck-type check: "extension" is present on TFile but not TFolder.
-      // Using "in" instead of instanceof so unit test plain-object mocks pass.
-      if (!file || !("extension" in file)) continue;
-      // eslint-disable-next-line obsidianmd/no-tfile-tfolder-cast
-      const tfile = file as TFile;
+      if (!file || !(file instanceof TFile)) continue;
 
-      const cache = this.app.metadataCache.getFileCache(tfile);
+      const cache = this.app.metadataCache.getFileCache(file);
       const frontmatter = sanitizeFrontmatter(cache?.frontmatter);
 
-      const schema = this.resolver.resolveForNote(tfile, frontmatter);
+      const schema = this.resolver.resolveForNote(file, frontmatter);
       if (!schema) continue;
 
       const fmHash = JSON.stringify(frontmatter);
@@ -159,7 +155,7 @@ export class BasesValidator {
       if (cached && cached.fmHash === fmHash) {
         results = cached.results;
       } else {
-        results = await this.engine.validate(tfile, frontmatter, schema);
+        results = await this.engine.validate(file, frontmatter, schema);
         this.resultCache.set(filePath, { fmHash, results });
       }
 

@@ -180,7 +180,7 @@ async function resolveJsSource(
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval -- Intentional: executes user-provided JS code for custom data sources. Users opt-in by writing JS in their schema.
     const fn = new Function("app", "dv", "currentFile", "currentPage", code) as (
       app: App,
       dv: unknown,

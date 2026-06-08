@@ -209,7 +209,6 @@ export class BasesDecorator {
           } else if (seenCorrect) {
             // Value was correct but has been overwritten (Bases committed old value).
             cleanup();
-            // eslint-disable-next-line obsidianmd/no-unsupported-api
             void app.fileManager.processFrontMatter(file, (latestFm) => {
               const latestFrontmatter = latestFm as Record<string, unknown>;
               latestFrontmatter[fieldKey] = savedValue;

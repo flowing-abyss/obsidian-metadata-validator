@@ -127,7 +127,7 @@ function evaluateBaseTerm(
       .replace(/^["']|["']$/g, "");
     const fmVal = frontmatter[key];
     return (
-      (fmVal === null || fmVal === undefined ? "" : String(fmVal)) === // eslint-disable-line @typescript-eslint/no-base-to-string
+      (fmVal === null || fmVal === undefined ? "" : String(fmVal)) === // eslint-disable-line @typescript-eslint/no-base-to-string -- frontmatter values are primitives or stringifiable
       val
     );
   }

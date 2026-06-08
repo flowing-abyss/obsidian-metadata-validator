@@ -1,13 +1,4 @@
-import {
-  Menu,
-  MenuItem,
-  Notice,
-  Plugin,
-  TAbstractFile,
-  TFile,
-  WorkspaceLeaf,
-  stringifyYaml,
-} from "obsidian";
+import { Menu, Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf, stringifyYaml } from "obsidian";
 import { ManifestCache } from "./manifest/cache";
 import { SchemaResolver } from "./schema/resolver";
 import { DEFAULT_SETTINGS, MetadataValidatorSettingTab, type PluginSettings } from "./settings";
@@ -509,7 +500,6 @@ export default class MetadataValidatorPlugin extends Plugin {
         const effectiveOrder = schema.formatting.property_order?.length
           ? schema.formatting.property_order
           : Object.keys(schema.fields);
-        // eslint-disable-next-line obsidianmd/no-unsupported-api
         await this.app.fileManager.processFrontMatter(file, (latestFm) => {
           const latestFrontmatter = latestFm as Record<string, unknown>;
           for (const [k, v] of Object.entries(engineValueChanges)) {
@@ -536,7 +526,6 @@ export default class MetadataValidatorPlugin extends Plugin {
           ? schema.formatting.property_order
           : Object.keys(schema.fields);
         if (effectiveOrder2.length) {
-          // eslint-disable-next-line obsidianmd/no-unsupported-api
           await this.app.fileManager.processFrontMatter(file, (latestFm) => {
             const latestFrontmatter = latestFm as Record<string, unknown>;
             const keys = Object.keys(latestFrontmatter);
@@ -746,14 +735,12 @@ export default class MetadataValidatorPlugin extends Plugin {
   private async activateSidebarPanel(): Promise<void> {
     const existing = this.app.workspace.getLeavesOfType(SIDEBAR_PANEL_TYPE);
     if (existing.length > 0) {
-      // eslint-disable-next-line obsidianmd/no-unsupported-api
       await this.app.workspace.revealLeaf(existing[0] as WorkspaceLeaf);
       return;
     }
     const leaf = this.app.workspace.getRightLeaf(false);
     if (!leaf) return;
     await leaf.setViewState({ type: SIDEBAR_PANEL_TYPE });
-    // eslint-disable-next-line obsidianmd/no-unsupported-api
     await this.app.workspace.revealLeaf(leaf);
   }
 

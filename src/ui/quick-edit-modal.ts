@@ -43,7 +43,6 @@ export class QuickEditModal extends Modal {
   }
 
   private save(value: unknown): void {
-    // eslint-disable-next-line obsidianmd/no-unsupported-api
     void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
       if (value === null || value === undefined) {
         delete fm[this.fieldKey];

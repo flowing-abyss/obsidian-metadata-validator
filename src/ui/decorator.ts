@@ -244,8 +244,7 @@ export class PropertyDecorator {
     const iconName = FIELD_TYPE_ICON[fieldDef.type] ?? "square";
     const isPicker = PICKER_TYPES.has(fieldDef.type);
 
-    // eslint-disable-next-line obsidianmd/prefer-create-el
-    const btn = activeDocument.createElement("button");
+    const btn = row.createEl("button");
     btn.setAttribute(PICKER_ATTR, "true");
     btn.setAttribute(PICKER_CONTEXT_ATTR, pickerContext);
     btn.setAttribute("aria-label", fieldDef.type);
@@ -274,7 +273,6 @@ export class PropertyDecorator {
           unknown
         >;
         const newVal = fresh[fieldKey] !== true;
-        // eslint-disable-next-line obsidianmd/no-unsupported-api
         void this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
           fm[fieldKey] = newVal;
         });

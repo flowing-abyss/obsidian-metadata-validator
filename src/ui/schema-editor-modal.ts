@@ -274,8 +274,7 @@ export class SchemaEditorModal extends Modal {
 
     new Setting(el)
       .setName("Extends")
-      // eslint-disable-next-line obsidianmd/ui/sentence-case
-      .setDesc("Parent schema folder path (e.g. schemas/base).")
+      .setDesc("Parent schema folder path (e.g. Schemas/base).")
       .addText((t) => {
         t.inputEl.setAttribute("placeholder", "Schemas/base");
         t.setValue(this.data.extends ?? "").onChange((v) => {
@@ -288,11 +287,9 @@ export class SchemaEditorModal extends Modal {
   private renderTarget(el: HTMLElement): void {
     new Setting(el)
       .setName("Expression")
-      .setDesc(
-        'Logical expression: "Folder/" AND/OR #tag, key=value; NOT/- excludes; (...) groups' // eslint-disable-line obsidianmd/ui/sentence-case
-      )
+      .setDesc('Logical expression: "Folder/" and/or #tag, key=value; NOT/- excludes; (...) groups')
       .addText((t) => {
-        t.inputEl.setAttribute("placeholder", '"Sources/" AND #book AND -#archive'); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.setAttribute("placeholder", '"sources/" and #book and -#archive');
         t.inputEl.addClass("mv-expression-input");
         t.setValue(this.data.target?.query ?? "").onChange((v) => {
           const trimmed = v.trim();
@@ -716,10 +713,10 @@ export class SchemaEditorModal extends Modal {
     new Setting(body)
       .setName("Expression")
       .setDesc(
-        'Filter notes by expression: "Folder/" AND/OR #tag, key=value; NOT/- excludes; (...) groups' // eslint-disable-line obsidianmd/ui/sentence-case
+        'Filter notes by expression: "Folder/" and/or #tag, key=value; NOT/- excludes; (...) groups'
       )
       .addText((t) => {
-        t.inputEl.setAttribute("placeholder", '"People/" AND #person AND -#archived'); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.setAttribute("placeholder", '"people/" and #person and -#archived');
         t.inputEl.addClass("mv-expression-input");
         t.setValue(field.source?.query ?? "").onChange((v) => {
           update({ source: { ...field.source, query: v.trim() || undefined } });
@@ -727,11 +724,11 @@ export class SchemaEditorModal extends Modal {
       });
 
     new Setting(body)
-      .setName("JS code") // eslint-disable-line obsidianmd/ui/sentence-case
+      .setName("JavaScript code")
       .setDesc("DataView/Obsidian JS returning [{value, label}] — overrides expression if set.")
       .addTextArea((t) => {
         t.inputEl.addClass("mv-js-textarea");
-        t.inputEl.setAttribute("placeholder", "return app.vault.getMarkdownFiles()..."); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.setAttribute("placeholder", "Return app.vault.getMarkdownFiles()...");
         t.inputEl.rows = 4;
         t.setValue(field.source?.js ?? "").onChange((v) => {
           update({ source: { ...field.source, js: v.trim() || undefined } });
@@ -770,7 +767,7 @@ export class SchemaEditorModal extends Modal {
       cls: "mv-options-mode-btn" + (!isDynamic ? " is-active" : ""),
     });
     const dynamicBtn = modeContainer.createEl("button", {
-      text: "Dynamic (expression / JS)", // eslint-disable-line obsidianmd/ui/sentence-case
+      text: "Dynamic (expression / JavaScript)",
       cls: "mv-options-mode-btn" + (isDynamic ? " is-active" : ""),
     });
 
@@ -796,11 +793,11 @@ export class SchemaEditorModal extends Modal {
     new Setting(dynamicPanel)
       .setName("Expression")
       .setDesc(
-        'Filter by expression: "Folder/" AND/OR #tag, key=value; NOT/- excludes; (...) groups' // eslint-disable-line obsidianmd/ui/sentence-case
+        'Filter by expression: "Folder/" and/or #tag, key=value; NOT/- excludes; (...) groups'
       )
       .addText((t) => {
         t.inputEl.addClass("mv-expression-input");
-        t.inputEl.setAttribute("placeholder", '"Sources/" AND (#book OR #article) AND -#archive'); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.setAttribute("placeholder", '"sources/" and (#book or #article) and -#archive');
         t.setValue(dynamicSource.query ?? "").onChange((v) => {
           update({
             options: {
@@ -814,11 +811,11 @@ export class SchemaEditorModal extends Modal {
       });
 
     new Setting(dynamicPanel)
-      .setName("JS code") // eslint-disable-line obsidianmd/ui/sentence-case
+      .setName("JavaScript code")
       .setDesc("DataView/Obsidian JS returning [{value, label}] — overrides expression.")
       .addTextArea((t) => {
         t.inputEl.addClass("mv-js-textarea");
-        t.inputEl.setAttribute("placeholder", "return app.vault.getMarkdownFiles()..."); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.setAttribute("placeholder", "Return app.vault.getMarkdownFiles()...");
         t.inputEl.rows = 4;
         t.setValue(dynamicSource.js ?? "").onChange((v) => {
           update({
@@ -963,10 +960,9 @@ export class SchemaEditorModal extends Modal {
   ): void {
     new Setting(body)
       .setName("Format")
-      // eslint-disable-next-line obsidianmd/ui/sentence-case
-      .setDesc("Expected date format, e.g. YYYY-MM-DD or DD/MM/YYYY")
+      .setDesc("Expected date format, e.g. yyyy-MM-dd or dd/mm/yyyy")
       .addText((t) => {
-        t.inputEl.setAttribute("placeholder", "YYYY-MM-DD"); // eslint-disable-line obsidianmd/ui/sentence-case
+        t.inputEl.setAttribute("placeholder", "yyyy-MM-dd");
         t.setValue(field.format ?? "").onChange((v) => update({ format: v || undefined }));
       });
 

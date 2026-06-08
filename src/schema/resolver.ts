@@ -134,7 +134,7 @@ export class SchemaResolver {
     if (target.property) {
       return Object.entries(target.property).every(([k, v]) => {
         const fmVal = frontmatter[k];
-        const strVal = fmVal === null || fmVal === undefined ? "" : String(fmVal); // eslint-disable-line @typescript-eslint/no-base-to-string
+        const strVal = fmVal === null || fmVal === undefined ? "" : String(fmVal); // eslint-disable-line @typescript-eslint/no-base-to-string -- frontmatter values are primitives or stringifiable
         return strVal === v;
       });
     }

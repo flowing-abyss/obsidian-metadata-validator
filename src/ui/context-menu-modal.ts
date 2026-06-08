@@ -549,8 +549,7 @@ export class ContextMenuModal extends Modal {
         chip.addEventListener("contextmenu", (e) => {
           e.preventDefault();
           // Replace the chip with an edit input pre-filled with the raw value
-          // eslint-disable-next-line obsidianmd/prefer-create-el
-          const editInput = activeDocument.createElement("input");
+          const editInput = chip.createEl("input");
           editInput.type = "text";
           editInput.value = val;
           editInput.className = "mv-list-add-input mv-list-edit-input";
@@ -687,7 +686,6 @@ export class ContextMenuModal extends Modal {
    */
   private toggleBoolean(fieldKey: string, newValue: boolean): void {
     this.localFrontmatter[fieldKey] = newValue;
-    // eslint-disable-next-line obsidianmd/no-unsupported-api
     void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
       fm[fieldKey] = newValue;
     });
@@ -708,7 +706,6 @@ export class ContextMenuModal extends Modal {
     );
 
     // Persist to file (fire and forget)
-    // eslint-disable-next-line obsidianmd/no-unsupported-api
     void this.app.fileManager.processFrontMatter(this.file, (fm: Record<string, unknown>) => {
       if (value === null || value === undefined) {
         delete fm[fieldKey];

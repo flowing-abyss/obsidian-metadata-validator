@@ -19,6 +19,17 @@ export default tseslint.config(
   },
   ...obsidianmd.configs.recommended,
   {
+    rules: {
+      "obsidianmd/ui/sentence-case": [
+        "error",
+        {
+          brands: ["Bases", "DataView", "Obsidian"],
+          acronyms: ["JS", "TS", "API", "JSON", "YAML", "CSS", "HTML", "URL"],
+        },
+      ],
+    },
+  },
+  {
     files: ["package.json"],
     rules: {
       "depend/ban-dependencies": "off",
@@ -38,6 +49,8 @@ export default tseslint.config(
       "vitest.config.ts",
       "src/**/*.test.ts",
       "src/__mocks__/**",
+      ".forge/**",
+      ".pi/**",
     ],
   }
 );
