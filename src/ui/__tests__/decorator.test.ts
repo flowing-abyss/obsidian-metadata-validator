@@ -119,10 +119,16 @@ describe("PropertyDecorator", () => {
 
     await decorator.decorateAll();
     expect(document.querySelector("[data-mv-picker='true']")).not.toBeNull();
+    expect(document.querySelector(".metadata-property")?.classList.contains("mv-has-picker")).toBe(
+      true
+    );
 
     setActiveFile("Notes/no-schema.md");
     await decorator.decorateAll();
 
     expect(document.querySelector("[data-mv-picker='true']")).toBeNull();
+    expect(document.querySelector(".metadata-property")?.classList.contains("mv-has-picker")).toBe(
+      false
+    );
   });
 });

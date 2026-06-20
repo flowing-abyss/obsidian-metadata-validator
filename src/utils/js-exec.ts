@@ -20,13 +20,13 @@ function getCachedFn(code: string, paramNames: string[]): GenericFn {
 
   /**
    * SECURITY NOTICE FOR REVIEWERS:
-   * This uses `new Function` to execute JavaScript code provided by the user
-   * in their own local vault schema files (manifest.md). This is NOT remote
+   * This uses the Function constructor to execute JavaScript code provided by
+   * the user in their own local vault schema files (manifest.md). This is NOT remote
    * code execution — the code is authored by the vault owner and stored locally.
    * Execution is gated behind an explicit opt-in setting (`enableJsExecution`)
    * which defaults to `false` and shows a security warning in the UI.
    */
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval -- User-authored vault JS is an explicit opt-in plugin feature.
   const fn = new Function(...paramNames, code) as GenericFn;
 
   if (fnCache.size >= MAX_CACHE_SIZE) {
@@ -59,7 +59,7 @@ export async function executeJsSource(
   const fn = getCachedFn(code, ["app", "dv", "currentFile", "currentPage"]);
 
   const timeoutPromise = new Promise<never>((_, reject) =>
-    activeWindow.setTimeout(() => reject(new Error("JS source timed out")), JS_SOURCE_TIMEOUT_MS)
+    window.setTimeout(() => reject(new Error("JS source timed out")), JS_SOURCE_TIMEOUT_MS)
   );
 
   return Promise.race([fn(app, dv, currentFile, currentPage), timeoutPromise]);
@@ -81,10 +81,7 @@ export async function executeJsValidator(
   const fn = getCachedFn(code, ["app", "dv", "currentFile", "currentPage", "value"]);
 
   const timeoutPromise = new Promise<never>((_, reject) =>
-    activeWindow.setTimeout(
-      () => reject(new Error("JS validator timed out")),
-      JS_VALIDATOR_TIMEOUT_MS
-    )
+    window.setTimeout(() => reject(new Error("JS validator timed out")), JS_VALIDATOR_TIMEOUT_MS)
   );
 
   return Promise.race([fn(app, dv, currentFile, currentPage, value), timeoutPromise]);

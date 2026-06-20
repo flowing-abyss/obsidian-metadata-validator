@@ -153,6 +153,7 @@ export class ContextMenuModal extends Modal {
     contentEl.empty();
     contentEl.addClass("mv-context-modal");
     this.titleEl.addClass("mv-hidden");
+    this.titleEl.closest<HTMLElement>(".modal-header")?.addClass("mv-hidden");
 
     const entries = Object.entries(this.schema.fields).filter(([, def]) => !def.hidden);
     const required = entries.filter(([, def]) => def.required === true);
@@ -333,7 +334,7 @@ export class ContextMenuModal extends Modal {
           input.addEventListener("blur", () => {
             this.saveField(fieldKey, input.value.trim() || null);
           });
-          activeWindow.setTimeout(() => {
+          window.setTimeout(() => {
             input.focus();
             input.select();
           }, 0);

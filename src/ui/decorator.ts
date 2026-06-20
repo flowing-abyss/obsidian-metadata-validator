@@ -11,6 +11,7 @@ import type { showValidatorTooltip as showValidatorTooltipType } from "./validat
 const PICKER_ATTR = "data-mv-picker";
 const PICKER_CONTEXT_ATTR = "data-mv-picker-context";
 const VALIDATOR_ATTR = "data-mv-validator";
+const HAS_PICKER_CLASS = "mv-has-picker";
 
 /** Lucide icon name for each field type */
 const FIELD_TYPE_ICON: Record<FieldType, string> = {
@@ -42,7 +43,7 @@ export class PropertyDecorator {
   private readonly resolver: SchemaResolver;
   private readonly engine: ValidationEngine;
   private readonly settings: PluginSettings;
-  private debounceTimer: ReturnType<typeof activeWindow.setTimeout> | null = null;
+  private debounceTimer: ReturnType<typeof window.setTimeout> | null = null;
   /** Keyed by file path — avoids re-running validation when frontmatter hasn't changed */
   private readonly resultCache = new Map<string, CachedResult>();
   private lastDecoratedFilePath: string | null = null;
@@ -88,7 +89,7 @@ export class PropertyDecorator {
   detach(): void {
     this.observer?.disconnect();
     this.observer = null;
-    if (this.debounceTimer) activeWindow.clearTimeout(this.debounceTimer);
+    if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
   }
 
   /** Invalidate cache for a specific file path when its metadata changes. */
@@ -108,6 +109,9 @@ export class PropertyDecorator {
     activeDocument
       .querySelectorAll(`[${PICKER_ATTR}],[${VALIDATOR_ATTR}]`)
       .forEach((el) => el.remove());
+    activeDocument
+      .querySelectorAll<HTMLElement>(`.metadata-property.${HAS_PICKER_CLASS}`)
+      .forEach((row) => row.classList.remove(HAS_PICKER_CLASS));
   }
 
   /**
@@ -119,9 +123,9 @@ export class PropertyDecorator {
   }
 
   private onMutation(): void {
-    if (this.debounceTimer) activeWindow.clearTimeout(this.debounceTimer);
+    if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
     // 50ms is enough to batch rapid DOM mutations without visible lag
-    this.debounceTimer = activeWindow.setTimeout(() => void this.decorateAll(), 50);
+    this.debounceTimer = window.setTimeout(() => void this.decorateAll(), 50);
   }
 
   async decorateAll(): Promise<void> {
@@ -180,6 +184,7 @@ export class PropertyDecorator {
       if (!schemaKey) {
         this.injectValidatorIcon(row, rowKey, resultMap.get(rowKey) ?? []);
         row.querySelector(`[${PICKER_ATTR}]`)?.remove();
+        row.classList.remove(HAS_PICKER_CLASS);
         continue;
       }
 
@@ -240,6 +245,7 @@ export class PropertyDecorator {
     const existing = row.querySelector<HTMLElement>(`[${PICKER_ATTR}]`);
     if (existing?.getAttribute(PICKER_CONTEXT_ATTR) === pickerContext) return;
     existing?.remove();
+    row.classList.remove(HAS_PICKER_CLASS);
 
     const iconName = FIELD_TYPE_ICON[fieldDef.type] ?? "square";
     const isPicker = PICKER_TYPES.has(fieldDef.type);
@@ -249,6 +255,7 @@ export class PropertyDecorator {
     btn.setAttribute(PICKER_CONTEXT_ATTR, pickerContext);
     btn.setAttribute("aria-label", fieldDef.type);
     btn.className = isPicker ? "mv-picker-btn clickable-icon" : "mv-type-icon clickable-icon";
+    row.classList.add(HAS_PICKER_CLASS);
     setIcon(btn, iconName);
 
     if (isPicker) {

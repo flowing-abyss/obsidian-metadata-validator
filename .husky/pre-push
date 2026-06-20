@@ -1,0 +1,4 @@
+#!/bin/sh
+npm run obsidian:lint
+npm test
+npm run build

@@ -25,7 +25,7 @@ export class BasesValidator {
   private readonly resolver: SchemaResolver;
   private readonly engine: ValidationEngine;
   private readonly settings: PluginSettings;
-  private debounceTimer: ReturnType<typeof activeWindow.setTimeout> | null = null;
+  private debounceTimer: ReturnType<typeof window.setTimeout> | null = null;
   private readonly resultCache = new Map<string, CachedResult>();
   private cacheRef: EventRef | null = null;
 
@@ -92,7 +92,7 @@ export class BasesValidator {
   detach(): void {
     this.observer?.disconnect();
     this.observer = null;
-    if (this.debounceTimer) activeWindow.clearTimeout(this.debounceTimer);
+    if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
     if (this.cacheRef) {
       this.app.metadataCache.offref(this.cacheRef);
       this.cacheRef = null;
@@ -117,8 +117,8 @@ export class BasesValidator {
   }
 
   private scheduleDecorate(): void {
-    if (this.debounceTimer) activeWindow.clearTimeout(this.debounceTimer);
-    this.debounceTimer = activeWindow.setTimeout(() => void this.decorateBases(), 50);
+    if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
+    this.debounceTimer = window.setTimeout(() => void this.decorateBases(), 50);
   }
 
   /** Decorate immediately without debounce — call from workspace leaf-change events. */

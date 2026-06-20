@@ -2,11 +2,11 @@
 
 /* ── Body-level CSS toggles (controlled by CssInjector) ──── */
 body.mv-hide-type-icon .metadata-content .metadata-property-icon {
-  display: none !important;
+  display: none;
 }
 
 body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
-  display: none !important;
+  display: none;
 }
 
 /* ── Picker Modal ─────────────────────────────────────────── */
@@ -887,12 +887,11 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   font-size: 12px;
   color: var(--text-accent);
   cursor: pointer;
-  text-decoration: underline;
-  text-decoration-color: transparent;
+  border-bottom: 1px solid transparent;
 }
 
 .mv-wikilink:hover {
-  text-decoration-color: var(--text-accent);
+  border-bottom-color: var(--text-accent);
 }
 
 .mv-list-editor {
@@ -1231,12 +1230,6 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   padding: 4px 16px 12px;
 }
 
-/* Obsidian wraps titleEl in a .modal-header div with margin-bottom that
-   creates wasted space even when the title is empty. */
-.modal:has(.modal-content.mv-context-modal) .modal-header {
-  display: none;
-}
-
 .mv-hidden {
   display: none;
 }
@@ -1266,10 +1259,10 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
 /* ── Suppress Obsidian's type icon when we inject our own ──  */
 /* Only hide when the setting is active (mv-hide-type-icon body class) */
 body.mv-hide-type-icon
-  .metadata-property:has([data-mv-picker])
+  .metadata-property.mv-has-picker
   .metadata-content
   .metadata-property-icon {
-  display: none !important;
+  display: none;
 }
 
 /* ── URL field in context modal ─────────────────────────── */

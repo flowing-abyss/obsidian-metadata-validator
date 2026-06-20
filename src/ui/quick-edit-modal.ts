@@ -84,7 +84,7 @@ export class QuickEditModal extends Modal {
           this.save(isNaN(n) ? null : n);
           this.close();
         });
-        activeWindow.setTimeout(() => input.focus(), 0);
+        window.setTimeout(() => input.focus(), 0);
         break;
       }
 
@@ -98,7 +98,7 @@ export class QuickEditModal extends Modal {
         input.addEventListener("keydown", (e) => {
           if (e.key === "Escape") this.close();
         });
-        activeWindow.setTimeout(() => {
+        window.setTimeout(() => {
           input.focus();
           input.showPicker?.();
         }, 0);
@@ -124,7 +124,7 @@ export class QuickEditModal extends Modal {
           this.save(input.value.trim() || null);
           this.close();
         });
-        activeWindow.setTimeout(() => {
+        window.setTimeout(() => {
           input.focus();
           input.select();
         }, 0);

@@ -45,7 +45,7 @@ export function showValidatorTooltip(anchor: HTMLElement, results: ValidationRes
       activeDocument.removeEventListener("click", close);
     }
   };
-  activeWindow.setTimeout(() => activeDocument.addEventListener("click", close), 0);
+  window.setTimeout(() => activeDocument.addEventListener("click", close), 0);
 }
 
 function removeTooltip(): void {
