@@ -5,7 +5,7 @@ const TOOLTIP_ID = "mv-validator-tooltip";
 export function showValidatorTooltip(anchor: HTMLElement, results: ValidationResult[]): void {
   removeTooltip();
 
-  const tooltip = activeDocument.createDiv();
+  const tooltip = activeDocument.body.createDiv();
   tooltip.id = TOOLTIP_ID;
 
   const errors = results.filter((r) => !r.autoFixed);
@@ -36,8 +36,6 @@ export function showValidatorTooltip(anchor: HTMLElement, results: ValidationRes
   const top = rect.bottom + 4;
   const left = Math.min(rect.left, window.innerWidth - 340);
   tooltip.setCssProps({ top: `${top}px`, left: `${left}px` });
-
-  activeDocument.body.appendChild(tooltip);
 
   const close = (e: MouseEvent) => {
     if (!tooltip.contains(e.target as Node)) {

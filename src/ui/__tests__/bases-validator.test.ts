@@ -281,4 +281,28 @@ describe("BasesValidator", () => {
     validator.clearAll();
     expect(cell?.classList.contains("mv-bases-error")).toBe(false);
   });
+
+  it("opens the validator tooltip when hovering an invalid cell", async () => {
+    const results: ValidationResult[] = [
+      {
+        field: "status",
+        severity: "error",
+        message: "Invalid option.",
+        rule: "options",
+        manifestPath: "schemas/proj/manifest.md",
+        autoFixed: false,
+      },
+    ];
+    renderBasesRow("Notes/proj.md", { status: "draft" });
+
+    const { validator } = makeContext(results);
+    await validator.decorateBases();
+
+    const cell = document.querySelector<HTMLElement>(".bases-td[data-property='note.status']");
+    cell?.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(document.getElementById("mv-validator-tooltip")).not.toBeNull();
+    });
+  });
 });

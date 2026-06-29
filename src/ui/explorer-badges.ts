@@ -43,7 +43,7 @@ export class ExplorerBadges {
         // Only update the class — avoids DOM removal + insertion
         existing.className = targetClass;
       } else {
-        const badge = activeDocument.createSpan();
+        const badge = item.createSpan();
         badge.className = targetClass;
         item.prepend(badge);
       }

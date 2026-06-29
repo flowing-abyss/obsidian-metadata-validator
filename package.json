@@ -1,6 +1,6 @@
 {
   "name": "obsidian-metadata-validator",
-  "version": "0.3.10",
+  "version": "0.3.11",
   "description": "Manifest-driven metadata validation, auto-fix, and field picker for notes.",
   "main": "main.js",
   "type": "module",

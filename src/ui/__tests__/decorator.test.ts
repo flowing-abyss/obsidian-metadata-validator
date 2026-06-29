@@ -1,7 +1,7 @@
 import type { App, TFile } from "obsidian";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PluginSettings } from "../../settings";
-import type { ResolvedSchema } from "../../types";
+import type { ResolvedSchema, ValidationResult } from "../../types";
 import type { SchemaResolver } from "../../schema/resolver";
 import type { ValidationEngine } from "../../validation/engine";
 import { PropertyDecorator } from "../decorator";
@@ -30,7 +30,7 @@ function makeSchema(manifestPath: string): ResolvedSchema {
   };
 }
 
-function makeDecoratorContext() {
+function makeDecoratorContext(results: ValidationResult[] = []) {
   let activeFile = makeFile("Notes/first.md");
 
   const frontmatterByPath = new Map<string, Record<string, unknown>>([
@@ -61,7 +61,7 @@ function makeDecoratorContext() {
   } as unknown as SchemaResolver;
 
   const engine = {
-    validate: vi.fn().mockResolvedValue([]),
+    validate: vi.fn().mockResolvedValue(results),
   } as unknown as ValidationEngine;
 
   const settings = {
@@ -130,5 +130,30 @@ describe("PropertyDecorator", () => {
     expect(document.querySelector(".metadata-property")?.classList.contains("mv-has-picker")).toBe(
       false
     );
+  });
+
+  it("creates a validator icon and opens the tooltip for invalid metadata", async () => {
+    const results: ValidationResult[] = [
+      {
+        field: "tags",
+        severity: "error",
+        message: "Invalid tags.",
+        rule: "options",
+        manifestPath: "schemas/first/manifest.md",
+        autoFixed: false,
+      },
+    ];
+    const { decorator } = makeDecoratorContext(results);
+    renderPropertyRow();
+
+    await decorator.decorateAll();
+
+    const icon = document.querySelector<HTMLElement>("[data-mv-validator='true']");
+    expect(icon).not.toBeNull();
+
+    icon?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(document.getElementById("mv-validator-tooltip")).not.toBeNull();
+    });
   });
 });

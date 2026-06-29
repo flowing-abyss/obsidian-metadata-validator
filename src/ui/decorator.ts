@@ -322,7 +322,7 @@ export class PropertyDecorator {
     const errors = results.filter((r) => !r.autoFixed);
     if (errors.length === 0) return;
 
-    const icon = activeDocument.createSpan();
+    const icon = row.createSpan();
     icon.setAttribute(VALIDATOR_ATTR, "true");
     icon.className = "mv-validator-icon clickable-icon";
     setIcon(icon, "triangle-alert");
