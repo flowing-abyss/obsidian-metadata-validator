@@ -12,6 +12,7 @@ import type { PickerModal as PickerModalType } from "./picker-modal";
 import type { QuickEditModal as QuickEditModalType } from "./quick-edit-modal";
 
 const PICKER_TYPES = new Set(["select", "multiselect", "link", "multilink"]);
+const CHECKBOX_SELECTOR = "input[type='checkbox'], [role='checkbox']";
 
 export class BasesDecorator {
   private readonly app: App;
@@ -260,6 +261,10 @@ export class BasesDecorator {
 
     // Don't intercept clicks on wikilinks — let Obsidian handle link navigation
     if (target.closest("a") ?? target.closest("[data-href]")) return;
+
+    // Let native Bases checkboxes handle their own clicks. Do not skip other input
+    // controls here: number and text values still need our schema-aware editor.
+    if (target.closest(CHECKBOX_SELECTOR)) return;
 
     // Find the cell with a data-property attribute
     const cell = target.closest<HTMLElement>(".bases-td[data-property]");
