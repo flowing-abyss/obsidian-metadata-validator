@@ -27,6 +27,9 @@ export class BasesValidator {
   private readonly settings: PluginSettings;
   private debounceTimer: ReturnType<typeof window.setTimeout> | null = null;
   private readonly resultCache = new Map<string, CachedResult>();
+  private pendingFullDecorate = false;
+  private readonly pendingFilePaths = new Set<string>();
+  private readonly pendingRows = new Set<HTMLElement>();
   private cacheRef: EventRef | null = null;
 
   /**
@@ -55,22 +58,34 @@ export class BasesValidator {
       for (const m of mutations) {
         // Attribute changes on elements inside a bases-view catch virtual-scroll
         // row reuse (Bases changes data-href in-place rather than removing nodes).
-        if (m.type === "attributes" && (m.target as HTMLElement).closest?.(".bases-view")) {
-          this.scheduleDecorate();
-          return;
+        if (m.type === "attributes") {
+          const row = (m.target as HTMLElement).closest?.<HTMLElement>(".bases-view .bases-tr");
+          if (row) this.scheduleRows([row]);
+          continue;
         }
-        // childList: detect .bases-view being added OR rows added inside one.
+
+        const affectedRows = new Set<HTMLElement>();
+        const targetRow = (m.target as HTMLElement).closest?.<HTMLElement>(".bases-view .bases-tr");
+        if (targetRow) affectedRows.add(targetRow);
+
+        // A newly mounted Bases view needs one complete pass. Mutations inside an
+        // existing view only invalidate the rows whose contents were replaced.
         for (const node of Array.from(m.addedNodes)) {
-          if (
-            node.instanceOf(HTMLElement) &&
-            (node.classList.contains("bases-view") ||
-              node.querySelector?.(".bases-view") !== null ||
-              node.closest?.(".bases-view") !== null)
-          ) {
-            this.scheduleDecorate();
+          if (!node.instanceOf(HTMLElement)) continue;
+          if (node.classList.contains("bases-view") || node.querySelector(".bases-view")) {
+            this.scheduleFullDecorate();
             return;
           }
+
+          const closestRow = node.closest<HTMLElement>(".bases-view .bases-tr");
+          if (closestRow) affectedRows.add(closestRow);
+          if (node.matches(".bases-tr") && node.closest(".bases-view")) affectedRows.add(node);
+          node
+            .querySelectorAll<HTMLElement>(".bases-tr")
+            .forEach((row) => row.closest(".bases-view") && affectedRows.add(row));
         }
+
+        if (affectedRows.size > 0) this.scheduleRows(affectedRows);
       }
     });
     this.observer.observe(activeDocument.body, {
@@ -82,17 +97,19 @@ export class BasesValidator {
 
     this.cacheRef = this.app.metadataCache.on("changed", (file: TFile) => {
       this.resultCache.delete(file.path);
-      this.scheduleDecorate();
+      this.scheduleFile(file.path);
     });
 
     // Decorate immediately in case a Bases view is already visible
-    this.scheduleDecorate();
+    this.scheduleFullDecorate();
   }
 
   detach(): void {
     this.observer?.disconnect();
     this.observer = null;
     if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
+    this.debounceTimer = null;
+    this.resetPendingDecorations();
     if (this.cacheRef) {
       this.app.metadataCache.offref(this.cacheRef);
       this.cacheRef = null;
@@ -116,38 +133,102 @@ export class BasesValidator {
     activeDocument.getElementById("mv-validator-tooltip")?.remove();
   }
 
-  private scheduleDecorate(): void {
+  private scheduleFullDecorate(): void {
+    this.pendingFullDecorate = true;
+    this.pendingFilePaths.clear();
+    this.pendingRows.clear();
+    this.scheduleFlush();
+  }
+
+  private scheduleFile(filePath: string): void {
+    if (!this.pendingFullDecorate) this.pendingFilePaths.add(filePath);
+    this.scheduleFlush();
+  }
+
+  private scheduleRows(rows: Iterable<HTMLElement>): void {
+    if (!this.pendingFullDecorate) {
+      for (const row of rows) this.pendingRows.add(row);
+    }
+    this.scheduleFlush();
+  }
+
+  private scheduleFlush(): void {
     if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
-    this.debounceTimer = window.setTimeout(() => void this.decorateBases(), 50);
+    this.debounceTimer = window.setTimeout(() => void this.flushScheduledDecorations(), 50);
+  }
+
+  private async flushScheduledDecorations(): Promise<void> {
+    this.debounceTimer = null;
+    const fullDecorate = this.pendingFullDecorate;
+    const filePaths = Array.from(this.pendingFilePaths);
+    const rows = new Set(this.pendingRows);
+    this.resetPendingDecorations();
+
+    if (fullDecorate) {
+      await this.decorateBases();
+      return;
+    }
+
+    if (!this.settings.showBasesErrors) return;
+    if (filePaths.length > 0) {
+      for (const row of activeDocument.querySelectorAll<HTMLElement>(".bases-view .bases-tr")) {
+        const filePath = this.resolveFilePath(row);
+        if (filePath && filePaths.includes(filePath)) rows.add(row);
+      }
+    }
+    await this.decorateRows(Array.from(rows).filter((row) => row.isConnected));
+  }
+
+  private resetPendingDecorations(): void {
+    this.pendingFullDecorate = false;
+    this.pendingFilePaths.clear();
+    this.pendingRows.clear();
   }
 
   /** Decorate immediately without debounce — call from workspace leaf-change events. */
   decorateNow(): void {
+    if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
+    this.debounceTimer = null;
+    this.resetPendingDecorations();
     void this.decorateBases();
   }
 
   async decorateBases(): Promise<void> {
     if (!this.settings.showBasesErrors) return;
 
-    // Always clear stale indicators first. Virtual-scroll row reuse means the
-    // same DOM node can represent a different file between decoration passes —
-    // clearAll() prevents leftover classes and tooltip closures from persisting.
-    this.clearAll();
-
     const rows = Array.from(activeDocument.querySelectorAll<HTMLElement>(".bases-view .bases-tr"));
+    await this.decorateRows(rows);
+  }
 
+  private async decorateRows(rows: HTMLElement[]): Promise<void> {
     for (const row of rows) {
+      // A virtualized cell may have been reused for a file/formula property. It
+      // will not appear in the note-cell loop below, so clear only indicators
+      // that are now attached to a non-note cell.
+      row.querySelectorAll<HTMLElement>(".mv-bases-error, .mv-bases-warning").forEach((cell) => {
+        if (!cell.matches(".bases-td[data-property^='note.']")) this.applyIndicator(cell, []);
+      });
+
       const filePath = this.resolveFilePath(row);
-      if (!filePath) continue;
+      if (!filePath) {
+        this.clearRow(row);
+        continue;
+      }
 
       const file = this.app.vault.getAbstractFileByPath(filePath);
-      if (!file || !(file instanceof TFile)) continue;
+      if (!file || !(file instanceof TFile)) {
+        this.clearRow(row);
+        continue;
+      }
 
       const cache = this.app.metadataCache.getFileCache(file);
       const frontmatter = sanitizeFrontmatter(cache?.frontmatter);
 
       const schema = this.resolver.resolveForNote(file, frontmatter);
-      if (!schema) continue;
+      if (!schema) {
+        this.clearRow(row);
+        continue;
+      }
 
       const fmHash = JSON.stringify(frontmatter);
       const cached = this.resultCache.get(filePath);
@@ -158,6 +239,10 @@ export class BasesValidator {
         results = await this.engine.validate(file, frontmatter, schema);
         this.resultCache.set(filePath, { fmHash, results });
       }
+
+      // The row can be recycled while async validation is running. A mutation
+      // event will schedule its new contents; do not decorate stale data now.
+      if (!row.isConnected || this.resolveFilePath(row) !== filePath) continue;
 
       // Build a map from fieldKey → non-autoFixed results for O(1) cell lookup
       const resultMap = new Map<string, ValidationResult[]>();
@@ -180,22 +265,31 @@ export class BasesValidator {
     }
   }
 
+  private clearRow(row: HTMLElement): void {
+    row
+      .querySelectorAll<HTMLElement>(".mv-bases-error, .mv-bases-warning")
+      .forEach((cell) => this.applyIndicator(cell, []));
+  }
+
   private resolveFilePath(row: HTMLElement): string | null {
     const fileCell = row.querySelector<HTMLElement>(".bases-td[data-property='file.name']");
     return fileCell?.querySelector<HTMLElement>("[data-href]")?.getAttribute("data-href") ?? null;
   }
 
   private applyIndicator(cell: HTMLElement, results: ValidationResult[]): void {
-    cell.classList.remove("mv-bases-error", "mv-bases-warning");
-    this.removeTooltipListeners(cell);
+    const hadTooltipListeners = this.removeTooltipListeners(cell);
+    if (hadTooltipListeners) activeDocument.getElementById("mv-validator-tooltip")?.remove();
 
     const hasError = results.some((r) => r.severity === "error");
     const hasWarning = results.some((r) => r.severity === "warning");
+    const showWarning = !hasError && hasWarning;
 
-    if (hasError) cell.classList.add("mv-bases-error");
-    else if (hasWarning) cell.classList.add("mv-bases-warning");
+    // toggle(force) leaves the DOM untouched when the class is already in the
+    // requested state, avoiding attribute mutations for every valid cell.
+    cell.classList.toggle("mv-bases-error", hasError);
+    cell.classList.toggle("mv-bases-warning", showWarning);
 
-    if (hasError || hasWarning) {
+    if (hasError || showWarning) {
       const enter: EventListener = () => {
         void import("./validator-tooltip").then(
           (mod: { showValidatorTooltip: typeof showValidatorTooltipType }) => {
@@ -212,12 +306,14 @@ export class BasesValidator {
     }
   }
 
-  private removeTooltipListeners(el: HTMLElement): void {
+  private removeTooltipListeners(el: HTMLElement): boolean {
     const old = this.tooltipListeners.get(el);
     if (old) {
       el.removeEventListener("mouseenter", old.enter);
       el.removeEventListener("mouseleave", old.leave);
       this.tooltipListeners.delete(el);
+      return true;
     }
+    return false;
   }
 }

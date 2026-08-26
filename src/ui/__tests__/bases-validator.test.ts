@@ -305,4 +305,161 @@ describe("BasesValidator", () => {
       expect(document.getElementById("mv-validator-tooltip")).not.toBeNull();
     });
   });
+
+  it("redecorates only rows for the file reported by metadataCache.changed", async () => {
+    vi.useFakeTimers();
+    const fileA = makeFile("Notes/a.md");
+    const fileB = makeFile("Notes/b.md");
+    document.body.innerHTML = `
+      <div class="bases-view"><table><tbody>
+        <tr class="bases-tr">
+          <td class="bases-td" data-property="file.name"><a data-href="Notes/a.md">a</a></td>
+          <td class="bases-td" data-property="note.status">draft</td>
+        </tr>
+        <tr class="bases-tr">
+          <td class="bases-td" data-property="file.name"><a data-href="Notes/b.md">b</a></td>
+          <td class="bases-td" data-property="note.status">draft</td>
+        </tr>
+      </tbody></table></div>
+    `;
+
+    let changed: ((file: TFile) => void) | null = null;
+    const app = {
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) => (path === fileA.path ? fileA : fileB)),
+      },
+      metadataCache: {
+        getFileCache: () => ({ frontmatter: { status: "draft" } }),
+        on: vi.fn((_event: string, callback: (file: TFile) => void) => {
+          changed = callback;
+          return {};
+        }),
+        offref: vi.fn(),
+      },
+    } as unknown as App;
+    const resolver = {
+      resolveForNote: vi.fn(() => makeSchema()),
+    } as unknown as SchemaResolver;
+    const engine = {
+      validate: vi.fn().mockResolvedValue([]),
+    } as unknown as ValidationEngine;
+    const validator = new BasesValidator(app, resolver, engine, {
+      showBasesErrors: true,
+    } as PluginSettings);
+
+    validator.attach();
+    try {
+      await vi.runAllTimersAsync();
+      expect(engine.validate).toHaveBeenCalledTimes(2);
+      vi.mocked(engine.validate).mockClear();
+
+      validator.invalidate(fileA.path);
+      if (!changed) throw new Error("metadataCache.changed callback was not registered");
+      changed(fileA);
+      await vi.runAllTimersAsync();
+
+      expect(engine.validate).toHaveBeenCalledOnce();
+      expect(engine.validate).toHaveBeenCalledWith(fileA, expect.any(Object), expect.any(Object));
+    } finally {
+      validator.detach();
+      vi.useRealTimers();
+    }
+  });
+
+  it("redecorates only the row affected by a Bases DOM mutation", async () => {
+    vi.useFakeTimers();
+    const fileA = makeFile("Notes/a.md");
+    const fileB = makeFile("Notes/b.md");
+    document.body.innerHTML = `
+      <div class="bases-view"><table><tbody>
+        <tr class="bases-tr" data-row="a">
+          <td class="bases-td" data-property="file.name"><a data-href="Notes/a.md">a</a></td>
+          <td class="bases-td" data-property="note.status">draft</td>
+        </tr>
+        <tr class="bases-tr" data-row="b">
+          <td class="bases-td" data-property="file.name"><a data-href="Notes/b.md">b</a></td>
+          <td class="bases-td" data-property="note.status">draft</td>
+        </tr>
+      </tbody></table></div>
+    `;
+    const app = {
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) => (path === fileA.path ? fileA : fileB)),
+      },
+      metadataCache: {
+        getFileCache: () => ({ frontmatter: { status: "draft" } }),
+        on: vi.fn(() => ({})),
+        offref: vi.fn(),
+      },
+    } as unknown as App;
+    const resolver = {
+      resolveForNote: vi.fn(() => makeSchema()),
+    } as unknown as SchemaResolver;
+    const engine = {
+      validate: vi.fn().mockResolvedValue([]),
+    } as unknown as ValidationEngine;
+    const validator = new BasesValidator(app, resolver, engine, {
+      showBasesErrors: true,
+    } as PluginSettings);
+
+    validator.attach();
+    try {
+      await vi.runAllTimersAsync();
+      vi.mocked(resolver.resolveForNote).mockClear();
+
+      document
+        .querySelector<HTMLElement>("[data-row='a'] .bases-td[data-property='note.status']")
+        ?.append(document.createElement("span"));
+      await Promise.resolve();
+      await vi.runAllTimersAsync();
+
+      expect(resolver.resolveForNote).toHaveBeenCalledOnce();
+      expect(app.vault.getAbstractFileByPath).toHaveBeenLastCalledWith(fileA.path);
+    } finally {
+      validator.detach();
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not mutate class attributes when indicator state is unchanged", async () => {
+    renderBasesRow("Notes/proj.md", { status: "draft" });
+    const { validator } = makeContext([]);
+    const cell = document.querySelector<HTMLElement>(".bases-td[data-property='note.status']");
+    if (!cell) throw new Error("status cell was not rendered");
+    let classMutations = 0;
+    const observer = new MutationObserver((mutations) => {
+      classMutations += mutations.filter((m) => m.attributeName === "class").length;
+    });
+    observer.observe(cell, { attributes: true, attributeFilter: ["class"] });
+
+    await validator.decorateBases();
+    await validator.decorateBases();
+    await Promise.resolve();
+    observer.disconnect();
+
+    expect(classMutations).toBe(0);
+  });
+
+  it("clears a stale indicator when virtual scroll reuses a cell for a non-note property", async () => {
+    const results: ValidationResult[] = [
+      {
+        field: "status",
+        severity: "error",
+        message: "Invalid option.",
+        rule: "options",
+        manifestPath: "schemas/proj/manifest.md",
+        autoFixed: false,
+      },
+    ];
+    renderBasesRow("Notes/proj.md", { status: "draft" });
+    const { validator } = makeContext(results);
+    await validator.decorateBases();
+    const cell = document.querySelector<HTMLElement>(".bases-td[data-property='note.status']");
+    expect(cell?.classList.contains("mv-bases-error")).toBe(true);
+
+    cell?.setAttribute("data-property", "formula.status");
+    await validator.decorateBases();
+
+    expect(cell?.classList.contains("mv-bases-error")).toBe(false);
+  });
 });
