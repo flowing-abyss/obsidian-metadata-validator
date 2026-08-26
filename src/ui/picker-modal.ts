@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import { App, Modal } from "obsidian";
-import { resolveSource } from "../schema/source-resolver";
+import { resolveSourceWithStatus, type SourceResolutionResult } from "../schema/source-resolver";
 import type { FieldOption, ManifestField, ResolvedSchema } from "../types";
 
 type SelectionMode = "select" | "multiselect";
@@ -20,6 +20,7 @@ export class PickerModal extends Modal {
   private readonly onSaved: ((value: unknown) => void) | null;
   private readonly enableJs: boolean;
   private options: FieldOption[] = [];
+  private sourceStatus: SourceResolutionResult["status"] = "resolved";
   // Mutable selection state — normalised values (no [[]])
   private selected: Set<string> = new Set();
   // For multi-select: defer save to onClose to avoid concurrent processFrontMatter calls
@@ -60,22 +61,34 @@ export class PickerModal extends Modal {
   }
 
   async onOpen(): Promise<void> {
-    this.options = await this.loadOptions();
+    const result = await this.loadOptions();
+    this.options = result.options;
+    this.sourceStatus = result.status;
     this.render();
   }
 
-  private async loadOptions(): Promise<FieldOption[]> {
+  private async loadOptions(): Promise<SourceResolutionResult> {
     if (Array.isArray(this.field.options)) {
-      return this.field.options;
+      return { options: this.field.options, status: "resolved" };
     }
     if (this.field.source) {
-      return resolveSource(this.field.source, this.app, this.file, this.enableJs);
+      return resolveSourceWithStatus(this.field.source, this.app, this.file, this.enableJs);
     }
     if (this.field.options && !Array.isArray(this.field.options)) {
       const src = this.field.options.source;
-      if (src) return resolveSource(src, this.app, this.file, this.enableJs);
+      if (src) return resolveSourceWithStatus(src, this.app, this.file, this.enableJs);
     }
-    return [];
+    return { options: [], status: "resolved" };
+  }
+
+  private get emptyMessage(): string {
+    if (this.sourceStatus === "disabled") {
+      return "JavaScript option source is disabled. Enable Settings → Metadata Validator → Allow JavaScript execution.";
+    }
+    if (this.sourceStatus === "error") {
+      return "Could not load options from the JavaScript source. Check the developer console for details.";
+    }
+    return "No options available.";
   }
 
   private render(): void {
@@ -95,6 +108,10 @@ export class PickerModal extends Modal {
       cls: "mv-picker-search",
     });
     search.setAttribute("placeholder", "Search...");
+    if (this.sourceStatus !== "resolved") {
+      search.disabled = true;
+      search.setAttribute("placeholder", "Options unavailable");
+    }
 
     const listEl = contentEl.createDiv("mv-picker-list");
     this.focusedIdx = 0;
@@ -125,7 +142,7 @@ export class PickerModal extends Modal {
       }
     });
 
-    search.focus();
+    if (!search.disabled) search.focus();
   }
 
   private applyFocus(items: HTMLElement[]): void {
@@ -288,7 +305,7 @@ export class PickerModal extends Modal {
 
     const groups = this.groupedOptions(options, query);
     if (groups.length === 0) {
-      listEl.createEl("p", { text: "No options available.", cls: "mv-picker-empty" });
+      listEl.createEl("p", { text: this.emptyMessage, cls: "mv-picker-empty" });
       return;
     }
 

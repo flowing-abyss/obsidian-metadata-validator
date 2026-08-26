@@ -9,7 +9,7 @@ import { checkLinkExists } from "./rules/link-exists";
 import { checkDateFormat } from "./rules/date-format";
 import { checkNumberRange } from "./rules/number-range";
 import { runJsValidator } from "./rules/js-validator";
-import { resolveSource } from "../schema/source-resolver";
+import { resolveSourceWithStatus } from "../schema/source-resolver";
 
 export class ValidationEngine {
   private readonly app: App;
@@ -106,13 +106,17 @@ export class ValidationEngine {
         } else if (field.strict !== false) {
           // Dynamic options + strict mode: resolve the source to validate against it
           const src = field.options.source;
-          if (src)
-            resolvedOptions = await resolveSource(
+          if (src) {
+            const resolution = await resolveSourceWithStatus(
               src,
               this.app,
               file,
               this.settings.enableJsExecution
             );
+            // A disabled or failed source is not an empty allow-list. Skipping
+            // validation here prevents every existing value from becoming invalid.
+            if (resolution.status === "resolved") resolvedOptions = resolution.options;
+          }
         }
         if (resolvedOptions) {
           const r = checkOptions(
@@ -138,14 +142,16 @@ export class ValidationEngine {
     }
 
     if ((field.type === "link" || field.type === "multilink") && field.source) {
-      const allowedOptions = await resolveSource(
+      const resolution = await resolveSourceWithStatus(
         field.source,
         this.app,
         file,
         this.settings.enableJsExecution
       );
-      const r = checkLinkSource(fieldName, value, allowedOptions, manifestPath);
-      if (r) results.push(r);
+      if (resolution.status === "resolved") {
+        const r = checkLinkSource(fieldName, value, resolution.options, manifestPath);
+        if (r) results.push(r);
+      }
     }
 
     if ((field.type === "link" || field.type === "multilink") && field.validate_exists !== false) {

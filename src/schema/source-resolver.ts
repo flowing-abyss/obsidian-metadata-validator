@@ -3,12 +3,35 @@ import type { FieldOption, FieldSource } from "../types";
 import { executeJsSource, JsDisabledError } from "../utils/js-exec";
 import { evaluateQuery } from "./query";
 
+type SourceResolutionStatus = "resolved" | "disabled" | "error";
+
+export interface SourceResolutionResult {
+  options: FieldOption[];
+  status: SourceResolutionStatus;
+  message?: string;
+}
+
 export async function resolveSource(
   source: FieldSource,
   app: App,
   currentFile: TFile | null,
   enableJs = false
 ): Promise<FieldOption[]> {
+  return (await resolveSourceWithStatus(source, app, currentFile, enableJs)).options;
+}
+
+/**
+ * Resolve a picker source without conflating an empty result with a source that
+ * could not run. Callers that validate values or render UI should use this
+ * variant so disabled/failed JavaScript never becomes an authoritative empty
+ * allow-list.
+ */
+export async function resolveSourceWithStatus(
+  source: FieldSource,
+  app: App,
+  currentFile: TFile | null,
+  enableJs = false
+): Promise<SourceResolutionResult> {
   if (source.js) {
     return resolveJsSource(source.js, app, currentFile, enableJs);
   }
@@ -28,11 +51,17 @@ export async function resolveSource(
       const fm = (cache?.frontmatter ?? {}) as Record<string, unknown>;
       return evaluateQuery(q, f.path, tags, fm);
     });
-    return filtered.map((f) => ({ value: f.basename, label: f.basename }));
+    return {
+      options: filtered.map((f) => ({ value: f.basename, label: f.basename })),
+      status: "resolved",
+    };
   }
 
   const filtered = files.filter((f) => fileMatchesSource(f, source, app));
-  return filtered.map((f) => ({ value: f.basename, label: f.basename }));
+  return {
+    options: filtered.map((f) => ({ value: f.basename, label: f.basename })),
+    status: "resolved",
+  };
 }
 
 function fileMatchesSource(file: TFile, source: FieldSource, app: App): boolean {
@@ -159,7 +188,7 @@ async function resolveJsSource(
   app: App,
   currentFile: TFile | null,
   enableJs: boolean
-): Promise<FieldOption[]> {
+): Promise<SourceResolutionResult> {
   const appRecord = app as unknown as Record<string, unknown>;
   // DataView API lives at app.plugins.plugins.dataview.api
   const pluginManager = appRecord["plugins"] as Record<string, unknown> | undefined;
@@ -193,7 +222,7 @@ async function resolveJsSource(
     );
     // dv.pages() returns a DataArray (not a plain Array) — convert any iterable.
     const items = toArray(result);
-    if (items.length === 0) return [];
+    if (items.length === 0) return { options: [], status: "resolved" };
 
     const out: FieldOption[] = [];
     for (const item of items) {
@@ -210,13 +239,21 @@ async function resolveJsSource(
 
       out.push(optionFromUnknown(item));
     }
-    return out;
+    return { options: out, status: "resolved" };
   } catch (e) {
     if (e instanceof JsDisabledError) {
       console.warn("[MetadataValidator] JS source skipped: enableJsExecution is disabled.");
-      return [];
+      return {
+        options: [],
+        status: "disabled",
+        message: e.message,
+      };
     }
     console.error("[MetadataValidator] Error in JS source:", e, "\nCode:", code);
-    return [];
+    return {
+      options: [],
+      status: "error",
+      message: e instanceof Error ? e.message : String(e),
+    };
   }
 }

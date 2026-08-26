@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { FieldOption, ManifestField, ResolvedSchema } from "../../types";
 import { PickerModal } from "../picker-modal";
 
-function makeModal(field: Partial<ManifestField>, currentValue: unknown) {
+function makeModal(field: Partial<ManifestField>, currentValue: unknown, enableJs = false) {
   const app = {} as App;
   const file = { path: "test.md", basename: "test", extension: "md" } as TFile;
   const schema = {
@@ -16,10 +16,42 @@ function makeModal(field: Partial<ManifestField>, currentValue: unknown) {
     formatting: {},
   } as ResolvedSchema;
   const fieldDef = { type: "multilink", ...field } as ManifestField;
-  return new PickerModal(app, "author", fieldDef, currentValue, schema, file);
+  return new PickerModal(app, "author", fieldDef, currentValue, schema, file, undefined, enableJs);
 }
 
 describe("PickerModal", () => {
+  describe("source state", () => {
+    it("explains when a JavaScript option source is disabled", async () => {
+      const m = makeModal({ options: { source: { js: `return ["expert"];` } } }, ["expert"], false);
+      const modal = m as unknown as {
+        loadOptions: () => Promise<{ options: FieldOption[]; status: string }>;
+        sourceStatus: string;
+        emptyMessage: string;
+      };
+
+      const result = await modal.loadOptions();
+      modal.sourceStatus = result.status;
+
+      expect(result).toMatchObject({ options: [], status: "disabled" });
+      expect(modal.emptyMessage).toContain("Allow JavaScript execution");
+    });
+
+    it("keeps a genuinely empty static source as a normal empty result", async () => {
+      const m = makeModal({}, null);
+      const modal = m as unknown as {
+        loadOptions: () => Promise<{ options: FieldOption[]; status: string }>;
+        sourceStatus: string;
+        emptyMessage: string;
+      };
+
+      const result = await modal.loadOptions();
+      modal.sourceStatus = result.status;
+
+      expect(result).toEqual({ options: [], status: "resolved" });
+      expect(modal.emptyMessage).toBe("No options available.");
+    });
+  });
+
   describe("normalise", () => {
     it("strips [[ and ]] from wikilinks", () => {
       const m = makeModal({}, null);

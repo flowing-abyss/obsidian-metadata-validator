@@ -1,6 +1,6 @@
 import type { App, TFile } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
-import { resolveSource } from "../source-resolver";
+import { resolveSource, resolveSourceWithStatus } from "../source-resolver";
 
 type MockTFile = TFile;
 
@@ -371,5 +371,38 @@ describe("resolveSource", () => {
     expect(result).toEqual([]);
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
+  });
+
+  it("distinguishes a disabled JS source from a resolved empty source", async () => {
+    const app = makeAppWithDataview([]);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const disabled = await resolveSourceWithStatus({ js: `return ["a"];` }, app, null, false);
+    const empty = await resolveSourceWithStatus({ folder: "Missing/" }, app, null, false);
+
+    expect(disabled.status).toBe("disabled");
+    expect(disabled.options).toEqual([]);
+    expect(empty.status).toBe("resolved");
+    expect(empty.options).toEqual([]);
+    warnSpy.mockRestore();
+  });
+
+  it("reports a failed JS source separately from an empty result", async () => {
+    const app = makeAppWithDataview([]);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await resolveSourceWithStatus(
+      { js: `throw new Error("broken source");` },
+      app,
+      null,
+      true
+    );
+
+    expect(result).toMatchObject({
+      options: [],
+      status: "error",
+      message: "broken source",
+    });
+    errorSpy.mockRestore();
   });
 });

@@ -280,6 +280,39 @@ describe("ValidationEngine", () => {
     expect(opt).toBeDefined();
   });
 
+  it("does not treat a disabled JS source as an empty allow-list", async () => {
+    const schema: ResolvedSchema = {
+      manifestPath: "schemas/book/manifest.md",
+      name: "book",
+      priority: 0,
+      target: {},
+      fields: {
+        tags: {
+          type: "multiselect",
+          options: { source: { js: `return ["expert"];` } },
+        },
+        author: {
+          type: "link",
+          source: { js: `return ["Alice"];` },
+          validate_exists: false,
+        },
+      },
+      formatting: {},
+      inheritanceChain: ["schemas/book/manifest.md"],
+    };
+    const app = makeApp();
+    const engine = new ValidationEngine(app, { enableJsExecution: false });
+    const file = { path: "Books/A.md", basename: "A" } as TFile;
+    const frontmatter = { tags: ["expert"], author: "[[Alice]]" };
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const results = await engine.validate(file, frontmatter, schema);
+
+    expect(results.find((r) => r.rule === "options")).toBeUndefined();
+    expect(results.find((r) => r.rule === "link-source")).toBeUndefined();
+    warnSpy.mockRestore();
+  });
+
   it("handles dynamic options object without source property", async () => {
     const schema: ResolvedSchema = {
       manifestPath: "schemas/book/manifest.md",
