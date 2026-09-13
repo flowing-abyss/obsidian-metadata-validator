@@ -1,5 +1,5 @@
 import type { App, TFile } from "obsidian";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { FieldOption, ManifestField, ResolvedSchema } from "../../types";
 import { PickerModal } from "../picker-modal";
 
@@ -20,6 +20,153 @@ function makeModal(field: Partial<ManifestField>, currentValue: unknown, enableJ
 }
 
 describe("PickerModal", () => {
+  describe("selection overview", () => {
+    const options: FieldOption[] = [
+      { value: "inbox", label: "Inbox", group: "Status", type: "select" },
+      { value: "working", label: "Working", group: "Status", type: "select" },
+      { value: "done", label: "Done", group: "Status", type: "select" },
+      { value: "topic", label: "Topic", group: "Topics", type: "multiselect" },
+    ];
+
+    it("shows selected values above the full list without removing or moving their rows", async () => {
+      const modal = makeModal({ type: "multiselect", options }, ["working", "topic"]);
+      await modal.onOpen();
+      const chips = modal.contentEl.querySelectorAll(".mv-picker-selected-chip");
+      expect(Array.from(chips, (chip) => chip.textContent)).toEqual(["Working", "Topic"]);
+      const rows = modal.contentEl.querySelectorAll<HTMLElement>(".mv-picker-option");
+      expect(Array.from(rows, (row) => row.dataset.value)).toEqual([
+        "inbox",
+        "working",
+        "done",
+        "topic",
+      ]);
+      expect(rows[1]?.getAttribute("aria-pressed")).toBe("true");
+    });
+
+    it("updates a select group in place and preserves scroll and keyboard focus", async () => {
+      const modal = makeModal({ type: "multiselect", options }, ["working", "topic"]);
+      document.body.appendChild(modal.contentEl);
+      try {
+        await modal.onOpen();
+        const list = modal.contentEl.querySelector<HTMLElement>(".mv-picker-list")!;
+        const rows = Array.from(list.querySelectorAll<HTMLButtonElement>(".mv-picker-option"));
+        list.scrollTop = 120;
+        rows[2]!.focus();
+        rows[2]!.click();
+        expect(list.scrollTop).toBe(120);
+        expect(document.activeElement).toBe(rows[2]);
+        expect(Array.from(list.querySelectorAll(".mv-picker-option"))).toEqual(rows);
+        expect(rows[1]?.getAttribute("aria-pressed")).toBe("false");
+        expect(rows[2]?.getAttribute("aria-pressed")).toBe("true");
+        expect(rows[3]?.getAttribute("aria-pressed")).toBe("true");
+        expect(
+          Array.from(
+            modal.contentEl.querySelectorAll(".mv-picker-selected-chip"),
+            (chip) => chip.textContent
+          )
+        ).toEqual(["Done", "Topic"]);
+      } finally {
+        modal.contentEl.remove();
+      }
+    });
+
+    it("keeps the selection overview visible while searching the full list", async () => {
+      const modal = makeModal({ type: "multiselect", options }, ["done"]);
+      await modal.onOpen();
+      const search = modal.contentEl.querySelector<HTMLInputElement>(".mv-picker-search")!;
+      search.value = "inbox";
+      search.dispatchEvent(new Event("input"));
+      expect(modal.contentEl.querySelector(".mv-picker-selected-chip")?.textContent).toBe("Done");
+      expect(
+        Array.from(
+          modal.contentEl.querySelectorAll<HTMLElement>(".mv-picker-option"),
+          (row) => row.dataset.value
+        )
+      ).toEqual(["inbox"]);
+    });
+
+    it("removes a selected shortcut without moving rows or losing keyboard focus", async () => {
+      const modal = makeModal({ type: "multiselect", options }, ["working", "topic"]);
+      document.body.appendChild(modal.contentEl);
+      try {
+        await modal.onOpen();
+        const list = modal.contentEl.querySelector<HTMLElement>(".mv-picker-list")!;
+        const rows = Array.from(list.querySelectorAll(".mv-picker-option"));
+        const chip = modal.contentEl.querySelector<HTMLButtonElement>(".mv-picker-selected-chip")!;
+        expect(chip.getAttribute("aria-label")).toBe("Remove Working");
+        expect(chip.querySelector(".mv-picker-option-label")?.innerHTML).toBe(
+          rows[1]?.querySelector(".mv-picker-option-label")?.innerHTML
+        );
+        list.scrollTop = 90;
+        chip.focus();
+        chip.click();
+        expect(list.scrollTop).toBe(90);
+        expect(Array.from(list.querySelectorAll(".mv-picker-option"))).toEqual(rows);
+        expect(rows[1]?.getAttribute("aria-pressed")).toBe("false");
+        expect(rows[3]?.getAttribute("aria-pressed")).toBe("true");
+        expect(document.activeElement?.getAttribute("aria-label")).toBe("Remove Topic");
+        expect(
+          modal.contentEl.querySelector(".mv-picker-selected-values")?.getAttribute("aria-label")
+        ).toBe("Selected values");
+      } finally {
+        modal.contentEl.remove();
+      }
+    });
+
+    it("saves clearing a single value once when the picker closes", async () => {
+      const modal = makeModal({ type: "select", options }, "working");
+      const frontmatter = { author: "working" };
+      const save = vi.fn(async (_file: TFile, edit: (fm: typeof frontmatter) => void) =>
+        edit(frontmatter)
+      );
+      Object.assign(modal.app, { fileManager: { processFrontMatter: save } });
+      await modal.onOpen();
+      modal.contentEl.querySelector<HTMLButtonElement>(".mv-picker-selected-chip")!.click();
+      expect(modal.contentEl.querySelectorAll(".mv-picker-option.is-selected")).toHaveLength(0);
+      expect(modal.contentEl.querySelector(".mv-picker-selected-empty")?.textContent).toBe("None");
+      expect(save).not.toHaveBeenCalled();
+      modal.onClose();
+      expect(frontmatter.author).toBeNull();
+      expect(save).toHaveBeenCalledTimes(1);
+    });
+
+    it("removes an unavailable value from a non-strict field while preserving other unmanaged values", async () => {
+      const modal = makeModal({ type: "multiselect", options, strict: false }, [
+        "working",
+        "legacy",
+        "keep",
+      ]);
+      const frontmatter = { author: ["working", "legacy", "keep", "added-elsewhere"] };
+      Object.assign(modal.app, {
+        fileManager: {
+          processFrontMatter: async (_file: TFile, edit: (fm: typeof frontmatter) => void) =>
+            edit(frontmatter),
+        },
+      });
+      await modal.onOpen();
+      modal.contentEl
+        .querySelector<HTMLButtonElement>('.mv-picker-selected-chip[data-value="legacy"]')!
+        .click();
+      modal.onClose();
+      expect(frontmatter.author).toEqual(["working", "keep", "added-elsewhere"]);
+    });
+  });
+
+  it("finds an option by its description without changing its stored value", () => {
+    const modal = makeModal({ type: "select" }, null) as unknown as {
+      groupedOptions: (options: FieldOption[], query: string) => { options: FieldOption[] }[];
+    };
+    const groups = modal.groupedOptions(
+      [
+        { value: "A", label: "Primary", description: "Original experiments." },
+        { value: "B", label: "Secondary", description: "Synthesis of studies." },
+      ],
+      "experiments"
+    );
+    expect(groups.flatMap((group) => group.options)).toMatchObject([
+      { value: "A", label: "Primary", description: "Original experiments." },
+    ]);
+  });
   describe("source state", () => {
     it("explains when a JavaScript option source is disabled", async () => {
       const m = makeModal({ options: { source: { js: `return ["expert"];` } } }, ["expert"], false);
@@ -136,100 +283,95 @@ describe("PickerModal", () => {
     });
   });
 
-  describe("sortedOptions", () => {
-    it("puts selected items first", () => {
+  describe("filteredOptions", () => {
+    it("keeps the selected item at its original position", () => {
       const m = makeModal({ type: "select" }, "banana");
-      const sortedOptions = (
+      const filteredOptions = (
         m as unknown as {
-          sortedOptions: (opts: Array<{ value: string }>, q: string) => Array<{ value: string }>;
+          filteredOptions: (opts: Array<{ value: string }>, q: string) => Array<{ value: string }>;
         }
-      ).sortedOptions.bind(m);
+      ).filteredOptions.bind(m);
       const opts = [{ value: "apple" }, { value: "banana" }, { value: "cherry" }];
-      const result = sortedOptions(opts, "");
-      expect(result[0]!.value).toBe("banana"); // selected first
+      const result = filteredOptions(opts, "");
+      expect(result.map((option) => option.value)).toEqual(["apple", "banana", "cherry"]);
     });
 
-    it("sorts unselected alphabetically", () => {
+    it("preserves source order instead of sorting alphabetically", () => {
       const m = makeModal({ type: "select" }, "banana");
-      const sortedOptions = (
+      const filteredOptions = (
         m as unknown as {
-          sortedOptions: (opts: Array<{ value: string }>, q: string) => Array<{ value: string }>;
+          filteredOptions: (opts: Array<{ value: string }>, q: string) => Array<{ value: string }>;
         }
-      ).sortedOptions.bind(m);
+      ).filteredOptions.bind(m);
       const opts = [{ value: "cherry" }, { value: "apple" }, { value: "banana" }];
-      const result = sortedOptions(opts, "");
-      expect(result[0]!.value).toBe("banana"); // selected
-      expect(result[1]!.value).toBe("apple"); // alphabetical
-      expect(result[2]!.value).toBe("cherry");
+      const result = filteredOptions(opts, "");
+      expect(result.map((option) => option.value)).toEqual(["cherry", "apple", "banana"]);
     });
 
     it("filters by search query", () => {
       const m = makeModal({ type: "select" }, null);
-      const sortedOptions = (
+      const filteredOptions = (
         m as unknown as {
-          sortedOptions: (opts: Array<{ value: string }>, q: string) => Array<{ value: string }>;
+          filteredOptions: (opts: Array<{ value: string }>, q: string) => Array<{ value: string }>;
         }
-      ).sortedOptions.bind(m);
+      ).filteredOptions.bind(m);
       const opts = [{ value: "apple" }, { value: "banana" }];
-      const result = sortedOptions(opts, "app");
+      const result = filteredOptions(opts, "app");
       expect(result).toHaveLength(1);
       expect(result[0]!.value).toBe("apple");
     });
 
     it("filters case-insensitively", () => {
       const m = makeModal({ type: "select" }, null);
-      const sortedOptions = (
+      const filteredOptions = (
         m as unknown as {
-          sortedOptions: (opts: Array<{ value: string }>, q: string) => Array<{ value: string }>;
+          filteredOptions: (opts: Array<{ value: string }>, q: string) => Array<{ value: string }>;
         }
-      ).sortedOptions.bind(m);
+      ).filteredOptions.bind(m);
       const opts = [{ value: "Apple" }, { value: "Banana" }];
-      const result = sortedOptions(opts, "APP");
+      const result = filteredOptions(opts, "APP");
       expect(result).toHaveLength(1);
       expect(result[0]!.value).toBe("Apple");
     });
 
     it("returns empty array when no options match query", () => {
       const m = makeModal({ type: "select" }, null);
-      const sortedOptions = (
+      const filteredOptions = (
         m as unknown as {
-          sortedOptions: (opts: Array<{ value: string }>, q: string) => Array<{ value: string }>;
+          filteredOptions: (opts: Array<{ value: string }>, q: string) => Array<{ value: string }>;
         }
-      ).sortedOptions.bind(m);
+      ).filteredOptions.bind(m);
       const opts = [{ value: "apple" }, { value: "banana" }];
-      const result = sortedOptions(opts, "xyz");
+      const result = filteredOptions(opts, "xyz");
       expect(result).toHaveLength(0);
     });
 
     it("filters by label when label does not match value", () => {
       const m = makeModal({ type: "select" }, null);
-      const sortedOptions = (
+      const filteredOptions = (
         m as unknown as {
-          sortedOptions: (
+          filteredOptions: (
             opts: Array<{ value: string; label?: string }>,
             q: string
           ) => Array<{ value: string; label?: string }>;
         }
-      ).sortedOptions.bind(m);
+      ).filteredOptions.bind(m);
       const opts = [{ value: "jrr-tolkien", label: "Tolkien" }];
-      const result = sortedOptions(opts, "tolkien");
+      const result = filteredOptions(opts, "tolkien");
       expect(result).toHaveLength(1);
       expect(result[0]!.value).toBe("jrr-tolkien");
     });
 
-    it("multiple selected items preserve their relative order (insertion order)", () => {
+    it("preserves the complete order with multiple selected items", () => {
       const m = makeModal({ type: "multiselect" }, ["cherry", "apple"]);
-      const sortedOptions = (
+      const filteredOptions = (
         m as unknown as {
-          sortedOptions: (opts: Array<{ value: string }>, q: string) => Array<{ value: string }>;
+          filteredOptions: (opts: Array<{ value: string }>, q: string) => Array<{ value: string }>;
         }
-      ).sortedOptions.bind(m);
+      ).filteredOptions.bind(m);
       const opts = [{ value: "banana" }, { value: "apple" }, { value: "cherry" }];
-      const result = sortedOptions(opts, "");
-      // cherry and apple are selected; banana is unselected
-      const values = result.map((o) => o.value);
-      expect(values.indexOf("cherry")).toBeLessThan(values.indexOf("banana"));
-      expect(values.indexOf("apple")).toBeLessThan(values.indexOf("banana"));
+      const result = filteredOptions(opts, "");
+      expect(result.map((o) => o.value)).toEqual(["banana", "apple", "cherry"]);
     });
   });
 
@@ -261,7 +403,7 @@ describe("PickerModal", () => {
       expect(result).toHaveLength(2);
       expect(result[0]?.label).toBe("Status");
       expect(result[0]?.type).toBe("select");
-      expect(result[0]?.options[0]?.value).toBe("published"); // selected first
+      expect(result[0]?.options.map((option) => option.value)).toEqual(["draft", "published"]);
       expect(result[1]?.label).toBe("Category");
       expect(result[1]?.type).toBe("multiselect");
     });

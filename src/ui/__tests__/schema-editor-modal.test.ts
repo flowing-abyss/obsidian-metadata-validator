@@ -1,7 +1,7 @@
 import type { App } from "obsidian";
 import { describe, expect, it } from "vitest";
 import type { ManifestCache } from "../../manifest/cache";
-import type { Manifest, ManifestData } from "../../types";
+import type { Manifest, ManifestData, ManifestField } from "../../types";
 import { SchemaEditorModal } from "../schema-editor-modal";
 
 function makeCache(manifests: Manifest[]): ManifestCache {
@@ -21,6 +21,71 @@ function inheritedKeys(manifestPath: string, data: ManifestData, cache: Manifest
 }
 
 describe("SchemaEditorModal inherited fields", () => {
+  it("keeps field help when switching to a different field type", () => {
+    const modal = new SchemaEditorModal(
+      {} as App,
+      "schemas/manifest.md",
+      {
+        fields: { status: { type: "select", description: "Work stage." } },
+      },
+      async () => undefined
+    );
+    const internal = modal as unknown as {
+      data: ManifestData;
+      renderFieldCard: (el: HTMLElement, key: string, field: ManifestField) => void;
+      buildCleanData: () => ManifestData;
+    };
+    const el = document.createElement("div");
+    internal.renderFieldCard(el, "status", internal.data.fields!.status!);
+    const select = el.querySelector<HTMLSelectElement>("select")!;
+    select.value = "text";
+    select.dispatchEvent(new Event("change"));
+    expect(internal.buildCleanData().fields?.status).toEqual({
+      type: "text",
+      description: "Work stage.",
+    });
+  });
+  it("preserves descriptions through editing option labels and saving", () => {
+    const modal = new SchemaEditorModal(
+      {} as App,
+      "schemas/manifest.md",
+      {
+        description: "A source.",
+        fields: {
+          status: {
+            type: "select",
+            description: "Work stage.",
+            options: [{ value: "done", label: "Done", description: "Work is complete." }],
+          },
+        },
+      },
+      async () => undefined
+    );
+    const internal = modal as unknown as {
+      renderOptionsFields: (
+        el: HTMLElement,
+        key: string,
+        field: ManifestField,
+        update: (patch: Partial<ManifestField>) => void
+      ) => void;
+      data: ManifestData;
+      buildCleanData: () => ManifestData;
+    };
+    const el = document.createElement("div");
+    // Render through the actual editor so changing a label exercises its option commit path.
+    internal.renderOptionsFields(el, "status", internal.data.fields!.status!, (patch) =>
+      Object.assign(internal.data.fields!.status!, patch)
+    );
+    const label = el.querySelector<HTMLInputElement>(".mv-option-label")!;
+    label.value = "Finished";
+    label.dispatchEvent(new Event("change"));
+    const saved = internal.buildCleanData();
+    expect(saved.description).toBe("A source.");
+    expect(saved.fields?.status?.description).toBe("Work stage.");
+    expect(saved.fields?.status?.options).toEqual([
+      { value: "done", label: "Finished", description: "Work is complete." },
+    ]);
+  });
   it("collects inherited fields from the full ancestor chain", () => {
     const category: Manifest = {
       path: "schemas/category/manifest.md",

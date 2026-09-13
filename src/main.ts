@@ -9,6 +9,7 @@ import { ContextMenuModal } from "./ui/context-menu-modal";
 import { CssInjector } from "./ui/css-injector";
 import { PropertyDecorator } from "./ui/decorator";
 import { ExplorerBadges } from "./ui/explorer-badges";
+import { registerKeyboardPropertiesCommand } from "./commands/keyboard-properties";
 
 import {
   SIDEBAR_PANEL_TYPE,
@@ -123,6 +124,7 @@ export default class MetadataValidatorPlugin extends Plugin {
       name: "Edit properties",
       callback: () => this.openPropertiesForActiveFile(),
     });
+    registerKeyboardPropertiesCommand(this, this.resolver, () => this.settings.enableJsExecution);
 
     // === CRITICAL: wait for vault to be fully indexed before loading schemas ===
     this.app.workspace.onLayoutReady(async () => {
@@ -243,7 +245,8 @@ export default class MetadataValidatorPlugin extends Plugin {
                   schema,
                   getFields,
                   (p) => void this.openSchemaEditor(p),
-                  this.settings.enableJsExecution
+                  this.settings.enableJsExecution,
+                  this
                 ).open();
               })
           );
@@ -344,7 +347,8 @@ export default class MetadataValidatorPlugin extends Plugin {
                   schema,
                   getFields,
                   (p) => void this.openSchemaEditor(p),
-                  this.settings.enableJsExecution
+                  this.settings.enableJsExecution,
+                  this
                 ).open();
               })
           );
@@ -384,7 +388,8 @@ export default class MetadataValidatorPlugin extends Plugin {
                 schema,
                 getFields,
                 (p) => void this.openSchemaEditor(p),
-                this.settings.enableJsExecution
+                this.settings.enableJsExecution,
+                this
               ).open();
             })
         );
@@ -764,7 +769,8 @@ export default class MetadataValidatorPlugin extends Plugin {
       schema,
       getFields,
       (p) => void this.openSchemaEditor(p),
-      this.settings.enableJsExecution
+      this.settings.enableJsExecution,
+      this
     ).open();
   }
 

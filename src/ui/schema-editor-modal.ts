@@ -242,6 +242,16 @@ export class SchemaEditorModal extends Modal {
     );
 
     new Setting(el)
+      .setName("Description")
+      .setClass("mv-description-setting")
+      .setDesc("What this note type represents.")
+      .addTextArea((t) =>
+        t.setValue(this.data.description ?? "").onChange((v) => {
+          this.data.description = v.trim() || undefined;
+        })
+      );
+
+    new Setting(el)
       .setName("Priority")
       .setDesc("Higher value wins when multiple schemas match.")
       .addText((t) => {
@@ -574,6 +584,7 @@ export class SchemaEditorModal extends Modal {
       const updated: ManifestField = {
         type: typeSelect.value as FieldType,
         label: existing?.label,
+        description: existing?.description,
         required: existing?.required,
       };
       fields[key] = updated;
@@ -618,6 +629,16 @@ export class SchemaEditorModal extends Modal {
       .setDesc("Human-readable display name (optional).")
       .addText((t) =>
         t.setValue(field.label ?? "").onChange((v) => update({ label: v || undefined }))
+      );
+
+    new Setting(body)
+      .setName("Description")
+      .setClass("mv-description-setting")
+      .setDesc("What this property means and when to use it.")
+      .addTextArea((t) =>
+        t
+          .setValue(field.description ?? "")
+          .onChange((v) => update({ description: v.trim() || undefined }))
       );
 
     new Setting(body)
@@ -725,7 +746,7 @@ export class SchemaEditorModal extends Modal {
 
     new Setting(body)
       .setName("JavaScript code")
-      .setDesc("DataView/Obsidian JS returning [{value, label}] — overrides expression if set.")
+      .setDesc("Return [{value, label, description}]. Overrides the expression if set.")
       .addTextArea((t) => {
         t.inputEl.addClass("mv-js-textarea");
         t.inputEl.setAttribute("placeholder", "Return app.vault.getMarkdownFiles()...");
@@ -812,7 +833,7 @@ export class SchemaEditorModal extends Modal {
 
     new Setting(dynamicPanel)
       .setName("JavaScript code")
-      .setDesc("DataView/Obsidian JS returning [{value, label}] — overrides expression.")
+      .setDesc("Return [{value, label, description}]. Overrides the expression.")
       .addTextArea((t) => {
         t.inputEl.addClass("mv-js-textarea");
         t.inputEl.setAttribute("placeholder", "Return app.vault.getMarkdownFiles()...");
@@ -904,15 +925,28 @@ export class SchemaEditorModal extends Modal {
 
         const delBtn = row.createEl("button", { text: "✕", cls: "mv-option-del clickable-icon" });
 
+        const descriptionInput = row.createEl("textarea", {
+          cls: "mv-option-description",
+          attr: {
+            placeholder: "Description (optional)",
+            "aria-label": "Option description",
+            rows: "2",
+          },
+        });
+        descriptionInput.value = opt.description ?? "";
+
         const commit = () => {
           options[idx] = {
+            ...options[idx],
             value: valInput.value.trim(),
             label: labelInput.value.trim() || undefined,
+            description: descriptionInput.value.trim() || undefined,
           };
           save();
         };
         valInput.addEventListener("change", commit);
         labelInput.addEventListener("change", commit);
+        descriptionInput.addEventListener("change", commit);
         delBtn.addEventListener("click", () => {
           options.splice(idx, 1);
           save();
@@ -1026,6 +1060,7 @@ export class SchemaEditorModal extends Modal {
     const out: Record<string, unknown> = {};
 
     if (d.name) out.name = d.name;
+    if (d.description) out.description = d.description;
     if (d.priority) out.priority = d.priority;
     if (d.extends) out.extends = d.extends;
     if (d.exclude?.length) out.exclude = d.exclude;
@@ -1041,6 +1076,7 @@ export class SchemaEditorModal extends Modal {
       if (!k.trim()) continue;
       const fOut: Record<string, unknown> = { type: f.type };
       if (f.label) fOut.label = f.label;
+      if (f.description) fOut.description = f.description;
       if (f.required) fOut.required = f.required;
       if (f.hidden) fOut.hidden = f.hidden;
       if (f.default !== undefined && f.default !== "") fOut.default = f.default;

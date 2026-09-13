@@ -16,6 +16,7 @@ export type FieldType =
 export interface FieldOption {
   value: string;
   label?: string;
+  description?: string;
   /** Optional UI group label for dynamic picker rendering */
   group?: string;
   /** Optional per-group selection mode for dynamic picker rendering */
@@ -35,6 +36,7 @@ export interface FieldSource {
 export interface ManifestField {
   type: FieldType;
   label?: string;
+  description?: string;
   required?: boolean;
   /** Hide this field from the Edit Properties modal */
   hidden?: boolean;
@@ -104,6 +106,10 @@ export interface Manifest {
 export interface ResolvedSchema {
   manifestPath: string;
   name: string;
+  /** Describes this schema only, not an ancestor. */
+  description?: string;
+  /** Names and descriptions of each ancestor, in inheritance order. */
+  manifestSummaries?: { path: string; name: string; description?: string }[];
   priority: number;
   enforce_folder?: boolean | string;
   target: ManifestTarget;
@@ -112,6 +118,27 @@ export interface ResolvedSchema {
   /** vault paths from root ancestor to this manifest */
   inheritanceChain: string[];
 }
+
+export interface PropertySuggestion {
+  key: string;
+  field: ManifestField;
+  label: string;
+}
+
+export type KeyboardPropertyItem = {
+  label: string;
+  description?: string;
+  section?: string;
+  pinned?: boolean;
+} & (
+  | { kind: "property"; property: PropertySuggestion }
+  | { kind: "option"; option: FieldOption }
+  | {
+      kind: "action";
+      action: "save" | "add" | "clear" | "message" | "date" | "calendar";
+      value?: string;
+    }
+);
 
 export type ValidationSeverity = "error" | "warning" | "info";
 

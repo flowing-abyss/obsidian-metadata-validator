@@ -2,6 +2,7 @@ import type { App, TFile } from "obsidian";
 import type { FieldOption, FieldSource } from "../types";
 import { executeJsSource, JsDisabledError } from "../utils/js-exec";
 import { evaluateQuery } from "./query";
+import { descriptionText } from "../utils/descriptions";
 
 type SourceResolutionStatus = "resolved" | "disabled" | "error";
 
@@ -52,16 +53,23 @@ export async function resolveSourceWithStatus(
       return evaluateQuery(q, f.path, tags, fm);
     });
     return {
-      options: filtered.map((f) => ({ value: f.basename, label: f.basename })),
+      options: filtered.map((f) => optionFromFile(f, app)),
       status: "resolved",
     };
   }
 
   const filtered = files.filter((f) => fileMatchesSource(f, source, app));
   return {
-    options: filtered.map((f) => ({ value: f.basename, label: f.basename })),
+    options: filtered.map((f) => optionFromFile(f, app)),
     status: "resolved",
   };
+}
+
+function optionFromFile(file: TFile, app: App): FieldOption {
+  const description = descriptionText(
+    app.metadataCache.getFileCache(file)?.frontmatter?.description
+  );
+  return { value: file.basename, label: file.basename, ...(description ? { description } : {}) };
 }
 
 function fileMatchesSource(file: TFile, source: FieldSource, app: App): boolean {
@@ -129,6 +137,7 @@ interface JsSourceItem {
   type?: string;
   value?: string | number | boolean;
   label?: string | number | boolean;
+  description?: unknown;
 }
 
 interface JsSourceGroup {
@@ -165,12 +174,14 @@ function optionFromUnknown(
   const label = coerceToString(typed.label ?? typed.value);
   const ownGroup = coerceToString(typed.group);
   const ownType = normalizeSelectionType(typed.type);
+  const description = descriptionText(typed.description);
 
   return {
     value,
     label,
     group: ownGroup || group,
     type: ownType ?? type,
+    ...(description ? { description } : {}),
   };
 }
 

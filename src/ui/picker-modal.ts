@@ -1,6 +1,10 @@
 import type { TFile } from "obsidian";
 import { App, Modal } from "obsidian";
-import { resolveSourceWithStatus, type SourceResolutionResult } from "../schema/source-resolver";
+import type { SourceResolutionResult } from "../schema/source-resolver";
+import { loadFieldOptions } from "../schema/field-options";
+import { descriptionText } from "../utils/descriptions";
+import { renderPickerSelection } from "./picker-selection";
+import { renderPickerOptionContent } from "./picker-option";
 import type { FieldOption, ManifestField, ResolvedSchema } from "../types";
 
 type SelectionMode = "select" | "multiselect";
@@ -23,10 +27,12 @@ export class PickerModal extends Modal {
   private sourceStatus: SourceResolutionResult["status"] = "resolved";
   // Mutable selection state — normalised values (no [[]])
   private selected: Set<string> = new Set();
-  // For multi-select: defer save to onClose to avoid concurrent processFrontMatter calls
-  private dirtyMulti = false;
+  // Defer removals and multi-select changes to one save on close.
+  private dirtySelection = false;
+  private removedValues = new Set<string>();
   // Keyboard navigation: index of the currently focused option row
   private focusedIdx = 0;
+  private selectionEl: HTMLElement | null = null;
 
   constructor(
     app: App,
@@ -68,17 +74,7 @@ export class PickerModal extends Modal {
   }
 
   private async loadOptions(): Promise<SourceResolutionResult> {
-    if (Array.isArray(this.field.options)) {
-      return { options: this.field.options, status: "resolved" };
-    }
-    if (this.field.source) {
-      return resolveSourceWithStatus(this.field.source, this.app, this.file, this.enableJs);
-    }
-    if (this.field.options && !Array.isArray(this.field.options)) {
-      const src = this.field.options.source;
-      if (src) return resolveSourceWithStatus(src, this.app, this.file, this.enableJs);
-    }
-    return { options: [], status: "resolved" };
+    return loadFieldOptions(this.field, this.app, this.file, this.enableJs);
   }
 
   private get emptyMessage(): string {
@@ -97,11 +93,14 @@ export class PickerModal extends Modal {
     contentEl.addClass("mv-picker-modal");
 
     const header = contentEl.createDiv("mv-picker-header");
-    header.createEl("strong", { text: this.fieldKey });
+    header.createEl("strong", { text: this.field.label ?? this.fieldKey });
     header.createSpan({
       text: ` · ${this.field.type}${this.field.required === true ? " · required" : ""}`,
       cls: "mv-picker-meta",
     });
+
+    const description = descriptionText(this.field.description);
+    if (description) contentEl.createDiv({ cls: "mv-field-description", text: description });
 
     const search = contentEl.createEl("input", {
       type: "text",
@@ -113,7 +112,11 @@ export class PickerModal extends Modal {
       search.setAttribute("placeholder", "Options unavailable");
     }
 
-    const listEl = contentEl.createDiv("mv-picker-list");
+    const optionsEl = contentEl.createDiv("mv-picker-options");
+    this.selectionEl = optionsEl.createDiv("mv-picker-selected");
+    const listEl = optionsEl.createDiv("mv-picker-list");
+    this.renderSelection(listEl);
+    listEl.setAttribute("aria-label", "All options");
     this.focusedIdx = 0;
     this.renderOptions(listEl, this.options, search.value);
 
@@ -121,6 +124,7 @@ export class PickerModal extends Modal {
       // Reset focus to first item on every search change
       this.focusedIdx = 0;
       this.renderOptions(listEl, this.options, search.value);
+      listEl.scrollTop = 0;
     });
 
     search.addEventListener("keydown", (e) => {
@@ -145,12 +149,12 @@ export class PickerModal extends Modal {
     if (!search.disabled) search.focus();
   }
 
-  private applyFocus(items: HTMLElement[]): void {
+  private applyFocus(items: HTMLElement[], scroll = true): void {
     items.forEach((el) => el.removeClass("is-focused"));
     const target = items[this.focusedIdx];
     if (target) {
       target.addClass("is-focused");
-      target.scrollIntoView({ block: "nearest" });
+      if (scroll) target.scrollIntoView({ block: "nearest" });
     }
   }
 
@@ -188,22 +192,17 @@ export class PickerModal extends Modal {
     return s.trim();
   }
 
-  private sortedOptions(options: FieldOption[], query: string): FieldOption[] {
+  private filteredOptions(options: FieldOption[], query: string): FieldOption[] {
     const q = query.toLowerCase();
-    const filtered = q
+    return q
       ? options.filter(
-          (o) => o.value.toLowerCase().includes(q) || (o.label ?? "").toLowerCase().includes(q)
+          (o) =>
+            o.value.toLowerCase().includes(q) ||
+            (o.label ?? "").toLowerCase().includes(q) ||
+            (descriptionText(o.description) ?? "").toLowerCase().includes(q) ||
+            (o.group ?? "").toLowerCase().includes(q)
         )
       : options;
-    // Single-pass partition — avoids iterating filtered twice
-    const sel: FieldOption[] = [];
-    const unsel: FieldOption[] = [];
-    for (const o of filtered) {
-      if (this.selected.has(o.value)) sel.push(o);
-      else unsel.push(o);
-    }
-    unsel.sort((a, b) => (a.label ?? a.value).localeCompare(b.label ?? b.value));
-    return [...sel, ...unsel];
   }
 
   private defaultSelectionMode(): SelectionMode {
@@ -219,33 +218,11 @@ export class PickerModal extends Modal {
     return group && group.length > 0 ? group : "__default__";
   }
 
-  private sortGroupOptions(opts: FieldOption[]): FieldOption[] {
-    const sel: FieldOption[] = [];
-    const unsel: FieldOption[] = [];
-    for (const o of opts) {
-      if (this.selected.has(o.value)) sel.push(o);
-      else unsel.push(o);
-    }
-    unsel.sort((a, b) => (a.label ?? a.value).localeCompare(b.label ?? b.value));
-    return [...sel, ...unsel];
-  }
-
   private groupedOptions(options: FieldOption[], query: string): OptionGroupView[] {
     const defaultType = this.defaultSelectionMode();
-    const q = query.toLowerCase();
     const groups = new Map<string, OptionGroupView>();
 
-    for (const raw of options) {
-      const label = raw.label ?? raw.value;
-      if (
-        q &&
-        !raw.value.toLowerCase().includes(q) &&
-        !label.toLowerCase().includes(q) &&
-        !(raw.group ?? "").toLowerCase().includes(q)
-      ) {
-        continue;
-      }
-
+    for (const raw of this.filteredOptions(options, query)) {
       const key = this.getOptionGroupKey(raw);
       const groupLabel = raw.group?.trim() ?? "";
       const mode = raw.type === "select" || raw.type === "multiselect" ? raw.type : defaultType;
@@ -267,17 +244,15 @@ export class PickerModal extends Modal {
       });
     }
 
-    return Array.from(groups.values()).map((group) => ({
-      ...group,
-      options: this.sortGroupOptions(group.options),
-    }));
+    return Array.from(groups.values());
   }
 
   private toggleOption(opt: FieldOption): void {
     if (!this.isMulti) {
       this.selected.clear();
       this.selected.add(opt.value);
-      this.dirtyMulti = false;
+      this.dirtySelection = false;
+      this.removedValues.delete(opt.value);
       return;
     }
 
@@ -296,8 +271,30 @@ export class PickerModal extends Modal {
       this.selected.delete(opt.value);
     } else {
       this.selected.add(opt.value);
+      this.removedValues.delete(opt.value);
     }
-    this.dirtyMulti = true;
+    this.dirtySelection = true;
+  }
+
+  private renderSelection(listEl: HTMLElement): void {
+    if (!this.selectionEl) return;
+    renderPickerSelection(this.selectionEl, this.options, this.selected, (value) => {
+      this.selected.delete(value);
+      this.removedValues.add(value);
+      this.dirtySelection = true;
+      this.refreshSelection(listEl);
+    });
+  }
+
+  private refreshSelection(listEl: HTMLElement): void {
+    const rows = Array.from(listEl.querySelectorAll<HTMLElement>(".mv-picker-option"));
+    for (const row of rows) {
+      const selected = this.selected.has(row.dataset.value ?? "");
+      row.toggleClass("is-selected", selected);
+      row.setAttribute("aria-pressed", String(selected));
+    }
+    this.applyFocus(rows, false);
+    this.renderSelection(listEl);
   }
 
   private renderOptions(listEl: HTMLElement, options: FieldOption[], query: string): void {
@@ -313,24 +310,26 @@ export class PickerModal extends Modal {
     const addOptionRow = (container: HTMLElement, opt: FieldOption) => {
       const isSelected = this.selected.has(opt.value);
 
-      const item = container.createDiv({
-        cls: isSelected ? "mv-picker-option is-selected" : "mv-picker-option",
+      const item = container.createEl("button", {
+        attr: { type: "button", "aria-pressed": String(isSelected) },
+        cls: "mv-picker-choice mv-picker-option" + (isSelected ? " is-selected" : ""),
       });
 
-      item.createSpan({ text: opt.label ?? opt.value });
-      if (opt.label && opt.label !== opt.value) {
-        item.createSpan({ text: opt.value, cls: "mv-picker-value-hint" });
-      }
+      renderPickerOptionContent(item, opt);
 
       item.addEventListener("click", () => {
         this.toggleOption(opt);
         if (this.isMulti) {
-          this.renderOptions(listEl, options, query);
+          // Update in place so selection never moves rows, scroll, or DOM focus.
+          const rows = Array.from(listEl.querySelectorAll<HTMLElement>(".mv-picker-option"));
+          this.focusedIdx = rows.indexOf(item);
+          this.refreshSelection(listEl);
         } else {
           this.persistSelection();
           this.close();
         }
       });
+      item.dataset.value = opt.value;
     };
 
     if (!hasNamedGroups && groups.length === 1) {
@@ -354,10 +353,10 @@ export class PickerModal extends Modal {
       }
     }
 
-    // Restore keyboard focus after every render (including re-renders after toggle)
+    // Highlight the keyboard target without moving the surrounding modal.
     const items = Array.from(listEl.querySelectorAll<HTMLElement>(".mv-picker-option"));
     this.focusedIdx = Math.min(this.focusedIdx, items.length - 1);
-    this.applyFocus(items);
+    this.applyFocus(items, false);
   }
 
   /**
@@ -409,7 +408,7 @@ export class PickerModal extends Modal {
             const existing = Array.isArray(fm[key]) ? (fm[key] as unknown[]) : [];
             const unmanaged = existing.filter((v) => {
               const n = this.normalise(v);
-              return n !== "" && !optionValues.has(n);
+              return n !== "" && !optionValues.has(n) && !this.removedValues.has(n);
             });
             savedValue = [...managed, ...unmanaged];
           } else {
@@ -433,11 +432,12 @@ export class PickerModal extends Modal {
   }
 
   onClose(): void {
-    // For multi-select: flush accumulated selection on close (single save, no races)
-    if (this.dirtyMulti) {
-      this.dirtyMulti = false;
+    // Flush pending edits once, including clearing a single selection.
+    if (this.dirtySelection) {
+      this.dirtySelection = false;
       this.persistSelection();
     }
     this.contentEl.empty();
+    this.selectionEl = null;
   }
 }

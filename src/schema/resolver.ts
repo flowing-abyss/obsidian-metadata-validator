@@ -78,6 +78,15 @@ export class SchemaResolver {
     return {
       manifestPath: manifest.path,
       name: data.name ?? manifest.folderPath.split("/").pop() ?? "unknown",
+      description: manifest.data.description,
+      manifestSummaries: chain.map((path) => {
+        const ancestor = this.cache.getByFolder(path.replace(/\/manifest\.md$/, ""));
+        return {
+          path,
+          name: ancestor?.data.name ?? path.split("/").slice(-2)[0] ?? path,
+          description: ancestor?.data.description,
+        };
+      }),
       priority: data.priority ?? 0,
       enforce_folder: data.enforce_folder,
       target: data.target ?? {},

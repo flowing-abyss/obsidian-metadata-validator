@@ -7,6 +7,7 @@ import { sanitizeFrontmatter } from "../validation/frontmatter";
 import type { PickerModal as PickerModalType } from "./picker-modal";
 import type { QuickEditModal as QuickEditModalType } from "./quick-edit-modal";
 import type { showValidatorTooltip as showValidatorTooltipType } from "./validator-tooltip";
+import { DescriptionHelp } from "./description-help";
 
 const PICKER_ATTR = "data-mv-picker";
 const PICKER_CONTEXT_ATTR = "data-mv-picker-context";
@@ -38,6 +39,7 @@ interface CachedResult {
 type NormalizedKeyMap = Map<string, string | null>;
 
 export class PropertyDecorator {
+  private readonly descriptions = new DescriptionHelp();
   private observer: MutationObserver | null = null;
   private readonly app: App;
   private readonly resolver: SchemaResolver;
@@ -61,6 +63,7 @@ export class PropertyDecorator {
   }
 
   attach(): void {
+    this.descriptions.load();
     // MutationObserver catches incremental property row additions (e.g. while
     // Obsidian is still building the properties panel). Short debounce to avoid
     // thrashing — the first paint is handled by decorateNow() called from main.ts.
@@ -87,6 +90,7 @@ export class PropertyDecorator {
   }
 
   detach(): void {
+    this.descriptions.unload();
     this.observer?.disconnect();
     this.observer = null;
     if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
@@ -106,6 +110,7 @@ export class PropertyDecorator {
    * Call this when the schema changes so re-decoration picks up the fresh fieldDefs.
    */
   clearIcons(): void {
+    this.descriptions.clear();
     activeDocument
       .querySelectorAll(`[${PICKER_ATTR}],[${VALIDATOR_ATTR}]`)
       .forEach((el) => el.remove());
@@ -176,12 +181,15 @@ export class PropertyDecorator {
     const normalizedSchemaKeys = this.buildNormalizedSchemaKeyMap(schema);
 
     const rows = Array.from(activeDocument.querySelectorAll<HTMLElement>(".metadata-property"));
+    this.descriptions.prune();
     for (const row of rows) {
       const rowKey = row.getAttribute("data-property-key");
       if (!rowKey) continue;
       const schemaKey = this.resolveSchemaFieldKey(rowKey, schema, normalizedSchemaKeys);
 
       if (!schemaKey) {
+        const name = row.querySelector<HTMLElement>(".metadata-property-key");
+        if (name) this.descriptions.unbind(name);
         this.injectValidatorIcon(row, rowKey, resultMap.get(rowKey) ?? []);
         row.querySelector(`[${PICKER_ATTR}]`)?.remove();
         row.classList.remove(HAS_PICKER_CLASS);
@@ -189,6 +197,13 @@ export class PropertyDecorator {
       }
 
       this.injectPickerIcon(row, schemaKey, schema, file, frontmatter);
+      const name = row.querySelector<HTMLElement>(".metadata-property-key");
+      if (name)
+        this.descriptions.bind(
+          name,
+          schema.fields[schemaKey]?.description,
+          schema.fields[schemaKey]?.label ?? schemaKey
+        );
       this.injectValidatorIcon(row, schemaKey, resultMap.get(schemaKey) ?? []);
     }
   }

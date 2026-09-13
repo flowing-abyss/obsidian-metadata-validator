@@ -31,6 +31,42 @@ function makeFile(
 }
 
 describe("SchemaResolver", () => {
+  it("keeps ancestor help separate from a missing child description", () => {
+    const cache = makeCache([
+      {
+        path: "schemas/manifest.md",
+        folderPath: "schemas",
+        data: {
+          name: "Source",
+          description: "A source.",
+          fields: {
+            status: {
+              type: "select",
+              description: "Work stage.",
+              options: [{ value: "done", description: "Work is complete." }],
+            },
+          },
+        },
+      },
+      {
+        path: "schemas/book/manifest.md",
+        folderPath: "schemas/book",
+        data: { name: "Book", target: { query: "#book" } },
+      },
+    ]);
+    const resolver = new SchemaResolver(cache);
+    resolver.rebuild();
+    const schema = resolver.resolveForNote(makeFile("Books/Dune.md"), { tags: ["book"] });
+    expect(schema?.description).toBeUndefined();
+    expect(schema?.manifestSummaries?.[0]).toMatchObject({
+      name: "Source",
+      description: "A source.",
+    });
+    expect(schema?.fields.status?.description).toBe("Work stage.");
+    expect(schema?.fields.status?.options).toEqual([
+      { value: "done", description: "Work is complete." },
+    ]);
+  });
   it("matches note to schema by folder expression", () => {
     const cache = makeCache([
       {

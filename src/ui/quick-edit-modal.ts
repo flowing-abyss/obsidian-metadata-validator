@@ -1,6 +1,7 @@
 import { App, Modal } from "obsidian";
 import type { TFile } from "obsidian";
 import type { ManifestField } from "../types";
+import { descriptionText } from "../utils/descriptions";
 
 /**
  * Compact single-field editor opened when clicking a type icon in the properties panel.
@@ -35,6 +36,8 @@ export class QuickEditModal extends Modal {
       text: this.fieldDef.label ?? this.fieldKey,
       cls: "mv-qe-title",
     });
+    const description = descriptionText(this.fieldDef.description);
+    if (description) contentEl.createDiv({ cls: "mv-field-description", text: description });
     this.renderInput(contentEl);
   }
 

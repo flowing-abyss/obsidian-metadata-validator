@@ -1,8 +1,11 @@
-import type { EventRef, TFile } from "obsidian";
+import type { Component, EventRef, TFile } from "obsidian";
 import { App, Modal, setIcon } from "obsidian";
 import type { FieldType, ManifestField, ResolvedSchema, ValidationResult } from "../types";
 import { ValidationEngine } from "../validation/engine";
 import { PickerModal } from "./picker-modal";
+import { DescriptionHelp } from "./description-help";
+import { descriptionText } from "../utils/descriptions";
+import { loadFieldOptions } from "../schema/field-options";
 import type { showValidatorTooltip as showValidatorTooltipType } from "./validator-tooltip";
 
 const FIELD_TYPE_ICON: Record<FieldType, string> = {
@@ -19,6 +22,7 @@ const FIELD_TYPE_ICON: Record<FieldType, string> = {
 };
 
 export class ContextMenuModal extends Modal {
+  private readonly descriptions = new DescriptionHelp();
   private readonly file: TFile;
   private readonly schema: ResolvedSchema;
   private readonly engine: ValidationEngine;
@@ -35,6 +39,7 @@ export class ContextMenuModal extends Modal {
   private cacheEventRef: EventRef | null = null;
 
   private readonly enableJs: boolean;
+  private readonly owner: Component | undefined;
 
   constructor(
     app: App,
@@ -42,18 +47,22 @@ export class ContextMenuModal extends Modal {
     schema: ResolvedSchema,
     getManifestFields?: (path: string) => Record<string, ManifestField> | undefined,
     openSchemaEditor?: (manifestPath: string) => void,
-    enableJs = false
+    enableJs = false,
+    owner?: Component
   ) {
     super(app);
     this.file = file;
     this.schema = schema;
     this.enableJs = enableJs;
+    this.owner = owner;
     this.engine = new ValidationEngine(app, { enableJsExecution: enableJs });
     this.getManifestFields = getManifestFields ?? null;
     this.openSchemaEditor = openSchemaEditor ?? null;
   }
 
   async onOpen(): Promise<void> {
+    this.owner?.addChild(this.descriptions);
+    this.descriptions.load();
     const cache = this.app.metadataCache.getFileCache(this.file);
     this.localFrontmatter = { ...(cache?.frontmatter ?? {}) };
     delete this.localFrontmatter["position"];
@@ -150,6 +159,7 @@ export class ContextMenuModal extends Modal {
     resultMap: Map<string, ValidationResult[]>
   ): void {
     const { contentEl } = this;
+    this.descriptions.clear();
     contentEl.empty();
     contentEl.addClass("mv-context-modal");
     this.titleEl.addClass("mv-hidden");
@@ -213,7 +223,15 @@ export class ContextMenuModal extends Modal {
 
     // Label column: field name only
     const labelEl = row.createDiv("mv-field-label");
-    labelEl.createSpan({ text: fieldDef.label ?? fieldKey, cls: "mv-field-label-text" });
+    const labelText = fieldDef.label ?? fieldKey;
+    const label = descriptionText(fieldDef.description)
+      ? labelEl.createEl("button", {
+          text: labelText,
+          cls: "mv-field-label-text mv-description-trigger",
+          attr: { type: "button" },
+        })
+      : labelEl.createSpan({ text: labelText, cls: "mv-field-label-text" });
+    this.descriptions.bind(label, fieldDef.description, labelText, true);
 
     // Type icon column — own grid cell so it stays vertically centred even when
     // the value column has multi-line content (tags, aliases, etc.)
@@ -243,6 +261,13 @@ export class ContextMenuModal extends Modal {
     }
 
     this.renderEditor(valueEl, fieldKey, fieldDef, frontmatter);
+    if (fieldDef.description) {
+      valueEl.querySelectorAll("input, textarea").forEach((input) => {
+        input.setAttribute("aria-label", labelText);
+        const describedBy = label.getAttribute("aria-describedby");
+        if (describedBy) input.setAttribute("aria-describedby", describedBy);
+      });
+    }
 
     // Wire up URL icon → switch to edit input after editor is rendered
     if (fieldDef.type === "url" && fieldDef.fixed === undefined) {
@@ -480,6 +505,14 @@ export class ContextMenuModal extends Modal {
           text: displayName,
         });
         this.decorateInternalLink(link, linkTarget);
+        link.setAttribute("data-mv-value", linkTarget);
+        const linked = this.app.metadataCache.getFirstLinkpathDest(linkTarget, this.file.path);
+        if (linked)
+          this.descriptions.bind(
+            link,
+            this.app.metadataCache.getFileCache(linked)?.frontmatter?.description,
+            displayName
+          );
         link.addEventListener("click", (e) => {
           e.preventDefault();
           void this.app.workspace.openLinkText(linkTarget, this.file.path, true);
@@ -489,12 +522,28 @@ export class ContextMenuModal extends Modal {
         if (fieldKey.trim().toLowerCase() === "tags") {
           chipClasses.push("mv-chip--tags");
         }
-        const chip = container.createSpan({ text: displayName, cls: chipClasses.join(" ") });
+        const chip = container.createEl("button", {
+          text: displayName,
+          cls: `${chipClasses.join(" ")} mv-description-trigger`,
+          attr: { type: "button", "data-mv-value": raw },
+        });
         chip.addEventListener("click", () => {
           this.openPicker(fieldKey, fieldDef);
         });
       }
     }
+    void loadFieldOptions(fieldDef, this.app, this.file, this.enableJs).then(({ options }) => {
+      if (!container.isConnected) return;
+      const byValue = new Map(options.map((option) => [option.value, option]));
+      container.querySelectorAll<HTMLElement>("[data-mv-value]").forEach((chip) => {
+        const value = chip.getAttribute("data-mv-value") ?? "";
+        const option =
+          byValue.get(value) ?? (isLink ? byValue.get(value.split("/").pop() ?? value) : undefined);
+        if (option && descriptionText(option.description)) {
+          this.descriptions.bind(chip, option.description, option.label ?? option.value);
+        }
+      });
+    });
   }
 
   /** List type: chips with inline add/remove */
@@ -620,6 +669,7 @@ export class ContextMenuModal extends Modal {
   }
 
   private openPicker(fieldKey: string, fieldDef: ManifestField): void {
+    this.descriptions.dismiss();
     // Always read from localFrontmatter — never from a stale render-time closure
     new PickerModal(
       this.app,
@@ -737,10 +787,12 @@ export class ContextMenuModal extends Modal {
 
     if (chain.length <= 1) {
       footer.createSpan({ text: "Schema: ", cls: "mv-footer-label" });
-      const schemaSpan = footer.createSpan({
+      const schemaSpan = footer.createEl("button", {
+        attr: { type: "button" },
         text: this.schema.name,
         cls: "mv-footer-schema-name",
       });
+      this.descriptions.bind(schemaSpan, this.schema.description, this.schema.name);
       if (this.openSchemaEditor && chain[0]) {
         const manifestPath = chain[0];
         schemaSpan.addEventListener("click", () => {
@@ -767,11 +819,14 @@ export class ContextMenuModal extends Modal {
       const parts = manifestPath.split("/");
       const name = parts.length >= 2 ? (parts[parts.length - 2] ?? manifestPath) : manifestPath;
 
-      const schemaSpan = footer.createSpan({
+      const schemaSpan = footer.createEl("button", {
+        attr: { type: "button" },
         text: name,
         cls: "mv-footer-schema-name",
       });
       schemaSpan.setAttribute("data-mv-chain-path", manifestPath);
+      const summary = this.schema.manifestSummaries?.find((item) => item.path === manifestPath);
+      this.descriptions.bind(schemaSpan, summary?.description, summary?.name ?? name);
 
       // Click: open schema editor for this manifest
       if (this.openSchemaEditor) {
@@ -820,6 +875,8 @@ export class ContextMenuModal extends Modal {
   }
 
   onClose(): void {
+    if (this.owner) this.owner.removeChild(this.descriptions);
+    else this.descriptions.unload();
     if (this.cacheEventRef) {
       this.app.metadataCache.offref(this.cacheEventRef);
       this.cacheEventRef = null;

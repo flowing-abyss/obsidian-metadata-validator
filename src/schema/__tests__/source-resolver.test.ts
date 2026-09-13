@@ -46,6 +46,29 @@ function makeAppWithDataview(
 }
 
 describe("resolveSource", () => {
+  it("preserves descriptions from note metadata and grouped JavaScript results", async () => {
+    const app = makeAppWithDataview([
+      { path: "People/Alice.md", tags: [], fm: { description: "  Writes books.  " } },
+      { path: "People/Bob.md", tags: [], fm: { description: { invalid: true } } },
+    ]);
+    const notes = await resolveSource({ folder: "People/" }, app, null);
+    expect(notes[0]?.description).toBe("Writes books.");
+    expect(notes[1]?.description).toBeUndefined();
+    const grouped = await resolveSource(
+      {
+        js: `return [{ group: "People", type: "select", options: [{ value: "Alice", description: "Writes books." }] }];`,
+      },
+      app,
+      null,
+      true
+    );
+    expect(grouped[0]).toMatchObject({
+      value: "Alice",
+      description: "Writes books.",
+      group: "People",
+      type: "select",
+    });
+  });
   it("filters by folder", async () => {
     const app = makeApp([
       { path: "People/Alice.md", tags: [], fm: {} },
