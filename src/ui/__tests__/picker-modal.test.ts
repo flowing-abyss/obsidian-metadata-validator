@@ -8,6 +8,7 @@ function makeModal(field: Partial<ManifestField>, currentValue: unknown, enableJ
   const file = { path: "test.md", basename: "test", extension: "md" } as TFile;
   const schema = {
     manifestPath: "schemas/test/manifest.md",
+    rules: [],
     inheritanceChain: ["schemas/test/manifest.md"],
     name: "test",
     priority: 0,

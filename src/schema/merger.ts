@@ -1,4 +1,4 @@
-import type { ManifestData } from "../types";
+import type { ManifestData, ManifestRule } from "../types";
 
 /**
  * Merge parent and child ManifestData.
@@ -8,6 +8,8 @@ import type { ManifestData } from "../types";
  * - formatting: child overrides parent if present
  * - target: always the child's own (never inherited)
  * - name, description, priority, extends: always child's own
+ * - rules: parent rules first, then child rules; a child rule with the same
+ *   name replaces the parent's in place; child `exclude` drops rules by name
  */
 export function mergeSchemas(parent: ManifestData, child: ManifestData): ManifestData {
   const mergedFields: Record<string, import("../types").ManifestField> = {
@@ -29,6 +31,26 @@ export function mergeSchemas(parent: ManifestData, child: ManifestData): Manifes
     enforce_folder: child.enforce_folder ?? parent.enforce_folder,
     target: child.target && Object.keys(child.target).length > 0 ? child.target : parent.target,
     fields: mergedFields,
+    rules: mergeRules(parent.rules ?? [], child.rules ?? [], child.exclude),
     formatting: child.formatting ?? parent.formatting,
   };
+}
+
+/**
+ * Append `child` rules after `parent` rules. A child rule whose `name` matches
+ * a parent rule replaces it in the parent's position. Names in `exclude` are dropped.
+ */
+export function mergeRules(
+  parent: ManifestRule[],
+  child: ManifestRule[],
+  exclude?: string[]
+): ManifestRule[] {
+  const out = [...parent];
+  for (const rule of child) {
+    const idx = rule.name ? out.findIndex((r) => r.name === rule.name) : -1;
+    if (idx === -1) out.push(rule);
+    else out[idx] = rule;
+  }
+  const dropped = new Set(exclude ?? []);
+  return out.filter((r) => !r.name || !dropped.has(r.name));
 }

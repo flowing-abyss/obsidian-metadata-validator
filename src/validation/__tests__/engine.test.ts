@@ -28,6 +28,7 @@ const SCHEMA: ResolvedSchema = {
     icon: { type: "text", fixed: "📚" },
   },
   formatting: {},
+  rules: [],
   inheritanceChain: ["schemas/book/manifest.md"],
 };
 
@@ -54,6 +55,7 @@ const DATE_SCHEMA: ResolvedSchema = {
     date: { type: "date", format: "YYYY-MM-DD" },
   },
   formatting: {},
+  rules: [],
   inheritanceChain: ["schemas/event/manifest.md"],
 };
 
@@ -70,6 +72,7 @@ const LINK_SCHEMA: ResolvedSchema = {
     },
   },
   formatting: {},
+  rules: [],
   inheritanceChain: ["schemas/book/manifest.md"],
 };
 
@@ -85,6 +88,7 @@ const JS_SCHEMA: ResolvedSchema = {
     },
   },
   formatting: {},
+  rules: [],
   inheritanceChain: ["schemas/custom/manifest.md"],
 };
 
@@ -158,6 +162,7 @@ describe("ValidationEngine", () => {
         },
       },
       formatting: {},
+      rules: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -243,6 +248,7 @@ describe("ValidationEngine", () => {
         },
       },
       formatting: {},
+      rules: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -268,6 +274,7 @@ describe("ValidationEngine", () => {
         },
       },
       formatting: {},
+      rules: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -298,6 +305,7 @@ describe("ValidationEngine", () => {
         },
       },
       formatting: {},
+      rules: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -326,6 +334,7 @@ describe("ValidationEngine", () => {
         },
       },
       formatting: {},
+      rules: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -349,6 +358,7 @@ describe("ValidationEngine", () => {
         a: { type: "text" },
       },
       formatting: { property_order: ["a", "z"] },
+      rules: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -374,6 +384,7 @@ describe("ValidationEngine", () => {
         a: { type: "text" },
       },
       formatting: { property_order: ["a", "z"] },
+      rules: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -394,6 +405,7 @@ describe("ValidationEngine", () => {
       target: {},
       fields: {},
       formatting: {},
+      rules: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -420,6 +432,7 @@ describe("ValidationEngine", () => {
         },
       },
       formatting: {},
+      rules: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -444,6 +457,7 @@ describe("ValidationEngine", () => {
         count: { type: "number" },
       },
       formatting: {},
+      rules: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();

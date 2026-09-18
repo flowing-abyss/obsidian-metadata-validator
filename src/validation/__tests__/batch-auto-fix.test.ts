@@ -47,6 +47,7 @@ function makeSchema(overrides: Partial<ResolvedSchema> = {}): ResolvedSchema {
     target: { query: "books/" },
     fields: {},
     formatting: {},
+    rules: [],
     inheritanceChain: ["schemas/books/manifest.md"],
     ...overrides,
   };

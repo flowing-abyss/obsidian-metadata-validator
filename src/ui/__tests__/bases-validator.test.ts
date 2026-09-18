@@ -16,6 +16,7 @@ function makeFile(path: string): TFile {
 function makeSchema(): ResolvedSchema {
   return {
     manifestPath: "schemas/proj/manifest.md",
+    rules: [],
     inheritanceChain: ["schemas/proj/manifest.md"],
     name: "proj",
     priority: 0,

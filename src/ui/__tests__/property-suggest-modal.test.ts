@@ -9,6 +9,7 @@ import * as optionSource from "../../schema/field-options";
 const schema: ResolvedSchema = {
   name: "Book",
   manifestPath: "schemas/book/manifest.md",
+  rules: [],
   inheritanceChain: [],
   priority: 0,
   target: {},

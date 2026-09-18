@@ -19,6 +19,7 @@ function makeFile(path: string): TFile {
 function makeSchema(manifestPath: string): ResolvedSchema {
   return {
     manifestPath,
+    rules: [],
     inheritanceChain: [manifestPath],
     name: manifestPath.split("/").at(-2) ?? "schema",
     priority: 0,

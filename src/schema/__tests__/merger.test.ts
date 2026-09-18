@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mergeSchemas } from "../merger";
+import { mergeRules, mergeSchemas } from "../merger";
 import type { ManifestData } from "../../types";
 
 describe("mergeSchemas", () => {
@@ -79,5 +79,52 @@ describe("mergeSchemas", () => {
     const child = { target: {}, fields: {} };
     const merged = mergeSchemas(parent, child);
     expect(merged.target).toEqual({ tag: "source" });
+  });
+});
+
+describe("mergeRules", () => {
+  it("appends child rules after parent rules", () => {
+    const merged = mergeRules([{ then: { set: { a: 1 } } }], [{ then: { set: { b: 2 } } }]);
+    expect(merged).toEqual([{ then: { set: { a: 1 } } }, { then: { set: { b: 2 } } }]);
+  });
+
+  it("replaces a parent rule with the same name in place", () => {
+    const merged = mergeRules(
+      [
+        { name: "x", then: { set: { a: 1 } } },
+        { then: { set: { c: 3 } } },
+      ],
+      [{ name: "x", then: { set: { a: 9 } } }]
+    );
+    expect(merged).toEqual([
+      { name: "x", then: { set: { a: 9 } } },
+      { then: { set: { c: 3 } } },
+    ]);
+  });
+
+  it("drops excluded names and keeps unnamed rules", () => {
+    expect(
+      mergeRules(
+        [
+          { name: "x", then: {} },
+          { name: "y", then: {} },
+          { then: {} },
+        ],
+        [],
+        ["x"]
+      )
+    ).toEqual([{ name: "y", then: {} }, { then: {} }]);
+  });
+
+  it("mergeSchemas merges rules and honours exclude", () => {
+    const merged = mergeSchemas(
+      { rules: [{ name: "p", then: {} }, { name: "gone", then: {} }] },
+      { rules: [{ name: "c", then: {} }], exclude: ["gone"] }
+    );
+    expect(merged.rules?.map((r) => r.name)).toEqual(["p", "c"]);
+  });
+
+  it("mergeSchemas yields an empty list when neither side has rules", () => {
+    expect(mergeSchemas({}, {}).rules).toEqual([]);
   });
 });

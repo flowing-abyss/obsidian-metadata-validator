@@ -46,6 +46,7 @@ describe("BasesDecorator", () => {
     const file = makeFile("Notes/daily.md");
     const schema: ResolvedSchema = {
       manifestPath: "schemas/daily/manifest.md",
+      rules: [],
       inheritanceChain: ["schemas/daily/manifest.md"],
       name: "daily",
       priority: 0,
@@ -98,6 +99,7 @@ describe("BasesDecorator", () => {
     const file = makeFile("Notes/daily.md");
     const schema: ResolvedSchema = {
       manifestPath: "schemas/daily/manifest.md",
+      rules: [],
       inheritanceChain: ["schemas/daily/manifest.md"],
       name: "daily",
       priority: 0,

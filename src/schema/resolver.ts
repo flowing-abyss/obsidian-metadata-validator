@@ -1,7 +1,7 @@
 import type { TFile } from "obsidian";
 import type { ManifestCache } from "../manifest/cache";
-import type { Manifest, ManifestData, ResolvedSchema } from "../types";
-import { mergeSchemas } from "./merger";
+import type { Manifest, ManifestData, ManifestRule, ResolvedSchema } from "../types";
+import { mergeRules, mergeSchemas } from "./merger";
 import { evaluateQuery } from "./query";
 
 interface ResolvedNode {
@@ -91,9 +91,43 @@ export class SchemaResolver {
       enforce_folder: data.enforce_folder,
       target: data.target ?? {},
       fields: data.fields ?? {},
+      rules: this.collectRules(manifest, chain),
       formatting: data.formatting ?? {},
       inheritanceChain: chain,
     };
+  }
+
+  /**
+   * Rules in execution order: outer before inner; in the same folder a rules.md
+   * comes before the manifest.md. Same-name rules replace earlier ones in place,
+   * a manifest's `exclude` drops rules by name.
+   */
+  private collectRules(manifest: Manifest, chain: string[]): ManifestRule[] {
+    const depthOf = (folder: string) => folder.split("/").length;
+    const contributions: Array<{
+      depth: number;
+      kind: 0 | 1;
+      rules: ManifestRule[];
+      exclude?: string[];
+    }> = [];
+    for (const rf of this.cache.getRulesFilesForFolder(manifest.folderPath)) {
+      contributions.push({ depth: depthOf(rf.folderPath), kind: 0, rules: rf.rules });
+    }
+    for (const path of chain) {
+      const m = this.cache.getByPath(path);
+      if (!m) continue;
+      contributions.push({
+        depth: depthOf(m.folderPath),
+        kind: 1,
+        rules: m.data.rules ?? [],
+        exclude: m.data.exclude,
+      });
+    }
+    contributions.sort((a, b) => a.depth - b.depth || a.kind - b.kind);
+    return contributions.reduce<ManifestRule[]>(
+      (acc, c) => mergeRules(acc, c.rules, c.exclude),
+      []
+    );
   }
 
   resolveForNote(file: TFile, frontmatter: Record<string, unknown>): ResolvedSchema | null {

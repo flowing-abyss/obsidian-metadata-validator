@@ -1,7 +1,7 @@
 import type { App, TFile } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 import { ManifestCache } from "../../manifest/cache";
-import type { Manifest } from "../../types";
+import type { Manifest, ManifestRule } from "../../types";
 import { SchemaResolver } from "../resolver";
 
 function makeCache(manifests: Manifest[]): ManifestCache {
@@ -557,5 +557,95 @@ describe("SchemaResolver", () => {
     const file = makeFile("Notes/Article.md");
     const schema = resolver.resolveForNote(file, { tags: "" });
     expect(schema).toBeNull();
+  });
+});
+
+describe("SchemaResolver rules", () => {
+  function makeCacheWithRules(
+    manifests: Manifest[],
+    rulesFiles: Array<{ path: string; folderPath: string; rules: ManifestRule[] }>
+  ): ManifestCache {
+    const cache = makeCache(manifests);
+    vi.spyOn(cache, "getByPath").mockImplementation((p: string) =>
+      manifests.find((m) => m.path === p)
+    );
+    vi.spyOn(cache, "getRulesFilesForFolder").mockImplementation((folder: string) =>
+      rulesFiles
+        .filter((r) => folder === r.folderPath || folder.startsWith(r.folderPath + "/"))
+        .sort((a, b) => a.folderPath.split("/").length - b.folderPath.split("/").length)
+    );
+    return cache;
+  }
+
+  const rule = (name: string): ManifestRule => ({ name, then: { set: { [name]: 1 } } });
+
+  it("orders rules outer to inner with rules.md before manifest.md in the same folder", () => {
+    const cache = makeCacheWithRules(
+      [
+        {
+          path: "schemas/manifest.md",
+          folderPath: "schemas",
+          data: { rules: [rule("root-manifest")] },
+        },
+        {
+          path: "schemas/projects/manifest.md",
+          folderPath: "schemas/projects",
+          data: { target: { query: "#project" }, rules: [rule("project-manifest")] },
+        },
+      ],
+      [
+        { path: "schemas/rules.md", folderPath: "schemas", rules: [rule("root-rules")] },
+        {
+          path: "schemas/projects/rules.md",
+          folderPath: "schemas/projects",
+          rules: [rule("project-rules")],
+        },
+      ]
+    );
+    const resolver = new SchemaResolver(cache);
+    resolver.rebuild();
+    const schema = resolver.resolveForNote(makeFile("p/x.md"), { tags: ["project"] });
+    expect(schema?.rules.map((r) => r.name)).toEqual([
+      "root-rules",
+      "root-manifest",
+      "project-rules",
+      "project-manifest",
+    ]);
+  });
+
+  it("replaces by name across layers and honours exclude", () => {
+    const cache = makeCacheWithRules(
+      [
+        {
+          path: "schemas/manifest.md",
+          folderPath: "schemas",
+          data: { rules: [rule("keep"), rule("drop")] },
+        },
+        {
+          path: "schemas/projects/manifest.md",
+          folderPath: "schemas/projects",
+          data: {
+            target: { query: "#project" },
+            exclude: ["drop"],
+            rules: [{ name: "keep", then: { set: { replaced: true } } }],
+          },
+        },
+      ],
+      []
+    );
+    const resolver = new SchemaResolver(cache);
+    resolver.rebuild();
+    const schema = resolver.resolveForNote(makeFile("p/x.md"), { tags: ["project"] });
+    expect(schema?.rules).toEqual([{ name: "keep", then: { set: { replaced: true } } }]);
+  });
+
+  it("manifest without rules resolves to an empty list", () => {
+    const cache = makeCacheWithRules(
+      [{ path: "schemas/a/manifest.md", folderPath: "schemas/a", data: { target: { query: "#a" } } }],
+      []
+    );
+    const resolver = new SchemaResolver(cache);
+    resolver.rebuild();
+    expect(resolver.resolveForNote(makeFile("x.md"), { tags: ["a"] })?.rules).toEqual([]);
   });
 });
