@@ -3,6 +3,7 @@ import type { SchemaResolver } from "../schema/resolver";
 import type { ResolvedSchema, ValidationResult } from "../types";
 import type { ValidationEngine } from "./engine";
 import { sanitizeFrontmatter } from "./frontmatter";
+import { persistEngineChanges } from "./persist";
 import { checkFolderLocation } from "./rules/folder-location";
 import type { WriteBudget } from "./write-budget";
 
@@ -60,68 +61,17 @@ export async function validateNote(
 
   appendLegacyEnforceFolderWarning(results, schema.enforce_folder, schema.manifestPath);
 
-  const hasAutoFix = results.some((r) => r.autoFixed);
-  if (hasAutoFix) {
-    // Compute which keys the engine actually changed (value-level diff).
-    // This is critical: we must NOT write the full stale `frontmatter` snapshot because a
-    // concurrent picker save (via processFrontMatter) may have already updated the file
-    // between when we read the cache and now. Writing the whole snapshot would overwrite the
-    // user's new value with the old one (TOCTOU race condition).
-    const engineValueChanges: Record<string, unknown> = {};
-    for (const k of Object.keys(frontmatter)) {
-      if (!(k in preEngineFrontmatter) || preEngineFrontmatter[k] !== frontmatter[k]) {
-        engineValueChanges[k] = frontmatter[k];
-      }
-    }
-    const hasValueChanges = Object.keys(engineValueChanges).length > 0;
-    const hasOrderChange = results.some((r) => r.rule === "property-order");
-    const effectiveOrder = schema.formatting.property_order?.length
-      ? schema.formatting.property_order
-      : Object.keys(schema.fields);
-
-    const rulesChanged = results.some((r) => r.rule === "rules" && r.autoFixed);
-    const overBudget =
-      rulesChanged && deps.writeBudget !== undefined && !deps.writeBudget.allow(file.path);
-    if (overBudget) {
-      results.push({
-        field: "__rules__",
-        severity: "warning",
-        message:
-          "Auto-fix paused for this note: too many rule-triggered writes in a short time. Check the rules for conflicts.",
-        rule: "write-budget",
-        manifestPath: schema.manifestPath,
-        autoFixed: false,
-      });
-    } else if (hasValueChanges || (hasOrderChange && effectiveOrder.length)) {
-      // Apply only the engine-computed value changes onto the LATEST frontmatter.
-      // processFrontMatter reads the current file state inside its callback, so it is
-      // atomic with respect to other processFrontMatter calls and never races with the picker.
-      await app.fileManager.processFrontMatter(file, (latestFm) => {
-        const latestFrontmatter = latestFm as Record<string, unknown>;
-        for (const [k, v] of Object.entries(engineValueChanges)) {
-          latestFrontmatter[k] = v;
-        }
-        // Re-apply property ordering to the latest frontmatter in the same atomic write
-        if (hasOrderChange && effectiveOrder.length) {
-          applyOrder(latestFrontmatter, effectiveOrder);
-        }
-      });
-    }
-  }
+  await persistEngineChanges({
+    app,
+    file,
+    schema,
+    results,
+    before: preEngineFrontmatter,
+    after: frontmatter,
+    writeBudget: deps.writeBudget,
+  });
 
   return { schema, results, moved };
-}
-
-function applyOrder(frontmatter: Record<string, unknown>, order: string[]): void {
-  const keys = Object.keys(frontmatter);
-  const orderedKeys = [
-    ...order.filter((ok) => keys.includes(ok)),
-    ...keys.filter((k) => !order.includes(k)),
-  ];
-  if (orderedKeys.every((k, i) => k === keys[i])) return;
-  const copy: Record<string, unknown> = { ...frontmatter };
-  for (const k of keys) Reflect.deleteProperty(frontmatter, k);
-  for (const k of orderedKeys) frontmatter[k] = copy[k];
 }
 
 export function appendLegacyEnforceFolderWarning(

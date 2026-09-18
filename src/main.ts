@@ -1,4 +1,4 @@
-import { Menu, Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf, stringifyYaml } from "obsidian";
+import { Menu, Notice, Plugin, TAbstractFile, TFile, WorkspaceLeaf } from "obsidian";
 import { ManifestCache } from "./manifest/cache";
 import { SchemaResolver } from "./schema/resolver";
 import { DEFAULT_SETTINGS, MetadataValidatorSettingTab, type PluginSettings } from "./settings";
@@ -571,27 +571,6 @@ export default class MetadataValidatorPlugin extends Plugin {
     this.getSidebarPanel()?.update(fileName, results);
   }
 
-  /**
-   * Write frontmatter to a file preserving exact key insertion order.
-   * Uses vault.read + vault.modify to bypass processFrontMatter's potential key reordering.
-   */
-  private async writeOrderedFrontmatter(
-    file: TFile,
-    frontmatter: Record<string, unknown>
-  ): Promise<void> {
-    const content = await this.app.vault.read(file);
-    const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
-    // stringifyYaml always ends with \n
-    const newYaml = stringifyYaml(frontmatter);
-    if (!fmMatch) {
-      // New file with no frontmatter block — prepend one
-      await this.app.vault.modify(file, `---\n${newYaml}---\n${content}`);
-      return;
-    }
-    const afterFrontmatter = content.slice(fmMatch[0].length);
-    await this.app.vault.modify(file, `---\n${newYaml}---\n${afterFrontmatter}`);
-  }
-
   private async validateForVaultScan(file: TFile): Promise<{
     manifestPath: string;
     manifestName: string;
@@ -691,7 +670,6 @@ export default class MetadataValidatorPlugin extends Plugin {
       schemasRoot: this.settings.schemasRoot,
       resolver: this.resolver,
       engine: this.engine,
-      writeFrontmatter: (file, frontmatter) => this.writeOrderedFrontmatter(file, frontmatter),
       onFileProcessed: ({ previousPath, filePath, status }) => {
         if (previousPath !== filePath) this.badges.setStatus(previousPath, "none");
         this.badges.setStatus(filePath, status);

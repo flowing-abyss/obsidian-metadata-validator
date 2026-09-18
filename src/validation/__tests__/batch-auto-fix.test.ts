@@ -14,10 +14,15 @@ function makeFile(path: string): TFile {
   } as TFile;
 }
 
+/**
+ * `frontmatterByPath` is what the metadata cache reports; `latestByPath` is what
+ * processFrontMatter finds on disk (defaults to a copy of the cached value).
+ */
 function makeApp(
   files: TFile[],
   frontmatterByPath: Map<string, Record<string, unknown>>,
-  renameFile?: (file: TFile, targetPath: string) => Promise<void>
+  renameFile?: (file: TFile, targetPath: string) => Promise<void>,
+  latestByPath: Map<string, Record<string, unknown>> = new Map()
 ): App {
   return {
     vault: {
@@ -35,6 +40,13 @@ function makeApp(
         (async () => {
           return undefined;
         }),
+      processFrontMatter: vi.fn(async (file: TFile, fn: (fm: Record<string, unknown>) => void) => {
+        // Obsidian parses the file afresh here; `position` is a cache-only key
+        const { position: _position, ...cached } = frontmatterByPath.get(file.path) ?? {};
+        const latest = latestByPath.get(file.path) ?? { ...cached };
+        latestByPath.set(file.path, latest);
+        fn(latest);
+      }),
     },
   } as unknown as App;
 }
@@ -86,14 +98,13 @@ describe("applyVaultAutoFixes", () => {
         ] satisfies ValidationResult[];
       }),
     };
-    const writeFrontmatter = vi.fn(async () => undefined);
+    const latestByPath = new Map<string, Record<string, unknown>>();
 
     const summary = await applyVaultAutoFixes({
-      app: makeApp(files, frontmatterByPath),
+      app: makeApp(files, frontmatterByPath, undefined, latestByPath),
       schemasRoot: "schemas",
       resolver,
       engine,
-      writeFrontmatter,
     });
 
     expect(summary).toEqual({
@@ -107,12 +118,48 @@ describe("applyVaultAutoFixes", () => {
       noSchema: 1,
       failed: 0,
     });
-    expect(writeFrontmatter).toHaveBeenCalledTimes(1);
-    expect(writeFrontmatter).toHaveBeenCalledWith(
-      note,
-      expect.objectContaining({ title: "Clean Code", status: "reading" })
-    );
-    expect((writeFrontmatter.mock.calls[0] as unknown[])[1]).not.toHaveProperty("position");
+    expect(Array.from(latestByPath.keys())).toEqual([note.path]);
+    expect(latestByPath.get(note.path)).toEqual({ title: "Clean Code", status: "reading" });
+  });
+
+  it("writes only the engine's changes, never the cached object as a whole", async () => {
+    // Longform empties `longform.scenes` inside Obsidian's cached frontmatter object;
+    // the file on disk still has the scenes. A full rewrite from the cache would lose them.
+    const note = makeFile("projects/lf.md");
+    const frontmatterByPath = new Map<string, Record<string, unknown>>([
+      [note.path, { status: null, longform: { scenes: [] } }],
+    ]);
+    const latestByPath = new Map<string, Record<string, unknown>>([
+      [note.path, { status: null, longform: { scenes: ["a", ["b"]] } }],
+    ]);
+    const resolver = { resolveForNote: vi.fn(() => makeSchema()) };
+    const engine = {
+      validate: vi.fn(async (_file: TFile, frontmatter: Record<string, unknown>) => {
+        frontmatter["status"] = "reading";
+        return [
+          {
+            field: "status",
+            severity: "info",
+            message: '"status" was auto-corrected.',
+            rule: "default",
+            manifestPath: "schemas/books/manifest.md",
+            autoFixed: true,
+          },
+        ] satisfies ValidationResult[];
+      }),
+    };
+
+    await applyVaultAutoFixes({
+      app: makeApp([note], frontmatterByPath, undefined, latestByPath),
+      schemasRoot: "schemas",
+      resolver,
+      engine,
+    });
+
+    expect(latestByPath.get(note.path)).toEqual({
+      status: "reading",
+      longform: { scenes: ["a", ["b"]] },
+    });
   });
 
   it("re-resolves the schema after moving a note and writes fixes to the new path", async () => {
@@ -158,24 +205,20 @@ describe("applyVaultAutoFixes", () => {
         ] satisfies ValidationResult[];
       }),
     };
-    const writeFrontmatter = vi.fn(async () => undefined);
     const onFileProcessed = vi.fn();
+    const latestByPath = new Map<string, Record<string, unknown>>();
 
     const summary = await applyVaultAutoFixes({
-      app: makeApp(files, frontmatterByPath, renameFile),
+      app: makeApp(files, frontmatterByPath, renameFile, latestByPath),
       schemasRoot: "schemas",
       resolver,
       engine,
-      writeFrontmatter,
       onFileProcessed,
     });
 
     expect(renameFile).toHaveBeenCalledWith(note, "sources/source.md");
     expect(resolver.resolveForNote).toHaveBeenCalledTimes(2);
-    expect(writeFrontmatter).toHaveBeenCalledWith(
-      movedNote,
-      expect.objectContaining({ status: "ready" })
-    );
+    expect(latestByPath.get("sources/source.md")).toEqual({ status: "ready" });
     expect(onFileProcessed).toHaveBeenCalledWith({
       previousPath: "notes/source.md",
       filePath: "sources/source.md",
@@ -200,20 +243,19 @@ describe("applyVaultAutoFixes", () => {
     const engine = {
       validate: vi.fn().mockRejectedValue(new Error("boom")),
     };
-    const writeFrontmatter = vi.fn(async () => undefined);
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const app = makeApp(files, frontmatterByPath);
 
     const summary = await applyVaultAutoFixes({
-      app: makeApp(files, frontmatterByPath),
+      app,
       schemasRoot: "schemas",
       resolver,
       engine,
-      writeFrontmatter,
     });
 
     expect(summary.failed).toBe(1);
     expect(summary.matched).toBe(1);
-    expect(writeFrontmatter).not.toHaveBeenCalled();
+    expect(app.fileManager.processFrontMatter).not.toHaveBeenCalled();
     errorSpy.mockRestore();
   });
 
@@ -244,7 +286,6 @@ describe("applyVaultAutoFixes", () => {
       schemasRoot: "schemas",
       resolver,
       engine,
-      writeFrontmatter: vi.fn(async () => undefined),
       onFileProcessed,
     });
 
@@ -271,7 +312,6 @@ describe("applyVaultAutoFixes", () => {
       schemasRoot: "schemas",
       resolver,
       engine,
-      writeFrontmatter: vi.fn(async () => undefined),
       onFileProcessed,
     });
 
@@ -298,7 +338,6 @@ describe("applyVaultAutoFixes", () => {
       schemasRoot: "schemas",
       resolver,
       engine,
-      writeFrontmatter: vi.fn(async () => undefined),
     });
 
     expect(renameFile).not.toHaveBeenCalled();
@@ -330,7 +369,6 @@ describe("applyVaultAutoFixes", () => {
       schemasRoot: "schemas",
       resolver,
       engine,
-      writeFrontmatter: vi.fn(async () => undefined),
     });
 
     expect(summary.moved).toBe(1);
@@ -363,7 +401,6 @@ describe("applyVaultAutoFixes", () => {
       schemasRoot: "schemas",
       resolver,
       engine,
-      writeFrontmatter: vi.fn(async () => undefined),
       onFileProcessed,
     });
 
@@ -400,7 +437,6 @@ describe("applyVaultAutoFixes", () => {
       schemasRoot: "schemas",
       resolver,
       engine,
-      writeFrontmatter: vi.fn(async () => undefined),
     });
 
     expect(summary.moved).toBe(1);

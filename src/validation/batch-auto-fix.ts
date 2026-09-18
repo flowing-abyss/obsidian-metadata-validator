@@ -2,6 +2,7 @@ import type { App, TFile } from "obsidian";
 import type { SchemaResolver } from "../schema/resolver";
 import type { ValidationEngine } from "./engine";
 import { sanitizeFrontmatter } from "./frontmatter";
+import { persistEngineChanges } from "./persist";
 import { checkFolderLocation } from "./rules/folder-location";
 
 type FileValidationStatus = "error" | "warning" | "valid" | "none";
@@ -33,7 +34,6 @@ interface BatchAutoFixDependencies {
   schemasRoot: string;
   resolver: Pick<SchemaResolver, "resolveForNote">;
   engine: Pick<ValidationEngine, "validate">;
-  writeFrontmatter: (file: TFile, frontmatter: Record<string, unknown>) => Promise<void>;
   onFileProcessed?: (result: BatchAutoFixFileResult) => void;
 }
 
@@ -98,6 +98,8 @@ export async function applyVaultAutoFixes(
         }
       }
 
+      // Snapshot before the engine mutates in place; only the diff is written
+      const before: Record<string, unknown> = { ...frontmatter };
       const results = await deps.engine.validate(file, frontmatter, schema);
       const autoFixed = results.filter((result) => result.autoFixed).length;
       const errors = results.filter(
@@ -107,12 +109,17 @@ export async function applyVaultAutoFixes(
         (result) => !result.autoFixed && result.severity === "warning"
       ).length;
 
-      if (autoFixed > 0) {
-        await deps.writeFrontmatter(file, frontmatter);
-        summary.autoFixed += autoFixed;
-      }
+      const written = await persistEngineChanges({
+        app: deps.app,
+        file,
+        schema,
+        results,
+        before,
+        after: frontmatter,
+      });
+      if (autoFixed > 0) summary.autoFixed += autoFixed;
 
-      if (moved || autoFixed > 0) summary.changed++;
+      if (moved || written) summary.changed++;
       summary.errors += errors;
       summary.warnings += warnings;
 
