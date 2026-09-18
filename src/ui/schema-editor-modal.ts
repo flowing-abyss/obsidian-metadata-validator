@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Setting, TFile, setIcon, stringifyYaml } from "obsidian";
+import { App, Modal, Notice, Setting, TFile, parseYaml, setIcon, stringifyYaml } from "obsidian";
 import type { ManifestCache } from "../manifest/cache";
 import { mergeSchemas } from "../schema/merger";
 import type {
@@ -7,6 +7,7 @@ import type {
   Manifest,
   ManifestData,
   ManifestField,
+  ManifestRule,
   ManifestTarget,
 } from "../types";
 
@@ -192,6 +193,8 @@ export class SchemaEditorModal extends Modal {
         })
       );
     });
+
+    this.renderCollapsibleSection(contentEl, "Rules", (body) => this.renderRules(body));
 
     this.renderInheritedAndOrderSection(contentEl);
 
@@ -1031,6 +1034,41 @@ export class SchemaEditorModal extends Modal {
       );
   }
 
+  // ── Rules ─────────────────────────────────────────────────────────────────
+
+  private renderRules(el: HTMLElement): void {
+    el.createEl("p", {
+      text: "YAML list of rules: when (query, selection, and/or/not or js) and then (set, add, remove, js). Rules inherit from parent manifests and rules.md files. See README → Rules.",
+      cls: "setting-item-description",
+    });
+    const errorEl = el.createDiv("mv-rules-error");
+    const area = el.createEl("textarea", { cls: "mv-rules-yaml" });
+    area.rows = 14;
+    area.spellcheck = false;
+    area.value = this.data.rules?.length ? stringifyYaml(this.data.rules) : "";
+    area.addEventListener("input", () => {
+      const error = this.applyRulesYaml(area.value);
+      errorEl.setText(error ?? "");
+    });
+  }
+
+  /** Parse the textarea into `data.rules`. Returns an error message when the YAML is not a list. */
+  private applyRulesYaml(text: string): string | null {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      this.data.rules = undefined;
+      return null;
+    }
+    try {
+      const parsed: unknown = parseYaml(trimmed);
+      if (!Array.isArray(parsed)) return "Rules must be a YAML list.";
+      this.data.rules = parsed as ManifestRule[];
+      return null;
+    } catch (e) {
+      return `Invalid YAML: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
   // ── Save ──────────────────────────────────────────────────────────────────
 
   private async save(): Promise<void> {
@@ -1110,6 +1148,8 @@ export class SchemaEditorModal extends Modal {
       fields[k] = fOut;
     }
     if (Object.keys(fields).length) out.fields = fields;
+
+    if (d.rules?.length) out.rules = d.rules;
 
     if (d.formatting?.property_order?.length) {
       out.formatting = { property_order: d.formatting.property_order };

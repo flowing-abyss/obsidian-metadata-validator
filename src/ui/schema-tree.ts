@@ -51,6 +51,29 @@ export class SchemaTreeView {
     for (const root of roots) {
       this.renderNode(root.path, childrenOf, ul);
     }
+
+    this.renderRulesFiles(container);
+  }
+
+  /** rules.md files, each applying to every manifest in its folder and below. */
+  private renderRulesFiles(container: HTMLElement): void {
+    const rulesFiles = this.cache
+      .getRulesFiles()
+      .sort((a, b) => a.folderPath.localeCompare(b.folderPath));
+    if (rulesFiles.length === 0) return;
+
+    container.createEl("h5", { text: "Rules files", cls: "mv-tree-subtitle" });
+    const ul = container.createEl("ul");
+    for (const rf of rulesFiles) {
+      const row = ul.createEl("li").createDiv("mv-tree-row");
+      row.createSpan({ text: "·", cls: "mv-tree-leaf" });
+      row.createSpan({ text: rf.name ?? rf.folderPath, cls: "mv-tree-name" });
+      row.createSpan({ text: `${rf.rules.length} rules`, cls: "mv-tree-count" });
+      row.createSpan({ text: rf.path, cls: "mv-tree-query" });
+      row.addEventListener("click", () => {
+        void this.app.workspace.openLinkText(rf.path, "");
+      });
+    }
   }
 
   private renderNode(
@@ -96,6 +119,9 @@ export class SchemaTreeView {
 
     const fieldCount = Object.keys(manifest.data.fields ?? {}).length;
     row.createSpan({ text: `${fieldCount} fields`, cls: "mv-tree-count" });
+
+    const ruleCount = manifest.data.rules?.length ?? 0;
+    if (ruleCount > 0) row.createSpan({ text: `${ruleCount} rules`, cls: "mv-tree-count" });
 
     const targetQuery = manifest.data.target?.query;
     if (typeof targetQuery === "string") {

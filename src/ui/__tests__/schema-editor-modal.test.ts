@@ -159,3 +159,47 @@ describe("SchemaEditorModal inherited fields", () => {
     expect(inheritedKeys(child.path, child.data, cache)).toEqual(["baseField"]);
   });
 });
+
+describe("SchemaEditorModal rules", () => {
+  function modalWith(data: ManifestData) {
+    const modal = new SchemaEditorModal({} as App, "schemas/manifest.md", data, async () => undefined);
+    return modal as unknown as {
+      data: ManifestData;
+      applyRulesYaml: (text: string) => string | null;
+      buildCleanData: () => ManifestData;
+      renderRules: (el: HTMLElement) => void;
+    };
+  }
+
+  it("round-trips rules through buildCleanData", () => {
+    const rules = [{ when: "status=🟩 AND end=", then: { set: { end: "{{today}}" } } }];
+    const internal = modalWith({ name: "x", rules });
+    expect(internal.buildCleanData().rules).toEqual(rules);
+    expect(modalWith({ name: "x", rules: [] }).buildCleanData().rules).toBeUndefined();
+  });
+
+  it("parses YAML into rules and reports errors", () => {
+    const internal = modalWith({});
+    expect(internal.applyRulesYaml("- when: a=\n  then:\n    set:\n      a: 1\n")).toBeNull();
+    expect(internal.data.rules).toEqual([{ when: "a=", then: { set: { a: 1 } } }]);
+    expect(internal.applyRulesYaml("when: a=")).toBe("Rules must be a YAML list.");
+    expect(internal.applyRulesYaml("   ")).toBeNull();
+    expect(internal.data.rules).toBeUndefined();
+    expect(internal.applyRulesYaml("- [")).toMatch(/^Invalid YAML/);
+  });
+
+  it("renders the textarea with existing rules and updates on input", () => {
+    const internal = modalWith({ rules: [{ then: { set: { a: 1 } } }] });
+    const el = document.createElement("div");
+    internal.renderRules(el);
+    const area = el.querySelector<HTMLTextAreaElement>("textarea")!;
+    expect(area.value).toContain("set:");
+    area.value = "- then:\n    add:\n      tags: x\n";
+    area.dispatchEvent(new Event("input"));
+    expect(internal.data.rules).toEqual([{ then: { add: { tags: "x" } } }]);
+    expect(el.querySelector(".mv-rules-error")?.textContent).toBe("");
+    area.value = "nope";
+    area.dispatchEvent(new Event("input"));
+    expect(el.querySelector(".mv-rules-error")?.textContent).toBe("Rules must be a YAML list.");
+  });
+});

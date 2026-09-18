@@ -1912,3 +1912,23 @@ body.mv-hide-type-icon
   outline: 2px solid var(--interactive-accent);
   outline-offset: -2px;
 }
+
+/* ── Rules (schema editor) ────────────────────────────────── */
+.mv-schema-editor-modal .mv-rules-yaml {
+  width: 100%;
+  font-family: var(--font-monospace);
+  font-size: var(--font-smaller);
+  resize: vertical;
+}
+
+.mv-schema-editor-modal .mv-rules-error {
+  color: var(--text-error);
+  font-size: var(--font-smaller);
+  min-height: 1.2em;
+  margin-bottom: var(--size-2-2);
+}
+
+.mv-schema-tree .mv-tree-subtitle {
+  margin: var(--size-4-2) 0 var(--size-2-1);
+  color: var(--text-muted);
+}
