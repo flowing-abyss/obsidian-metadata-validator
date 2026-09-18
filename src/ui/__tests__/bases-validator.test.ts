@@ -360,7 +360,9 @@ describe("BasesValidator", () => {
       await vi.runAllTimersAsync();
 
       expect(engine.validate).toHaveBeenCalledOnce();
-      expect(engine.validate).toHaveBeenCalledWith(fileA, expect.any(Object), expect.any(Object));
+      expect(engine.validate).toHaveBeenCalledWith(fileA, expect.any(Object), expect.any(Object), {
+        skipRules: true,
+      });
     } finally {
       validator.detach();
       vi.useRealTimers();

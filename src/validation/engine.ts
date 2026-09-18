@@ -24,6 +24,15 @@ interface EngineOptions {
   now?: () => Date;
 }
 
+interface ValidateOptions {
+  /**
+   * Skip the rules phase. For display-only callers (property icons, Bases cells,
+   * pickers) that validate a throwaway copy on every paint: rules may run user
+   * JavaScript and walk linked notes, which belongs in the real save/open pass.
+   */
+  skipRules?: boolean;
+}
+
 /**
  * One validation pass over a note, in four phases:
  *   1. field auto-fix (`fixed`, `default`, required placeholder, shape)
@@ -50,11 +59,13 @@ export class ValidationEngine {
   async validate(
     file: TFile,
     frontmatter: Record<string, unknown>,
-    schema: ResolvedSchema
+    schema: ResolvedSchema,
+    options: ValidateOptions = {}
   ): Promise<ValidationResult[]> {
     const results: ValidationResult[] = [];
     const fields = Object.entries(schema.fields);
     const fixInfo = new Map<string, FieldFixInfo>();
+    const runRulesPhase = !options.skipRules && schema.rules.length > 0;
 
     // Phase 1: field auto-fix
     for (const [fieldName, field] of fields) {
@@ -75,7 +86,7 @@ export class ValidationEngine {
     }
 
     // Phase 2: rules
-    if (schema.rules.length > 0) {
+    if (runRulesPhase) {
       results.push(
         ...(await runRules({
           rules: schema.rules,
@@ -91,7 +102,7 @@ export class ValidationEngine {
     }
 
     // Phase 3: normalisation and fixed re-asserted (rules cannot override fixed)
-    if (schema.rules.length > 0) {
+    if (runRulesPhase) {
       for (const [fieldName, field] of fields) {
         if (field.fixed !== undefined && frontmatter[fieldName] !== field.fixed) {
           frontmatter[fieldName] = field.fixed;

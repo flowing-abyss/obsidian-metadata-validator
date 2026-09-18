@@ -102,20 +102,15 @@ describe("mergeRules", () => {
     ).toEqual([{ name: "y", then: {} }, { then: {} }]);
   });
 
-  it("mergeSchemas merges rules and honours exclude", () => {
-    const merged = mergeSchemas(
-      {
-        rules: [
-          { name: "p", then: {} },
-          { name: "gone", then: {} },
-        ],
-      },
-      { rules: [{ name: "c", then: {} }], exclude: ["gone"] }
-    );
-    expect(merged.rules?.map((r) => r.name)).toEqual(["p", "c"]);
+  it("ignores rules that are not a list and items that are not maps", () => {
+    expect(mergeRules([{ name: "p", then: {} }], { when: "x", then: {} })).toEqual([
+      { name: "p", then: {} },
+    ]);
+    expect(mergeRules([], undefined)).toEqual([]);
+    expect(mergeRules([], [null, 5, [], { then: {} }])).toEqual([{ then: {} }]);
   });
 
-  it("mergeSchemas yields an empty list when neither side has rules", () => {
-    expect(mergeSchemas({}, {}).rules).toEqual([]);
+  it("mergeSchemas leaves rules to the resolver", () => {
+    expect(mergeSchemas({ rules: [{ then: {} }] }, {}).rules).toBeUndefined();
   });
 });

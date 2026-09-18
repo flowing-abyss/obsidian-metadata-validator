@@ -89,7 +89,7 @@ export class ContextMenuModal extends Modal {
    */
   private async validateForDisplay(): Promise<ValidationResult[]> {
     const copy = { ...this.localFrontmatter };
-    return this.engine.validate(this.file, copy, this.schema);
+    return this.engine.validate(this.file, copy, this.schema, { skipRules: true });
   }
 
   private buildResultMap(results: ValidationResult[]): Map<string, ValidationResult[]> {

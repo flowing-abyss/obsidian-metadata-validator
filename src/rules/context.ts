@@ -1,5 +1,6 @@
 import type { App, TFile } from "obsidian";
 import type { ManifestField } from "../types";
+import { sanitizeFrontmatter } from "../validation/frontmatter";
 import { valueText } from "./link-text";
 import type { TemplateContext } from "./template";
 
@@ -40,8 +41,7 @@ export function contextFromFrontmatter(
 /** Context of another note from the metadata cache (frontmatter + inline tags). */
 export function contextForFile(file: TFile, app: App): NoteContext {
   const cache = app.metadataCache.getFileCache(file);
-  const frontmatter: Record<string, unknown> = { ...(cache?.frontmatter ?? {}) };
-  delete frontmatter["position"];
+  const frontmatter = sanitizeFrontmatter(cache?.frontmatter);
   const inline = (cache?.tags ?? []).map((t) => t.tag.replace(/^#/, ""));
   const tags = Array.from(new Set([...tagsOf(frontmatter), ...inline]));
   return { path: file.path, tags, frontmatter };

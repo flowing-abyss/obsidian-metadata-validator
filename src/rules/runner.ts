@@ -36,7 +36,20 @@ function ruleLabel(rule: ManifestRule, index: number): string {
 function isBareFilter(v: unknown): v is { when?: unknown } {
   if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
   const keys = Object.keys(v);
-  return keys.length === 1 && keys[0] === "when";
+  return keys.length === 0 || (keys.length === 1 && keys[0] === "when");
+}
+
+/**
+ * Copy `scratch` back into `working`, keeping the original reference for every
+ * key whose content did not change so the value-level diff stays silent.
+ */
+function commit(working: Record<string, unknown>, scratch: Record<string, unknown>): void {
+  for (const key of Object.keys(working)) {
+    if (!(key in scratch)) delete working[key];
+  }
+  for (const key of Object.keys(scratch)) {
+    if (!(key in working) || !jsonEqual(working[key], scratch[key])) working[key] = scratch[key];
+  }
 }
 
 function jsonEqual(a: unknown, b: unknown): boolean {
@@ -45,7 +58,8 @@ function jsonEqual(a: unknown, b: unknown): boolean {
 
 /**
  * Run rules in order. Each rule reads a snapshot of the note as it was when the
- * rule started and applies its verbs sequentially to the working frontmatter.
+ * rule started and applies its verbs sequentially to a scratch copy; the copy is
+ * committed only when every verb succeeded, so a failing rule changes nothing.
  */
 export async function runRules(input: RunRulesInput): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
@@ -69,7 +83,11 @@ export async function runRules(input: RunRulesInput): Promise<ValidationResult[]
   });
 
   for (let i = 0; i < input.rules.length; i++) {
-    const rule = input.rules[i] as ManifestRule;
+    const rule = input.rules[i] as ManifestRule | null | undefined;
+    if (!rule || typeof rule !== "object") {
+      results.push(warn("not a map.", `#${i + 1}`));
+      continue;
+    }
     const label = ruleLabel(rule, i);
     const then = rule.then as RuleThen | undefined;
     if (!then || typeof then !== "object" || Array.isArray(then)) {
@@ -83,6 +101,8 @@ export async function runRules(input: RunRulesInput): Promise<ValidationResult[]
     }
 
     const snapshot = deepClone(working);
+    const scratch = deepClone(working);
+    const ruleResults: ValidationResult[] = [];
     const env: RuleEnv = {
       app: input.app,
       file: input.file,
@@ -102,20 +122,20 @@ export async function runRules(input: RunRulesInput): Promise<ValidationResult[]
           const { dv, currentPage } = dataviewContext(input.app, input.file);
           await executeJs(
             then.js as string,
-            { fm: working, snapshot, file: input.file, app: input.app, dv, currentPage },
+            { fm: scratch, snapshot, file: input.file, app: input.app, dv, currentPage },
             input.enableJs
           );
-          for (const key of new Set([...Object.keys(snapshot), ...Object.keys(working)])) {
-            if (!jsonEqual(snapshot[key], working[key]))
-              results.push(changed(key, "changed", label));
+          for (const key of new Set([...Object.keys(snapshot), ...Object.keys(scratch)])) {
+            if (!jsonEqual(snapshot[key], scratch[key])) {
+              ruleResults.push(changed(key, "changed", label));
+            }
           }
           continue;
         }
 
         const spec = then[verb as "set" | "add" | "remove"];
         if (!spec || typeof spec !== "object" || Array.isArray(spec)) {
-          results.push(warn(`"${verb}" needs a map of property to value.`, label));
-          continue;
+          throw new RuleConfigError(`"${verb}" needs a map of property to value.`);
         }
         for (const [prop, given] of Object.entries(spec)) {
           const field = input.fields[prop];
@@ -123,26 +143,28 @@ export async function runRules(input: RunRulesInput): Promise<ValidationResult[]
           const rawValue = isBareFilter(given) ? { [prop]: given } : given;
           if (verb === "set") {
             if (field?.fixed !== undefined) {
-              results.push(warn(`cannot set "${prop}", the field is fixed.`, label));
-              continue;
+              throw new RuleConfigError(`cannot set "${prop}", the field is fixed.`);
             }
             const value = await resolveRuleValue(rawValue, env);
-            if (applySet(working, prop, value, field)) results.push(changed(prop, "set", label));
+            if (applySet(scratch, prop, value, field))
+              ruleResults.push(changed(prop, "set", label));
             continue;
           }
           if (!isListField(field)) {
-            results.push(
-              warn(`"${verb}" needs a list field, "${prop}" is "${field?.type}".`, label)
+            throw new RuleConfigError(
+              `"${verb}" needs a list field, "${prop}" is "${field?.type}".`
             );
-            continue;
           }
           const resolved = await resolveRuleValue(rawValue, env);
           const values = Array.isArray(resolved) ? resolved : [resolved];
           const didChange =
-            verb === "add" ? applyAdd(working, prop, values) : applyRemove(working, prop, values);
-          if (didChange) results.push(changed(prop, VERB_PAST[verb] ?? verb, label));
+            verb === "add" ? applyAdd(scratch, prop, values) : applyRemove(scratch, prop, values);
+          if (didChange) ruleResults.push(changed(prop, VERB_PAST[verb] ?? verb, label));
         }
       }
+
+      commit(working, scratch);
+      results.push(...ruleResults);
     } catch (e) {
       if (e instanceof JsDisabledError) {
         results.push({

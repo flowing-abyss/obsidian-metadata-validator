@@ -42,6 +42,8 @@ export default class MetadataValidatorPlugin extends Plugin {
   private basesValidator: BasesValidatorType | null = null;
   /** Coalesces file-change bursts so each note is validated once after it settles */
   private changeScheduler!: ChangeScheduler;
+  /** Same coalescing for notes queued because a neighbour changed type; not tied to "validate on save" */
+  private backlinkScheduler!: ChangeScheduler;
   /** Manifest each note resolved to at its last validation — a change means the note changed type */
   private readonly lastManifestByPath = new Map<string, string>();
   /** Caps rule-triggered writes per note so conflicting rules cannot ping-pong forever */
@@ -69,6 +71,17 @@ export default class MetadataValidatorPlugin extends Plugin {
       () => this.settings.onSaveDelaySeconds * 1000
     );
     this.register(() => this.changeScheduler.dispose());
+    this.backlinkScheduler = new ChangeScheduler(
+      (file) => {
+        if (!this.settings.revalidateBacklinks) return;
+        if (this.app.vault.getAbstractFileByPath(file.path) !== file) return;
+        this.validateAndUpdate(file).catch((error: unknown) => {
+          console.error(`[MetadataValidator] Failed to revalidate "${file.path}"`, error);
+        });
+      },
+      () => this.settings.onSaveDelaySeconds * 1000
+    );
+    this.register(() => this.backlinkScheduler.dispose());
 
     // Apply CSS overrides immediately (no vault needed)
     this.cssInjector.update();
@@ -548,7 +561,7 @@ export default class MetadataValidatorPlugin extends Plugin {
     for (const path of paths) {
       const target = this.app.vault.getAbstractFileByPath(path);
       if (target instanceof TFile && target.extension === "md") {
-        this.changeScheduler.schedule(target);
+        this.backlinkScheduler.schedule(target);
       }
     }
   }

@@ -116,6 +116,49 @@ describe("runRules", () => {
     ]);
   });
 
+  it("a verb that fails leaves the note untouched (rules are atomic)", async () => {
+    const files = { "m/a.md": { tags: ["system/high/problem"] } };
+    const { fm, results } = await run(
+      [
+        {
+          then: {
+            remove: { meta: { when: "#system/high/problem" } },
+            add: { problem: { js: "return 'x'" } },
+          },
+        },
+      ],
+      { meta: ["[[a]]"], problem: [] },
+      files,
+      false
+    );
+    expect(fm.meta).toEqual(["[[a]]"]);
+    expect(fm.problem).toEqual([]);
+    expect(results).toHaveLength(1);
+    expect(results[0]?.message).toContain("JS validation disabled");
+  });
+
+  it("keeps array identity for untouched properties after a commit", async () => {
+    const tags = ["a"];
+    const { fm, results } = await run([{ then: { set: { x: 1 } } }], { tags, x: 0 });
+    expect(fm.tags).toBe(tags);
+    expect(results.map((r) => r.field)).toEqual(["x"]);
+  });
+
+  it("a null rule item is reported and skipped", async () => {
+    const { results } = await run([null as never, { then: { set: { a: 1 } } }], {});
+    expect(results.map((r) => r.rule)).toEqual(["rule-config", "rules"]);
+    expect(results[0]?.message).toBe('Rule "#1": not a map.');
+  });
+
+  it("an empty object in a value slot means every value of that property", async () => {
+    const { fm } = await run([{ then: { add: { tags: {} }, remove: { aliases: {} } } }], {
+      tags: ["a"],
+      aliases: ["x", "y"],
+    });
+    expect(fm.tags).toEqual(["a"]);
+    expect(fm.aliases).toEqual([]);
+  });
+
   it("set with a bare filter keeps only the matching links", async () => {
     const files = { "m/a.md": { tags: ["keep"] }, "m/b.md": { tags: ["drop"] } };
     const { fm } = await run(

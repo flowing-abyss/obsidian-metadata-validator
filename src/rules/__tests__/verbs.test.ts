@@ -28,6 +28,8 @@ describe("applySet", () => {
     expect(applySet(fm, "tags", null)).toBe(true);
     expect(fm.tags).toBeNull();
     expect(applySet(fm, "tags", undefined)).toBe(false);
+    expect(applySet(fm, "absent", null)).toBe(false);
+    expect("absent" in fm).toBe(false);
     expect(applySet(fm, "tags", "x")).toBe(true);
     expect(applySet(fm, "tags", ["x"])).toBe(true);
   });
@@ -101,12 +103,20 @@ describe("applyRemove", () => {
     expect(fm.tags).toEqual(["axb"]);
   });
 
-  it("* clears the list and a missing or scalar property is a no-op", () => {
-    const fm: Record<string, unknown> = { tags: ["a", "b"], status: "x" };
+  it("* clears the list; a missing property is a no-op", () => {
+    const fm: Record<string, unknown> = { tags: ["a", "b"], empty: null };
     expect(applyRemove(fm, "tags", ["*"])).toBe(true);
     expect(fm.tags).toEqual([]);
     expect(applyRemove(fm, "nothing", ["*"])).toBe(false);
-    expect(applyRemove(fm, "status", ["*"])).toBe(false);
+    expect(applyRemove(fm, "empty", ["*"])).toBe(false);
+  });
+
+  it("treats a scalar value on a list property as a one-item list", () => {
+    const fm: Record<string, unknown> = { meta: "[[Problem]]", status: "x" };
+    expect(applyRemove(fm, "meta", ["[[Problem]]"])).toBe(true);
+    expect(fm.meta).toEqual([]);
+    expect(applyRemove(fm, "status", ["y"])).toBe(false);
+    expect(fm.status).toBe("x");
   });
 
   it("keeps array identity when nothing matches", () => {

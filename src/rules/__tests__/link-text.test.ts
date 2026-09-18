@@ -21,6 +21,13 @@ describe("link-text", () => {
     expect(linkName("[[x]]")).toBe("x");
   });
 
+  it("ignores heading and block subpaths", () => {
+    expect(linkTarget("[[base/x#Overview]]")).toBe("base/x");
+    expect(linkTarget("[[x#^abc123]]")).toBe("x");
+    expect(linkName("[[x#Overview|alias]]")).toBe("x");
+    expect(valuesEqual("[[x#Overview]]", "[[x]]")).toBe(true);
+  });
+
   it("renders primitive text and JSON for objects", () => {
     expect(valueText(null)).toBe("");
     expect(valueText(undefined)).toBe("");

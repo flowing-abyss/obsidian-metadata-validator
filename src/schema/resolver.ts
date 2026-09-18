@@ -98,36 +98,21 @@ export class SchemaResolver {
   }
 
   /**
-   * Rules in execution order: outer before inner; in the same folder a rules.md
-   * comes before the manifest.md. Same-name rules replace earlier ones in place,
-   * a manifest's `exclude` drops rules by name.
+   * Rules in execution order: every applicable rules.md (outermost folder first),
+   * then the manifest chain from the root ancestor to this manifest. Same-name
+   * rules replace earlier ones in place, a manifest's `exclude` drops rules by name.
    */
   private collectRules(manifest: Manifest, chain: string[]): ManifestRule[] {
-    const depthOf = (folder: string) => folder.split("/").length;
-    const contributions: Array<{
-      depth: number;
-      kind: 0 | 1;
-      rules: ManifestRule[];
-      exclude?: string[];
-    }> = [];
+    let rules: ManifestRule[] = [];
     for (const rf of this.cache.getRulesFilesForFolder(manifest.folderPath)) {
-      contributions.push({ depth: depthOf(rf.folderPath), kind: 0, rules: rf.rules });
+      rules = mergeRules(rules, rf.rules);
     }
     for (const path of chain) {
       const m = this.cache.getByPath(path);
       if (!m) continue;
-      contributions.push({
-        depth: depthOf(m.folderPath),
-        kind: 1,
-        rules: m.data.rules ?? [],
-        exclude: m.data.exclude,
-      });
+      rules = mergeRules(rules, m.data.rules, m.data.exclude);
     }
-    contributions.sort((a, b) => a.depth - b.depth || a.kind - b.kind);
-    return contributions.reduce<ManifestRule[]>(
-      (acc, c) => mergeRules(acc, c.rules, c.exclude),
-      []
-    );
+    return rules;
   }
 
   resolveForNote(file: TFile, frontmatter: Record<string, unknown>): ResolvedSchema | null {

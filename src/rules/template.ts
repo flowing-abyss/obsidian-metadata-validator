@@ -32,9 +32,15 @@ export function renderValue(s: string, ctx: TemplateContext): unknown {
   return renderText(s, ctx);
 }
 
-/** Render placeholders inside text. A list-valued placeholder expands into one string per element. */
-export function renderText(s: string, ctx: TemplateContext): string | string[] {
+/**
+ * Render placeholders inside text. A list-valued placeholder expands into one
+ * string per element. An empty placeholder makes the whole text `null`, so
+ * `category/{{category}}` on a note without a category yields nothing rather
+ * than the junk value `category/`.
+ */
+export function renderText(s: string, ctx: TemplateContext): string | string[] | null {
   let listValues: string[] | null = null;
+  let empty = false;
   const rendered = s.replace(PLACEHOLDER, (_m, expr: string) => {
     const v = evaluatePlaceholder(expr, ctx);
     if (Array.isArray(v)) {
@@ -42,8 +48,10 @@ export function renderText(s: string, ctx: TemplateContext): string | string[] {
       listValues = v.map(valueText);
       return LIST_MARK;
     }
+    if (v === null || v === undefined || v === "") empty = true;
     return valueText(v);
   });
+  if (empty) return null;
   if (listValues === null) return rendered;
   return (listValues as string[]).map((item) => rendered.replace(LIST_MARK, item));
 }

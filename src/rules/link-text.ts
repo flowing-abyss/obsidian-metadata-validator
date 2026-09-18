@@ -5,13 +5,16 @@ export function isWikiLink(v: unknown): v is string {
   return s.startsWith("[[") && s.endsWith("]]");
 }
 
-/** `[[path/name|alias]]` → `path/name`; plain strings pass through trimmed. */
+/** `[[path/name#heading|alias]]` → `path/name`; plain strings pass through trimmed. */
 export function linkTarget(raw: string): string {
   let s = raw.trim();
   if (s.startsWith("[[")) s = s.slice(2);
   if (s.endsWith("]]")) s = s.slice(0, -2);
   const pipe = s.indexOf("|");
   if (pipe !== -1) s = s.slice(0, pipe);
+  // `[[note#heading]]` and `[[note#^block]]` point at the same note
+  const hash = s.indexOf("#");
+  if (hash !== -1) s = s.slice(0, hash);
   return s.replace(/\.md$/, "").trim();
 }
 

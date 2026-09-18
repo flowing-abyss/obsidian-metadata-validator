@@ -579,7 +579,7 @@ describe("SchemaResolver rules", () => {
 
   const rule = (name: string): ManifestRule => ({ name, then: { set: { [name]: 1 } } });
 
-  it("orders rules outer to inner with rules.md before manifest.md in the same folder", () => {
+  it("orders all rules.md files (outer first) before the manifest chain", () => {
     const cache = makeCacheWithRules(
       [
         {
@@ -607,10 +607,56 @@ describe("SchemaResolver rules", () => {
     const schema = resolver.resolveForNote(makeFile("p/x.md"), { tags: ["project"] });
     expect(schema?.rules.map((r) => r.name)).toEqual([
       "root-rules",
-      "root-manifest",
       "project-rules",
+      "root-manifest",
       "project-manifest",
     ]);
+  });
+
+  it("follows the extends chain, not folder depth", () => {
+    const cache = makeCacheWithRules(
+      [
+        {
+          path: "schemas/x/y/z/manifest.md",
+          folderPath: "schemas/x/y/z",
+          data: { rules: [rule("parent"), { name: "shared", then: { set: { from: "parent" } } }] },
+        },
+        {
+          path: "schemas/a/manifest.md",
+          folderPath: "schemas/a",
+          data: {
+            target: { query: "#a" },
+            extends: "schemas/x/y/z",
+            rules: [{ name: "shared", then: { set: { from: "child" } } }, rule("child")],
+          },
+        },
+      ],
+      []
+    );
+    const resolver = new SchemaResolver(cache);
+    resolver.rebuild();
+    const schema = resolver.resolveForNote(makeFile("n.md"), { tags: ["a"] });
+    expect(schema?.rules).toEqual([
+      { name: "parent", then: { set: { parent: 1 } } },
+      { name: "shared", then: { set: { from: "child" } } },
+      { name: "child", then: { set: { child: 1 } } },
+    ]);
+  });
+
+  it("survives a manifest whose rules is not a list", () => {
+    const cache = makeCacheWithRules(
+      [
+        {
+          path: "schemas/a/manifest.md",
+          folderPath: "schemas/a",
+          data: { target: { query: "#a" }, rules: { when: "x", then: {} } as never },
+        },
+      ],
+      []
+    );
+    const resolver = new SchemaResolver(cache);
+    expect(() => resolver.rebuild()).not.toThrow();
+    expect(resolver.resolveForNote(makeFile("n.md"), { tags: ["a"] })?.rules).toEqual([]);
   });
 
   it("replaces by name across layers and honours exclude", () => {

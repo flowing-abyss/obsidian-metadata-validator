@@ -75,7 +75,9 @@ export function applySet(
     next = [value];
   }
   if (next === undefined) next = null;
-  if (sameValue(working[prop], next)) return false;
+  const current = working[prop];
+  if (next === null && (current === null || current === undefined)) return false;
+  if (sameValue(current, next)) return false;
   working[prop] = next;
   return true;
 }
@@ -116,14 +118,17 @@ function matchesPattern(value: unknown, pattern: unknown): boolean {
   return valuesEqual(value, pattern);
 }
 
-/** Remove matching items (literal, `*` mask, or link by name). Keeps identity when unchanged. */
+/**
+ * Remove matching items (literal, `*` mask, or link by name). A scalar value on a
+ * list property counts as a one-item list. Keeps identity when unchanged.
+ */
 export function applyRemove(
   working: Record<string, unknown>,
   prop: string,
   patterns: unknown[]
 ): boolean {
-  if (!Array.isArray(working[prop])) return false;
-  const current = working[prop] as unknown[];
+  const current = toList(working[prop]);
+  if (current.length === 0) return false;
   const kept = current.filter((v) => !patterns.some((p) => matchesPattern(v, p)));
   if (kept.length === current.length) return false;
   working[prop] = kept;

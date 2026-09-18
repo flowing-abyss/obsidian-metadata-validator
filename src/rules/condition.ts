@@ -35,7 +35,7 @@ export async function evaluateCondition(
     const { dv, currentPage } = dataviewContext(env.app, env.file);
     const result = await executeJs(
       cond.js,
-      { fm: target.frontmatter, file: env.file, app: env.app, dv, currentPage },
+      { fm: target.frontmatter, path: target.path, file: env.file, app: env.app, dv, currentPage },
       env.enableJs
     );
     return Boolean(result);

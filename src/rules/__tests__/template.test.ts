@@ -69,7 +69,7 @@ describe("template", () => {
     expect(renderText('{{aliases|join:", "}}', ctx)).toBe("a, b");
     expect(renderText("{{aliases|join}}", ctx)).toBe("a, b");
     expect(renderText("{{meta|name|join}}", ctx)).toBe("x");
-    expect(renderText("{{empty|join}}", ctx)).toBe("");
+    expect(renderText("{{empty|join}}", ctx)).toBeNull();
     expect(renderText('{{start|date:"DD.MM.YYYY"}}', ctx)).toBe("05.01.2026");
     expect(renderText("{{start|date}}", ctx)).toBe("2026-01-05");
     expect(renderText('{{meta|name|date:"YYYY"}}', ctx)).toBe("x");
@@ -81,15 +81,18 @@ describe("template", () => {
     expect(renderText("{{file.name|kebab}}", spaced)).toBe("my-note");
     expect(renderText("{{file.name|snake}}", spaced)).toBe("my_note");
     expect(renderText("{{file.name|trim|lower}}", spaced)).toBe("my note");
-    expect(renderText("{{empty|upper}}", ctx)).toBe("");
+    expect(renderText("{{empty|upper}}", ctx)).toBeNull();
   });
 
   it("keeps a pipe inside quoted filter arguments", () => {
     expect(renderText('{{aliases|join:"|"}}', ctx)).toBe("a|b");
   });
 
-  it("renders empty values as empty text", () => {
-    expect(renderText("x{{empty}}y", ctx)).toBe("xy");
+  it("an empty placeholder inside text yields null, not junk", () => {
+    expect(renderText("x{{empty}}y", ctx)).toBeNull();
+    expect(renderText("category/{{missing|name|snake}}", ctx)).toBeNull();
+    expect(renderValue("category/{{missing}}", ctx)).toBeNull();
+    expect(renderText("category/{{none}}", { ...ctx, frontmatter: { none: [] } })).toEqual([]);
   });
 
   it("throws on unknown filter", () => {

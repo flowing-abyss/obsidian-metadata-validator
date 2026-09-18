@@ -1,6 +1,6 @@
 import type { App, TFile } from "obsidian";
 import type { FieldOption, FieldSource } from "../types";
-import { executeJsSource, JsDisabledError } from "../utils/js-exec";
+import { dataviewContext, executeJsSource, JsDisabledError } from "../utils/js-exec";
 import { evaluateQuery } from "./query";
 import { descriptionText } from "../utils/descriptions";
 
@@ -200,27 +200,7 @@ async function resolveJsSource(
   currentFile: TFile | null,
   enableJs: boolean
 ): Promise<SourceResolutionResult> {
-  const appRecord = app as unknown as Record<string, unknown>;
-  // DataView API lives at app.plugins.plugins.dataview.api
-  const pluginManager = appRecord["plugins"] as Record<string, unknown> | undefined;
-  const pluginsMap = pluginManager?.["plugins"] as Record<string, unknown> | undefined;
-  const dataview = pluginsMap?.["dataview"] as Record<string, unknown> | undefined;
-  const dv = dataview?.["api"];
-
-  let currentPage: unknown = null;
-  if (
-    currentFile &&
-    dv &&
-    typeof dv === "object" &&
-    "page" in (dv as Record<string, unknown>) &&
-    typeof (dv as { page?: unknown }).page === "function"
-  ) {
-    try {
-      currentPage = (dv as { page: (path: string) => unknown }).page(currentFile.path);
-    } catch {
-      currentPage = null;
-    }
-  }
+  const { dv, currentPage } = dataviewContext(app, currentFile);
 
   try {
     const result: unknown = await executeJsSource(

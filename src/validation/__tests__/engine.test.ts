@@ -664,6 +664,17 @@ describe("ValidationEngine rules", () => {
     ]);
   });
 
+  it("skipRules leaves the rules phase out for display-only callers", async () => {
+    const engine = new ValidationEngine(makeApp(), { enableJsExecution: false }, { now: NOW });
+    const schema = schemaWith({ end: { type: "date" } }, [
+      { when: "end=", then: { set: { end: "{{today}}" } } },
+    ]);
+    const fm: Record<string, unknown> = {};
+    const results = await engine.validate(file, fm, schema, { skipRules: true });
+    expect(fm.end).toBeUndefined();
+    expect(results.find((r) => r.rule === "rules")).toBeUndefined();
+  });
+
   it("a schema without rules skips phases 2 and 3", async () => {
     const engine = new ValidationEngine(makeApp(), { enableJsExecution: false }, { now: NOW });
     const schema = schemaWith({ tags: { type: "multiselect", sort: "alphabetical" } }, []);

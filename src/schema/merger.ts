@@ -8,8 +8,7 @@ import type { ManifestData, ManifestRule } from "../types";
  * - formatting: child overrides parent if present
  * - target: always the child's own (never inherited)
  * - name, description, priority, extends: always child's own
- * - rules: parent rules first, then child rules; a child rule with the same
- *   name replaces the parent's in place; child `exclude` drops rules by name
+ * - rules: not merged here; the resolver orders them (see SchemaResolver.collectRules)
  */
 export function mergeSchemas(parent: ManifestData, child: ManifestData): ManifestData {
   const mergedFields: Record<string, import("../types").ManifestField> = {
@@ -31,7 +30,6 @@ export function mergeSchemas(parent: ManifestData, child: ManifestData): Manifes
     enforce_folder: child.enforce_folder ?? parent.enforce_folder,
     target: child.target && Object.keys(child.target).length > 0 ? child.target : parent.target,
     fields: mergedFields,
-    rules: mergeRules(parent.rules ?? [], child.rules ?? [], child.exclude),
     formatting: child.formatting ?? parent.formatting,
   };
 }
@@ -39,14 +37,18 @@ export function mergeSchemas(parent: ManifestData, child: ManifestData): Manifes
 /**
  * Append `child` rules after `parent` rules. A child rule whose `name` matches
  * a parent rule replaces it in the parent's position. Names in `exclude` are dropped.
+ * A `rules:` value that is not a list (hand-written YAML) contributes nothing.
  */
 export function mergeRules(
   parent: ManifestRule[],
-  child: ManifestRule[],
+  child: unknown,
   exclude?: string[]
 ): ManifestRule[] {
   const out = [...parent];
-  for (const rule of child) {
+  const children = Array.isArray(child) ? (child as unknown[]) : [];
+  for (const item of children) {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) continue;
+    const rule = item as ManifestRule;
     const idx = rule.name ? out.findIndex((r) => r.name === rule.name) : -1;
     if (idx === -1) out.push(rule);
     else out[idx] = rule;

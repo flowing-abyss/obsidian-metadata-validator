@@ -167,7 +167,7 @@ export class PropertyDecorator {
     if (cached && cached.fmHash === fmHash) {
       results = cached.results;
     } else {
-      results = await this.engine.validate(file, frontmatter, schema);
+      results = await this.engine.validate(file, frontmatter, schema, { skipRules: true });
       this.resultCache.set(file.path, { fmHash, results });
     }
 

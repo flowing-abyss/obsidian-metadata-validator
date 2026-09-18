@@ -236,7 +236,7 @@ export class BasesValidator {
       if (cached && cached.fmHash === fmHash) {
         results = cached.results;
       } else {
-        results = await this.engine.validate(file, frontmatter, schema);
+        results = await this.engine.validate(file, frontmatter, schema, { skipRules: true });
         this.resultCache.set(filePath, { fmHash, results });
       }
 
