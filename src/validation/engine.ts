@@ -2,7 +2,7 @@ import type { App, TFile } from "obsidian";
 import type { FieldOption, ManifestField, ResolvedSchema, ValidationResult } from "../types";
 import type { PluginSettings } from "../settings";
 import { runRules } from "../rules/runner";
-import { applyAutoFix, normalizeField } from "./auto-fix";
+import { applyAutoFix, normalizeField, sameValue } from "./auto-fix";
 import { checkRequired } from "./rules/required";
 import { checkOptions } from "./rules/options";
 import { checkLinkSource } from "./rules/link-source";
@@ -115,7 +115,7 @@ export class ValidationEngine {
     // Phase 3: normalisation and fixed re-asserted (rules cannot override fixed)
     if (runRulesPhase) {
       for (const [fieldName, field] of fields) {
-        if (field.fixed !== undefined && frontmatter[fieldName] !== field.fixed) {
+        if (field.fixed !== undefined && !sameValue(frontmatter[fieldName], field.fixed)) {
           frontmatter[fieldName] = field.fixed;
           results.push(this.autoFixResult(fieldName, "fixed", schema.manifestPath));
         }

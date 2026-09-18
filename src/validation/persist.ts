@@ -1,5 +1,7 @@
 import type { App, TFile } from "obsidian";
 import type { ResolvedSchema, ValidationResult } from "../types";
+import { sameValue } from "./auto-fix";
+import type { SelfWrites } from "./self-writes";
 import type { WriteBudget } from "./write-budget";
 
 export interface PersistEngineChangesInput {
@@ -13,6 +15,8 @@ export interface PersistEngineChangesInput {
   after: Record<string, unknown>;
   /** Caps rule-triggered writes per note so conflicting rules cannot ping-pong forever */
   writeBudget?: Pick<WriteBudget, "allow">;
+  /** Marks the write so the resulting "changed" event is not treated as a user edit */
+  selfWrites?: Pick<SelfWrites, "mark">;
 }
 
 /**
@@ -33,7 +37,7 @@ export async function persistEngineChanges(input: PersistEngineChangesInput): Pr
 
   const changes: Record<string, unknown> = {};
   for (const k of Object.keys(after)) {
-    if (!(k in before) || before[k] !== after[k]) changes[k] = after[k];
+    if (!(k in before) || !sameValue(before[k], after[k])) changes[k] = after[k];
   }
   const hasValueChanges = Object.keys(changes).length > 0;
   const hasOrderChange = results.some((r) => r.rule === "property-order");
@@ -58,6 +62,7 @@ export async function persistEngineChanges(input: PersistEngineChangesInput): Pr
     return false;
   }
 
+  input.selfWrites?.mark(file.path);
   await app.fileManager.processFrontMatter(file, (latestFm) => {
     const latest = latestFm as Record<string, unknown>;
     for (const [k, v] of Object.entries(changes)) latest[k] = v;

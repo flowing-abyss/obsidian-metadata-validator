@@ -86,3 +86,19 @@ describe("applyAutoFix", () => {
     expect(changed).toBe(false);
   });
 });
+
+describe("applyAutoFix with a list-valued fixed", () => {
+  it("does not report a change when the list is equal by value", () => {
+    const field: ManifestField = { type: "list", fixed: ["a", "b"] };
+    const fm: Record<string, unknown> = { tags: ["a", "b"] };
+    expect(applyAutoFix("tags", field, fm)).toBe(false);
+    expect(fm["tags"]).toEqual(["a", "b"]);
+  });
+
+  it("rewrites a list that differs by value", () => {
+    const field: ManifestField = { type: "list", fixed: ["a", "b"] };
+    const fm: Record<string, unknown> = { tags: ["b"] };
+    expect(applyAutoFix("tags", field, fm)).toBe(true);
+    expect(fm["tags"]).toEqual(["a", "b"]);
+  });
+});

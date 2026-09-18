@@ -33,6 +33,42 @@ export async function resolveSourceWithStatus(
   currentFile: TFile | null,
   enableJs = false
 ): Promise<SourceResolutionResult> {
+  // JS sources may depend on the current page and on the JS setting; query/folder/tag sources do not
+  const key =
+    JSON.stringify(source) + (source.js ? `|${currentFile?.path ?? ""}|${String(enableJs)}` : "");
+  const cached = sourceCache.get(key);
+  if (cached && cached.revision === sourceRevision) return cached.result;
+
+  const result = await resolveSourceUncached(source, app, currentFile, enableJs);
+  // A disabled or failed source is not worth remembering: settings or Dataview may recover
+  if (result.status === "resolved") {
+    if (sourceCache.size >= SOURCE_CACHE_LIMIT) sourceCache.clear();
+    sourceCache.set(key, { revision: sourceRevision, result });
+  }
+  return result;
+}
+
+/**
+ * Resolved sources are memoised until the vault changes. A validation pass
+ * resolves the same handful of sources for every field, and a vault scan does
+ * that for thousands of notes; without this each resolution rescans the vault.
+ */
+const SOURCE_CACHE_LIMIT = 500;
+const sourceCache = new Map<string, { revision: number; result: SourceResolutionResult }>();
+let sourceRevision = 0;
+
+/** Call when any note's metadata changed, or a file was created, renamed or deleted. */
+export function bumpSourceRevision(): void {
+  sourceRevision++;
+  if (sourceCache.size > 0) sourceCache.clear();
+}
+
+async function resolveSourceUncached(
+  source: FieldSource,
+  app: App,
+  currentFile: TFile | null,
+  enableJs: boolean
+): Promise<SourceResolutionResult> {
   if (source.js) {
     return resolveJsSource(source.js, app, currentFile, enableJs);
   }

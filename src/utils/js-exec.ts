@@ -37,6 +37,23 @@ function getCachedFn(code: string, paramNames: string[]): GenericFn {
   return fn;
 }
 
+/** Run user code against a deadline; the timer is cleared as soon as the code settles. */
+async function raceTimeout(
+  run: () => unknown,
+  timeoutMs: number,
+  message: string
+): Promise<unknown> {
+  let timer: number | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  try {
+    return await Promise.race([Promise.resolve().then(run), timeoutPromise]);
+  } finally {
+    if (timer !== undefined) window.clearTimeout(timer);
+  }
+}
+
 export class JsDisabledError extends Error {
   constructor() {
     super("JS execution is disabled in plugin settings");
@@ -57,12 +74,11 @@ export async function executeJsSource(
   }
 
   const fn = getCachedFn(code, ["app", "dv", "currentFile", "currentPage"]);
-
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    window.setTimeout(() => reject(new Error("JS source timed out")), JS_SOURCE_TIMEOUT_MS)
+  return raceTimeout(
+    () => fn(app, dv, currentFile, currentPage),
+    JS_SOURCE_TIMEOUT_MS,
+    "JS source timed out"
   );
-
-  return Promise.race([fn(app, dv, currentFile, currentPage), timeoutPromise]);
 }
 
 export async function executeJsValidator(
@@ -79,12 +95,11 @@ export async function executeJsValidator(
   }
 
   const fn = getCachedFn(code, ["app", "dv", "currentFile", "currentPage", "value"]);
-
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    window.setTimeout(() => reject(new Error("JS validator timed out")), JS_VALIDATOR_TIMEOUT_MS)
+  return raceTimeout(
+    () => fn(app, dv, currentFile, currentPage, value),
+    JS_VALIDATOR_TIMEOUT_MS,
+    "JS validator timed out"
   );
-
-  return Promise.race([fn(app, dv, currentFile, currentPage, value), timeoutPromise]);
 }
 
 /** Generic executor for rule code: named params become function arguments. */
@@ -100,12 +115,7 @@ export async function executeJs(
 
   const names = Object.keys(params);
   const fn = getCachedFn(code, names);
-
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    window.setTimeout(() => reject(new Error("JS rule timed out")), timeoutMs)
-  );
-
-  return Promise.race([fn(...names.map((n) => params[n])), timeoutPromise]);
+  return raceTimeout(() => fn(...names.map((n) => params[n])), timeoutMs, "JS rule timed out");
 }
 
 /** Dataview API and the current page, when the Dataview plugin is present. */

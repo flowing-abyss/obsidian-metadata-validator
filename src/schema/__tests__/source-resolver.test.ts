@@ -1,6 +1,9 @@
 import type { App, TFile } from "obsidian";
-import { describe, expect, it, vi } from "vitest";
-import { resolveSource, resolveSourceWithStatus } from "../source-resolver";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { bumpSourceRevision, resolveSource, resolveSourceWithStatus } from "../source-resolver";
+
+// Resolved sources are memoised per vault revision; every test starts from a fresh vault.
+beforeEach(() => bumpSourceRevision());
 
 type MockTFile = TFile;
 
@@ -427,5 +430,50 @@ describe("resolveSource", () => {
       message: "broken source",
     });
     errorSpy.mockRestore();
+  });
+});
+
+describe("source cache", () => {
+  function cachingApp(files: Array<{ path: string; basename: string }>) {
+    const getMarkdownFiles = vi.fn(() => files);
+    const app = {
+      vault: { getMarkdownFiles },
+      metadataCache: {
+        getFileCache: () => ({ frontmatter: { tags: ["book"] } }),
+      },
+    } as unknown as App;
+    return { app, getMarkdownFiles };
+  }
+
+  it("resolves a query source once per vault revision", async () => {
+    bumpSourceRevision();
+    const { app, getMarkdownFiles } = cachingApp([{ path: "a.md", basename: "a" }]);
+    const source = { query: "#book" };
+    const first = await resolveSourceWithStatus(source, app, null);
+    const second = await resolveSourceWithStatus(source, app, null);
+    expect(first.options.map((o) => o.value)).toEqual(["a"]);
+    expect(second).toBe(first);
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(1);
+
+    bumpSourceRevision();
+    await resolveSourceWithStatus(source, app, null);
+    expect(getMarkdownFiles).toHaveBeenCalledTimes(2);
+  });
+
+  it("keys js sources by the current file and does not cache failures", async () => {
+    bumpSourceRevision();
+    const { app } = cachingApp([]);
+    const fileA = { path: "a.md", basename: "a" } as TFile;
+    const fileB = { path: "b.md", basename: "b" } as TFile;
+    const source = { js: "return [currentFile.path]" };
+    const a = await resolveSourceWithStatus(source, app, fileA, true);
+    const b = await resolveSourceWithStatus(source, app, fileB, true);
+    expect(a.options.map((o) => o.value)).toEqual(["a.md"]);
+    expect(b.options.map((o) => o.value)).toEqual(["b.md"]);
+
+    const disabled = await resolveSourceWithStatus(source, app, fileA, false);
+    expect(disabled.status).toBe("disabled");
+    const enabledAgain = await resolveSourceWithStatus(source, app, fileA, true);
+    expect(enabledAgain.status).toBe("resolved");
   });
 });

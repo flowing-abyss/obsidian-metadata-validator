@@ -13,9 +13,9 @@ export function applyAutoFix(
   let changed = false;
   const current = frontmatter[fieldName];
 
-  // fixed: always overwrite
+  // fixed: always overwrite (compared by value, so a list `fixed` does not rewrite forever)
   if (field.fixed !== undefined) {
-    if (current !== field.fixed) {
+    if (!sameValue(current, field.fixed)) {
       frontmatter[fieldName] = field.fixed;
       changed = true;
     }
@@ -50,6 +50,13 @@ export function applyAutoFix(
   if (normalizeField(fieldName, field, frontmatter)) changed = true;
 
   return changed;
+}
+
+/** Deep equality for frontmatter values (primitives, lists, nested objects). */
+export function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 /**

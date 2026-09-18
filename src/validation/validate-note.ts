@@ -5,6 +5,7 @@ import type { ValidationEngine } from "./engine";
 import { sanitizeFrontmatter } from "./frontmatter";
 import { persistEngineChanges } from "./persist";
 import { checkFolderLocation } from "./rules/folder-location";
+import type { SelfWrites } from "./self-writes";
 import type { WriteBudget } from "./write-budget";
 
 interface ValidateNoteDependencies {
@@ -13,6 +14,7 @@ interface ValidateNoteDependencies {
   engine: Pick<ValidationEngine, "validate">;
   /** Caps rule-triggered writes per note so conflicting rules cannot ping-pong forever */
   writeBudget?: Pick<WriteBudget, "allow">;
+  selfWrites?: Pick<SelfWrites, "mark">;
 }
 
 interface ValidateNoteOutcome {
@@ -69,6 +71,7 @@ export async function validateNote(
     before: preEngineFrontmatter,
     after: frontmatter,
     writeBudget: deps.writeBudget,
+    selfWrites: deps.selfWrites,
   });
 
   return { schema, results, moved };

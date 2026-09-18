@@ -25,6 +25,8 @@ import { ValidationEngine } from "./validation/engine";
 import { sanitizeFrontmatter } from "./validation/frontmatter";
 import { appendLegacyEnforceFolderWarning, validateNote } from "./validation/validate-note";
 import { WriteBudget } from "./validation/write-budget";
+import { SelfWrites } from "./validation/self-writes";
+import { bumpSourceRevision } from "./schema/source-resolver";
 
 export default class MetadataValidatorPlugin extends Plugin {
   settings: PluginSettings = { ...DEFAULT_SETTINGS };
@@ -49,6 +51,13 @@ export default class MetadataValidatorPlugin extends Plugin {
   private readonly lastManifestByPath = new Map<string, string>();
   /** Caps rule-triggered writes per note so conflicting rules cannot ping-pong forever */
   private readonly writeBudget = new WriteBudget();
+  /** Notes we just wrote: their "changed" event is an echo, not a user edit */
+  private readonly selfWrites = new SelfWrites();
+  /** Frontmatter hash at the last validation, so a body-only edit is not validated again */
+  private readonly lastValidatedHash = new Map<string, string>();
+  /** While the vault auto-fix runs, per-file change events are ignored (it redraws at the end) */
+  private batchRunning = false;
+  private lastUiYield = 0;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -65,6 +74,8 @@ export default class MetadataValidatorPlugin extends Plugin {
         // The setting may have been turned off, or the note deleted, while pending
         if (!this.settings.enableOnSave) return;
         if (this.app.vault.getAbstractFileByPath(file.path) !== file) return;
+        // A body-only edit leaves the frontmatter as it was last validated: nothing to do
+        if (this.lastValidatedHash.get(file.path) === this.frontmatterHash(file)) return;
         this.validateAndUpdate(file).catch((error: unknown) => {
           console.error(`[MetadataValidator] Failed to validate "${file.path}"`, error);
         });
@@ -200,10 +211,17 @@ export default class MetadataValidatorPlugin extends Plugin {
       this.registerEvent(
         this.app.metadataCache.on("changed", (file: TFile) => {
           if (file.path.startsWith(this.settings.schemasRoot + "/")) return;
-          // Invalidate the decorator's result cache so stale icons don't linger
-          this.decorator.invalidate(file.path);
+          // The vault auto-fix redraws everything once at the end
+          if (this.batchRunning) return;
+          // Echo of our own write: the note was just validated, nothing else changed
+          if (this.selfWrites.consume(file.path)) {
+            this.decorator.decorateNow();
+            return;
+          }
+          bumpSourceRevision();
           // Deferred: lets a burst of writes (the user's, or another plugin's
           // multi-step transaction) finish before we validate and auto-fix.
+          // The decorator keeps its own frontmatter hash, so a body-only edit is a cache hit.
           if (this.settings.enableOnSave) this.changeScheduler.schedule(file);
           // Re-decorate so validator icons reflect the updated value immediately.
           // MutationObserver alone is not reliable here: Obsidian sometimes updates
@@ -215,10 +233,28 @@ export default class MetadataValidatorPlugin extends Plugin {
 
       this.registerEvent(
         this.app.vault.on("delete", (file: TAbstractFile) => {
+          bumpSourceRevision();
+          this.lastValidatedHash.delete(file.path);
           if (file instanceof TFile && this.isSchemaFile(file)) {
             this.cache.delete(file.path);
             this.resolver.rebuild();
           }
+        })
+      );
+
+      this.registerEvent(
+        this.app.vault.on("rename", (file: TAbstractFile, oldPath: string) => {
+          bumpSourceRevision();
+          this.selfWrites.rename(oldPath, file.path);
+          const hash = this.lastValidatedHash.get(oldPath);
+          this.lastValidatedHash.delete(oldPath);
+          if (hash !== undefined) this.lastValidatedHash.set(file.path, hash);
+        })
+      );
+
+      this.registerEvent(
+        this.app.vault.on("create", () => {
+          bumpSourceRevision();
         })
       );
 
@@ -503,17 +539,30 @@ export default class MetadataValidatorPlugin extends Plugin {
     return this.cache.isManifestFile(file) || this.cache.isRulesFile(file);
   }
 
+  /** Hash of the note's cached frontmatter, the same key the decorator uses. */
+  private frontmatterHash(file: TFile): string {
+    return JSON.stringify(
+      sanitizeFrontmatter(this.app.metadataCache.getFileCache(file)?.frontmatter)
+    );
+  }
+
   private async validateAndUpdate(file: TFile): Promise<void> {
     const previousPath = file.path;
+    const hashBefore = this.frontmatterHash(file);
     const { schema, results, moved } = await validateNote(
       {
         app: this.app,
         resolver: this.resolver,
         engine: this.engine,
         writeBudget: this.writeBudget,
+        selfWrites: this.selfWrites,
       },
       file
     );
+    this.lastValidatedHash.delete(previousPath);
+    this.lastValidatedHash.set(file.path, hashBefore);
+    // Icons must reflect the post-fix state; the display cache is keyed by frontmatter only
+    this.decorator.invalidate(file.path);
 
     if (!schema) {
       this.lastManifestByPath.delete(previousPath);
@@ -543,6 +592,7 @@ export default class MetadataValidatorPlugin extends Plugin {
       errors.length > 0 ? "error" : warnings.length > 0 ? "warning" : "valid"
     );
     if (this.settings.showFileExplorerBadges) this.badges.render();
+    this.decorator.decorateNow();
 
     this.updateSidebarPanel(file.basename, results);
   }
@@ -605,7 +655,7 @@ export default class MetadataValidatorPlugin extends Plugin {
       .filter((file) => !file.path.startsWith(this.settings.schemasRoot + "/"));
 
     onProgress?.({ processed: 0, total: files.length });
-    await this.yieldScanProgressUi();
+    await this.yieldScanProgressUi(true);
 
     let errorFiles = 0;
     let warningFiles = 0;
@@ -619,9 +669,7 @@ export default class MetadataValidatorPlugin extends Plugin {
         noSchemaFiles++;
         processed++;
         onProgress?.({ processed, total: files.length });
-        if (processed % 20 === 0 || processed === files.length) {
-          await this.yieldScanProgressUi();
-        }
+        await this.yieldScanProgressUi(processed === files.length);
         continue;
       }
 
@@ -640,9 +688,7 @@ export default class MetadataValidatorPlugin extends Plugin {
 
       processed++;
       onProgress?.({ processed, total: files.length });
-      if (processed % 20 === 0 || processed === files.length) {
-        await this.yieldScanProgressUi();
-      }
+      await this.yieldScanProgressUi(processed === files.length);
     }
 
     return {
@@ -657,15 +703,20 @@ export default class MetadataValidatorPlugin extends Plugin {
     };
   }
 
-  private async yieldScanProgressUi(): Promise<void> {
+  /** Let the UI paint when the last frame is older than ~2 frames; cheap to call per note. */
+  private async yieldScanProgressUi(force = false): Promise<void> {
+    const now = performance.now();
+    if (!force && now - this.lastUiYield < 32) return;
     await new Promise<void>((resolve) => {
       window.requestAnimationFrame(() => resolve());
     });
+    this.lastUiYield = performance.now();
   }
 
   private async applyAutoFixesAcrossVault(): Promise<void> {
     await this.reloadSchemas();
     const progress = new ProgressNotice("Applying auto-fix");
+    this.batchRunning = true;
 
     try {
       const summary = await applyVaultAutoFixes({
@@ -673,6 +724,7 @@ export default class MetadataValidatorPlugin extends Plugin {
         schemasRoot: this.settings.schemasRoot,
         resolver: this.resolver,
         engine: this.engine,
+        selfWrites: this.selfWrites,
         onFileProcessed: ({ previousPath, filePath, status }) => {
           if (previousPath !== filePath) this.badges.setStatus(previousPath, "none");
           this.badges.setStatus(filePath, status);
@@ -680,9 +732,12 @@ export default class MetadataValidatorPlugin extends Plugin {
         onProgress: async ({ processed, total }) => {
           progress.update({ processed, total });
           // Let the notice repaint and keep the editor responsive during a long run
-          if (processed % 20 === 0 || processed === total) await this.yieldScanProgressUi();
+          await this.yieldScanProgressUi(processed === total);
         },
       });
+      this.batchRunning = false;
+      // Writes during the batch changed the vault; validations after it must see that
+      bumpSourceRevision();
 
       if (this.settings.showFileExplorerBadges) this.badges.render();
       this.decorator.invalidateAll();
@@ -708,6 +763,8 @@ export default class MetadataValidatorPlugin extends Plugin {
     } catch (error) {
       progress.finish("Auto-fix failed. Check the developer console for details.", 2400);
       throw error;
+    } finally {
+      this.batchRunning = false;
     }
   }
 

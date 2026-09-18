@@ -3,6 +3,7 @@ import type { SchemaResolver } from "../schema/resolver";
 import type { ValidationEngine } from "./engine";
 import { sanitizeFrontmatter } from "./frontmatter";
 import { persistEngineChanges } from "./persist";
+import type { SelfWrites } from "./self-writes";
 import { checkFolderLocation } from "./rules/folder-location";
 
 type FileValidationStatus = "error" | "warning" | "valid" | "none";
@@ -35,6 +36,7 @@ interface BatchAutoFixDependencies {
   resolver: Pick<SchemaResolver, "resolveForNote">;
   engine: Pick<ValidationEngine, "validate">;
   onFileProcessed?: (result: BatchAutoFixFileResult) => void;
+  selfWrites?: Pick<SelfWrites, "mark">;
   /** Awaited after each note so the caller can update a progress bar and yield to the UI */
   onProgress?: (progress: { processed: number; total: number }) => void | Promise<void>;
 }
@@ -121,6 +123,7 @@ export async function applyVaultAutoFixes(
         results,
         before,
         after: frontmatter,
+        selfWrites: deps.selfWrites,
       });
       if (autoFixed > 0) summary.autoFixed += autoFixed;
 
