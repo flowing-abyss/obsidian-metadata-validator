@@ -4,11 +4,14 @@ import type { ResolvedSchema, ValidationResult } from "../types";
 import type { ValidationEngine } from "./engine";
 import { sanitizeFrontmatter } from "./frontmatter";
 import { checkFolderLocation } from "./rules/folder-location";
+import type { WriteBudget } from "./write-budget";
 
 interface ValidateNoteDependencies {
   app: App;
   resolver: Pick<SchemaResolver, "resolveForNote">;
   engine: Pick<ValidationEngine, "validate">;
+  /** Caps rule-triggered writes per note so conflicting rules cannot ping-pong forever */
+  writeBudget?: Pick<WriteBudget, "allow">;
 }
 
 interface ValidateNoteOutcome {
@@ -76,7 +79,20 @@ export async function validateNote(
       ? schema.formatting.property_order
       : Object.keys(schema.fields);
 
-    if (hasValueChanges || (hasOrderChange && effectiveOrder.length)) {
+    const rulesChanged = results.some((r) => r.rule === "rules" && r.autoFixed);
+    const overBudget =
+      rulesChanged && deps.writeBudget !== undefined && !deps.writeBudget.allow(file.path);
+    if (overBudget) {
+      results.push({
+        field: "__rules__",
+        severity: "warning",
+        message:
+          "Auto-fix paused for this note: too many rule-triggered writes in a short time. Check the rules for conflicts.",
+        rule: "write-budget",
+        manifestPath: schema.manifestPath,
+        autoFixed: false,
+      });
+    } else if (hasValueChanges || (hasOrderChange && effectiveOrder.length)) {
       // Apply only the engine-computed value changes onto the LATEST frontmatter.
       // processFrontMatter reads the current file state inside its callback, so it is
       // atomic with respect to other processFrontMatter calls and never races with the picker.

@@ -35,7 +35,7 @@ function ruleLabel(rule: ManifestRule, index: number): string {
 /** `{ when: ... }` or `{}` standing alone in a value slot: a filter over the target property. */
 function isBareFilter(v: unknown): v is { when?: unknown } {
   if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
-  const keys = Object.keys(v as object);
+  const keys = Object.keys(v);
   return keys.length === 1 && keys[0] === "when";
 }
 

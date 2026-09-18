@@ -23,6 +23,7 @@ import { ChangeScheduler } from "./validation/change-scheduler";
 import { ValidationEngine } from "./validation/engine";
 import { sanitizeFrontmatter } from "./validation/frontmatter";
 import { appendLegacyEnforceFolderWarning, validateNote } from "./validation/validate-note";
+import { WriteBudget } from "./validation/write-budget";
 
 export default class MetadataValidatorPlugin extends Plugin {
   settings: PluginSettings = { ...DEFAULT_SETTINGS };
@@ -41,6 +42,10 @@ export default class MetadataValidatorPlugin extends Plugin {
   private basesValidator: BasesValidatorType | null = null;
   /** Coalesces file-change bursts so each note is validated once after it settles */
   private changeScheduler!: ChangeScheduler;
+  /** Manifest each note resolved to at its last validation — a change means the note changed type */
+  private readonly lastManifestByPath = new Map<string, string>();
+  /** Caps rule-triggered writes per note so conflicting rules cannot ping-pong forever */
+  private readonly writeBudget = new WriteBudget();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -163,7 +168,7 @@ export default class MetadataValidatorPlugin extends Plugin {
       // Register vault event watchers
       this.registerEvent(
         this.app.vault.on("modify", async (file: TAbstractFile) => {
-          if (file instanceof TFile && file.basename === "manifest" && file.extension === "md") {
+          if (file instanceof TFile && this.isSchemaFile(file)) {
             await this.cache.refresh(file);
             this.resolver.rebuild();
             this.settingTab.refreshTree();
@@ -196,7 +201,7 @@ export default class MetadataValidatorPlugin extends Plugin {
 
       this.registerEvent(
         this.app.vault.on("delete", (file: TAbstractFile) => {
-          if (file instanceof TFile && file.basename === "manifest" && file.extension === "md") {
+          if (file instanceof TFile && this.isSchemaFile(file)) {
             this.cache.delete(file.path);
             this.resolver.rebuild();
           }
@@ -479,14 +484,25 @@ export default class MetadataValidatorPlugin extends Plugin {
     this.settingTab?.refreshTree();
   }
 
+  /** manifest.md or rules.md inside the schemas folder */
+  private isSchemaFile(file: TFile): boolean {
+    return this.cache.isManifestFile(file) || this.cache.isRulesFile(file);
+  }
+
   private async validateAndUpdate(file: TFile): Promise<void> {
     const previousPath = file.path;
     const { schema, results, moved } = await validateNote(
-      { app: this.app, resolver: this.resolver, engine: this.engine },
+      {
+        app: this.app,
+        resolver: this.resolver,
+        engine: this.engine,
+        writeBudget: this.writeBudget,
+      },
       file
     );
 
     if (!schema) {
+      this.lastManifestByPath.delete(previousPath);
       this.badges.setStatus(file.path, "none");
       this.updateSidebarPanel(file.basename, []);
       return;
@@ -497,6 +513,15 @@ export default class MetadataValidatorPlugin extends Plugin {
       this.badges.setStatus(previousPath, "none");
     }
 
+    // A note that changed type (different manifest, or moved by enforce_folder) may now
+    // belong in a different link property of the notes pointing at it: let their rules run.
+    const previousManifest = this.lastManifestByPath.get(previousPath);
+    this.lastManifestByPath.delete(previousPath);
+    this.lastManifestByPath.set(file.path, schema.manifestPath);
+    const changedType =
+      moved || (previousManifest !== undefined && previousManifest !== schema.manifestPath);
+    if (changedType && this.settings.revalidateBacklinks) this.scheduleBacklinks(file);
+
     const errors = results.filter((r) => !r.autoFixed && r.severity === "error");
     const warnings = results.filter((r) => !r.autoFixed && r.severity === "warning");
     this.badges.setStatus(
@@ -506,6 +531,26 @@ export default class MetadataValidatorPlugin extends Plugin {
     if (this.settings.showFileExplorerBadges) this.badges.render();
 
     this.updateSidebarPanel(file.basename, results);
+  }
+
+  /** Queue every note that links to `file` for validation. */
+  private scheduleBacklinks(file: TFile): void {
+    const cache = this.app.metadataCache as unknown as {
+      getBacklinksForFile?: (f: TFile) => { data?: unknown } | null;
+    };
+    const data = cache.getBacklinksForFile?.(file)?.data;
+    const paths: string[] =
+      data instanceof Map
+        ? Array.from(data.keys()).filter((k): k is string => typeof k === "string")
+        : data && typeof data === "object"
+          ? Object.keys(data)
+          : [];
+    for (const path of paths) {
+      const target = this.app.vault.getAbstractFileByPath(path);
+      if (target instanceof TFile && target.extension === "md") {
+        this.changeScheduler.schedule(target);
+      }
+    }
   }
 
   /** Look up the live SidebarPanel instance from the workspace — never stale. */

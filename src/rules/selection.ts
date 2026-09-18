@@ -1,4 +1,3 @@
-import type { TFile } from "obsidian";
 import type { RuleSelection } from "../types";
 import { evaluateCondition } from "./condition";
 import { contextForFile, type NoteContext, type RuleEnv } from "./context";
@@ -9,7 +8,7 @@ const RESERVED = new Set(["js", "and", "or", "not", "when"]);
 /** `{ prop: { when?: ... } }` with at least one key and nothing but an optional `when` inside. */
 export function isSelection(v: unknown): v is RuleSelection {
   if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
-  const entries = Object.entries(v as Record<string, unknown>);
+  const entries = Object.entries(v);
   if (entries.length === 0) return false;
   return entries.every(([key, spec]) => {
     if (RESERVED.has(key)) return false;
@@ -39,7 +38,7 @@ export async function resolveSelection(
         if (!isWikiLink(value)) continue;
         const file = env.app.metadataCache.getFirstLinkpathDest(linkTarget(value), env.file.path);
         if (!file) continue;
-        const ctx = contextForFile(file as TFile, env.app);
+        const ctx = contextForFile(file, env.app);
         if (!(await evaluateCondition(spec.when, ctx, env))) continue;
       }
       if (!out.some((existing) => valuesEqual(existing, value))) out.push(value);

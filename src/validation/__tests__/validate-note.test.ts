@@ -249,3 +249,63 @@ describe("validateNote", () => {
     ]);
   });
 });
+
+describe("validateNote write budget", () => {
+  function rulesEngine() {
+    return {
+      validate: vi.fn(async (_file: TFile, frontmatter: Record<string, unknown>) => {
+        frontmatter["end"] = "2026-09-18";
+        const results: ValidationResult[] = [
+          {
+            field: "end",
+            severity: "info",
+            message: '"end" set by rule "x".',
+            rule: "rules",
+            manifestPath: "schemas/problems/manifest.md",
+            autoFixed: true,
+          },
+        ];
+        return results;
+      }),
+    };
+  }
+
+  it("writes when the budget allows and consumes it only for rule changes", async () => {
+    const fake = makeApp({ tags: ["problem"], end: null });
+    const allow = vi.fn(() => true);
+    const resolver = { resolveForNote: () => makeSchema() };
+    const { results } = await validateNote(
+      { app: fake.app, resolver, engine: rulesEngine(), writeBudget: { allow } },
+      makeFile("Notes/a.md")
+    );
+    expect(allow).toHaveBeenCalledWith("Notes/a.md");
+    expect(fake.processFrontMatter).toHaveBeenCalledTimes(1);
+    expect(fake.latest["end"]).toBe("2026-09-18");
+    expect(results.find((r) => r.rule === "write-budget")).toBeUndefined();
+
+    // Non-rule auto-fixes do not touch the budget
+    allow.mockClear();
+    const fake2 = makeApp({ tags: ["problem"], color: "wrong" });
+    await validateNote(
+      { app: fake2.app, resolver, engine: fixedColorEngine(), writeBudget: { allow } },
+      makeFile("Notes/b.md")
+    );
+    expect(allow).not.toHaveBeenCalled();
+    expect(fake2.processFrontMatter).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the write and warns when the budget is exhausted", async () => {
+    const fake = makeApp({ tags: ["problem"], end: null });
+    const resolver = { resolveForNote: () => makeSchema() };
+    const { results } = await validateNote(
+      { app: fake.app, resolver, engine: rulesEngine(), writeBudget: { allow: () => false } },
+      makeFile("Notes/a.md")
+    );
+    expect(fake.processFrontMatter).not.toHaveBeenCalled();
+    expect(fake.latest["end"]).toBeNull();
+    expect(results.find((r) => r.rule === "write-budget")).toMatchObject({
+      severity: "warning",
+      autoFixed: false,
+    });
+  });
+});

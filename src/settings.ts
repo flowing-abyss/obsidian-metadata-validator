@@ -8,6 +8,8 @@ export interface PluginSettings {
   /** Quiet period after a note changes before it is validated and auto-fixed */
   onSaveDelaySeconds: number;
   enableOnOpen: boolean;
+  /** When a note's schema changes, re-validate the notes linking to it */
+  revalidateBacklinks: boolean;
   hideObsidianTypeIcon: boolean;
   hideObsidianValidator: boolean;
   showInlineErrors: boolean;
@@ -23,6 +25,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   enableOnSave: true,
   onSaveDelaySeconds: 1,
   enableOnOpen: true,
+  revalidateBacklinks: true,
   hideObsidianTypeIcon: true,
   hideObsidianValidator: true,
   showInlineErrors: true,
@@ -105,6 +108,18 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
+
+    new Setting(containerEl)
+      .setName("Revalidate linking notes when a note changes type")
+      .setDesc(
+        "When a note's schema changes (for example a meta note becomes a problem), notes that link to it are re-validated so rules can move the link to the right property."
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.revalidateBacklinks).onChange(async (v) => {
+          this.plugin.settings.revalidateBacklinks = v;
+          await this.plugin.saveSettings();
+        })
+      );
 
     new Setting(containerEl).setName("UI").setHeading();
 

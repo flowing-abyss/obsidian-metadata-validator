@@ -48,6 +48,7 @@ export default tseslint.config(
       "main.js",
       "vitest.config.ts",
       "src/**/*.test.ts",
+      "src/**/__tests__/**",
       "src/__mocks__/**",
       ".forge/**",
       ".pi/**",

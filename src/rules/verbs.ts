@@ -23,7 +23,7 @@ function isJsValue(v: unknown): v is { js: string } {
     typeof v === "object" &&
     !Array.isArray(v) &&
     typeof (v as { js?: unknown }).js === "string" &&
-    Object.keys(v as object).length === 1
+    Object.keys(v).length === 1
   );
 }
 
@@ -33,7 +33,7 @@ export async function resolveRuleValue(value: RuleValue, env: RuleEnv): Promise<
     const out: unknown[] = [];
     for (const item of value) {
       const r = await resolveRuleValue(item, env);
-      if (Array.isArray(r)) out.push(...r);
+      if (Array.isArray(r)) out.push(...(r as unknown[]));
       else if (!isEmpty(r)) out.push(r);
     }
     return out;
