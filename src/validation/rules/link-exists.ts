@@ -1,4 +1,5 @@
 import type { App } from "obsidian";
+import { linkTarget } from "../../rules/link-text";
 import type { ValidationResult } from "../../types";
 
 /**
@@ -7,20 +8,9 @@ import type { ValidationResult } from "../../types";
  * internal link index, so no vault scan is needed.
  */
 function resolveLink(raw: string, app: App, sourcePath: string): boolean {
-  let target = raw.trim();
-
-  // Strip [[ ]] wrapper
-  if (target.startsWith("[[")) target = target.slice(2);
-  if (target.endsWith("]]")) target = target.slice(0, -2);
-
-  // Strip display text after |
-  const pipeIdx = target.indexOf("|");
-  if (pipeIdx !== -1) target = target.slice(0, pipeIdx);
-
-  // Strip .md extension
-  target = target.replace(/\.md$/, "").trim();
+  // [[path/Name.md#heading|alias]] resolves by "path/Name"
+  const target = linkTarget(raw);
   if (!target) return false;
-
   return app.metadataCache.getFirstLinkpathDest(target, sourcePath) !== null;
 }
 

@@ -83,3 +83,26 @@ describe("checkLinkExists", () => {
     expect(r?.autoFixed).toBe(false);
   });
 });
+
+describe("checkLinkExists link forms", () => {
+  it.each(["[[My Book]]", "[[My Book.md]]", "[[My Book#Chapter 1]]", "[[My Book.md#^abc|alias]]"])(
+    "resolves %s to the note itself",
+    (value) => {
+      const app = makeApp({ "My Book": true });
+      expect(checkLinkExists("up", value, app, "s/manifest.md", "n.md")).toBeNull();
+    }
+  );
+
+  it("resolves a link with a folder path by that path", () => {
+    const app = makeApp({ "projects/My Book/My Book": true });
+    expect(
+      checkLinkExists(
+        "up",
+        "[[projects/My Book/My Book.md#Intro|My Book]]",
+        app,
+        "s/manifest.md",
+        "n.md"
+      )
+    ).toBeNull();
+  });
+});

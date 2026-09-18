@@ -51,3 +51,35 @@ describe("checkLinkSource", () => {
     ).toBeNull();
   });
 });
+
+describe("checkLinkSource link forms", () => {
+  const allowed: FieldOption[] = [{ value: "My Book" }];
+
+  it.each([
+    "[[My Book]]",
+    "[[My Book.md]]",
+    "[[projects/My Book/My Book.md|My Book]]",
+    "[[My Book#Chapter 1]]",
+    "[[folder/My Book.md#^abc|alias]]",
+    "My Book",
+  ])("accepts %s", (value) => {
+    expect(checkLinkSource("up", value, allowed, "s/manifest.md")).toBeNull();
+  });
+
+  it("still rejects a different note written with an extension", () => {
+    const result = checkLinkSource("up", "[[Other.md]]", allowed, "s/manifest.md");
+    expect(result?.rule).toBe("link-source");
+    expect(result?.message).toContain("[[Other.md]]");
+  });
+
+  it("checks every value of a list", () => {
+    const result = checkLinkSource(
+      "up",
+      ["[[projects/My Book/My Book.md|My Book]]", "[[Other]]"],
+      allowed,
+      "s/manifest.md"
+    );
+    expect(result?.message).toContain("[[Other]]");
+    expect(result?.message).not.toContain("My Book.md");
+  });
+});
