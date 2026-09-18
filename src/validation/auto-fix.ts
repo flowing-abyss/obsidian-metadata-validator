@@ -47,15 +47,27 @@ export function applyAutoFix(
     changed = true;
   }
 
+  if (normalizeField(fieldName, field, frontmatter)) changed = true;
+
+  return changed;
+}
+
+/**
+ * Shape-only fixes that are safe to re-run after rules changed a value:
+ * wrap a scalar into a list for `list` fields, and apply `sort`.
+ * Mutates in place. Returns true if a change was made.
+ */
+export function normalizeField(
+  fieldName: string,
+  field: ManifestField,
+  frontmatter: Record<string, unknown>
+): boolean {
+  let changed = false;
+
   // list: if the current value is a non-null scalar, wrap it in an array
-  const postFix = frontmatter[fieldName];
-  if (
-    field.type === "list" &&
-    postFix !== undefined &&
-    postFix !== null &&
-    !Array.isArray(postFix)
-  ) {
-    frontmatter[fieldName] = [postFix];
+  const current = frontmatter[fieldName];
+  if (field.type === "list" && current !== undefined && current !== null && !Array.isArray(current)) {
+    frontmatter[fieldName] = [current];
     changed = true;
   }
 

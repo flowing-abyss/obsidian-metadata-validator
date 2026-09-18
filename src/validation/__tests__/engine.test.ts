@@ -506,3 +506,162 @@ describe("ValidationEngine", () => {
     expect(jsResult?.message).toContain("JS validation disabled");
   });
 });
+
+describe("ValidationEngine rules", () => {
+  const NOW = () => new Date("2026-09-18T12:00:00+07:00");
+
+  function makeVaultApp(files: Record<string, Record<string, unknown>>): App {
+    const tfiles = Object.keys(files).map(
+      (p) =>
+        ({ path: p, basename: (p.split("/").pop() ?? p).replace(/\.md$/, ""), extension: "md" }) as TFile
+    );
+    return {
+      vault: { getMarkdownFiles: () => tfiles },
+      metadataCache: {
+        getFileCache: (f: TFile) => (files[f.path] ? { frontmatter: files[f.path], tags: [] } : null),
+        getFirstLinkpathDest: (name: string) => tfiles.find((f) => f.basename === name) ?? null,
+      },
+      fileManager: { processFrontMatter: vi.fn().mockResolvedValue(undefined) },
+    } as unknown as App;
+  }
+
+  function schemaWith(
+    fields: ResolvedSchema["fields"],
+    rules: ResolvedSchema["rules"],
+    formatting: ResolvedSchema["formatting"] = {}
+  ): ResolvedSchema {
+    return {
+      manifestPath: "schemas/project/manifest.md",
+      name: "project",
+      priority: 0,
+      target: { query: "#project" },
+      fields,
+      rules,
+      formatting,
+      inheritanceChain: ["schemas/project/manifest.md"],
+    };
+  }
+
+  const file = { path: "Projects/A.md", basename: "A", extension: "md" } as TFile;
+
+  it("required sees the value a rule just set", async () => {
+    const engine = new ValidationEngine(makeApp(), { enableJsExecution: false }, { now: NOW });
+    const schema = schemaWith(
+      { status: { type: "select" }, end: { type: "date", required: true } },
+      [{ name: "end on done", when: "status=🟩 AND end=", then: { set: { end: "{{today}}" } } }]
+    );
+    const fm: Record<string, unknown> = { status: "🟩" };
+    const results = await engine.validate(file, fm, schema);
+    expect(fm.end).toBe("2026-09-18");
+    expect(results.find((r) => r.rule === "required")).toBeUndefined();
+    expect(results.find((r) => r.rule === "rules")).toMatchObject({ field: "end", autoFixed: true });
+  });
+
+  it("default is visible to rules and rules can change it", async () => {
+    const engine = new ValidationEngine(makeApp(), { enableJsExecution: false }, { now: NOW });
+    const schema = schemaWith(
+      { status: { type: "select", default: "📥" }, priority: { type: "select" } },
+      [{ when: "status=📥", then: { set: { priority: "◽" } } }]
+    );
+    const fm: Record<string, unknown> = {};
+    await engine.validate(file, fm, schema);
+    expect(fm.status).toBe("📥");
+    expect(fm.priority).toBe("◽");
+  });
+
+  it("fixed wins over a js rule that overwrote it", async () => {
+    const engine = new ValidationEngine(makeApp(), { enableJsExecution: true }, { now: NOW });
+    const schema = schemaWith({ icon: { type: "text", fixed: "📚" } }, [
+      { then: { js: "fm.icon = 'x'" } },
+    ]);
+    const fm: Record<string, unknown> = { icon: "📚" };
+    const results = await engine.validate(file, fm, schema);
+    expect(fm.icon).toBe("📚");
+    expect(results.filter((r) => r.rule === "fixed")).toHaveLength(1);
+  });
+
+  it("sort applies after add", async () => {
+    const engine = new ValidationEngine(makeApp(), { enableJsExecution: false }, { now: NOW });
+    const schema = schemaWith({ tags: { type: "multiselect", sort: "alphabetical" } }, [
+      { then: { add: { tags: "a" } } },
+    ]);
+    const fm: Record<string, unknown> = { tags: ["c", "b"] };
+    const results = await engine.validate(file, fm, schema);
+    expect(fm.tags).toEqual(["a", "b", "c"]);
+    expect(results.map((r) => r.rule)).toEqual(["sort", "rules", "sort"]);
+  });
+
+  it("list wrap applies after set on a list field", async () => {
+    const engine = new ValidationEngine(makeApp(), { enableJsExecution: false }, { now: NOW });
+    const schema = schemaWith({ aliases: { type: "list" }, title: { type: "text" } }, [
+      { when: "aliases=", then: { set: { aliases: "{{title}}" } } },
+    ]);
+    const fm: Record<string, unknown> = { title: "T" };
+    await engine.validate(file, fm, schema);
+    expect(fm.aliases).toEqual(["T"]);
+  });
+
+  it("options check is still skipped when a default filled an empty select", async () => {
+    const engine = new ValidationEngine(makeApp(), { enableJsExecution: false }, { now: NOW });
+    const schema = schemaWith(
+      { status: { type: "select", default: "x", options: [{ value: "a" }] } },
+      [{ then: { set: { other: 1 } } }]
+    );
+    const fm: Record<string, unknown> = {};
+    const results = await engine.validate(file, fm, schema);
+    expect(results.find((r) => r.rule === "options")).toBeUndefined();
+  });
+
+  it("transfer between link fields with the property order applied", async () => {
+    const app = makeVaultApp({
+      "base/IP.md": { tags: ["system/high/problem"] },
+      "base/M.md": { tags: ["system/high/meta"] },
+    });
+    const engine = new ValidationEngine(app, { enableJsExecution: false }, { now: NOW });
+    const schema = schemaWith(
+      {
+        meta: { type: "multilink", sort: "alphabetical", validate_exists: false },
+        problem: { type: "multilink", sort: "alphabetical", validate_exists: false },
+      },
+      [
+        {
+          then: {
+            add: {
+              problem: { meta: { when: "#system/high/problem" } },
+              meta: { problem: { when: "#system/high/meta" } },
+            },
+            remove: {
+              meta: { when: "#system/high/problem" },
+              problem: { when: "#system/high/meta" },
+            },
+          },
+        },
+      ],
+      { property_order: ["problem", "meta"] }
+    );
+    const fm: Record<string, unknown> = { meta: ["[[IP]]", "[[M]]"], problem: [] };
+    const results = await engine.validate(file, fm, schema);
+    expect(fm.meta).toEqual(["[[M]]"]);
+    expect(fm.problem).toEqual(["[[IP]]"]);
+    expect(Object.keys(fm)).toEqual(["problem", "meta"]);
+    expect(results.filter((r) => !r.autoFixed)).toEqual([]);
+  });
+
+  it("rule-config warnings surface as non-fixed warnings", async () => {
+    const engine = new ValidationEngine(makeApp(), { enableJsExecution: false }, { now: NOW });
+    const schema = schemaWith({ status: { type: "select" } }, [{ then: { add: { status: "x" } } }]);
+    const results = await engine.validate(file, { status: "a" }, schema);
+    expect(results).toEqual([
+      expect.objectContaining({ rule: "rule-config", severity: "warning", autoFixed: false }),
+    ]);
+  });
+
+  it("a schema without rules skips phases 2 and 3", async () => {
+    const engine = new ValidationEngine(makeApp(), { enableJsExecution: false }, { now: NOW });
+    const schema = schemaWith({ tags: { type: "multiselect", sort: "alphabetical" } }, []);
+    const fm: Record<string, unknown> = { tags: ["b", "a"] };
+    const results = await engine.validate(file, fm, schema);
+    expect(fm.tags).toEqual(["a", "b"]);
+    expect(results.map((r) => r.rule)).toEqual(["sort"]);
+  });
+});

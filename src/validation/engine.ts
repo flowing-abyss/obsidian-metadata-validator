@@ -1,7 +1,8 @@
 import type { App, TFile } from "obsidian";
-import type { ManifestField, ResolvedSchema, ValidationResult } from "../types";
+import type { FieldOption, ManifestField, ResolvedSchema, ValidationResult } from "../types";
 import type { PluginSettings } from "../settings";
-import { applyAutoFix } from "./auto-fix";
+import { runRules } from "../rules/runner";
+import { applyAutoFix, normalizeField } from "./auto-fix";
 import { checkRequired } from "./rules/required";
 import { checkOptions } from "./rules/options";
 import { checkLinkSource } from "./rules/link-source";
@@ -11,13 +12,39 @@ import { checkNumberRange } from "./rules/number-range";
 import { runJsValidator } from "./rules/js-validator";
 import { resolveSourceWithStatus } from "../schema/source-resolver";
 
+interface FieldFixInfo {
+  /** applyAutoFix changed the value in the first pass */
+  wasFixed: boolean;
+  /** the value was empty before the first pass */
+  isEmpty: boolean;
+}
+
+interface EngineOptions {
+  /** Injectable clock for rule templates (tests) */
+  now?: () => Date;
+}
+
+/**
+ * One validation pass over a note, in four phases:
+ *   1. field auto-fix (`fixed`, `default`, required placeholder, shape)
+ *   2. rules (state-based `when` / `then`)
+ *   3. normalisation (list wrapping, `sort`) and `fixed` re-asserted
+ *   4. field checks on the final state
+ * followed by property ordering. Mutates `frontmatter` in place.
+ */
 export class ValidationEngine {
   private readonly app: App;
   private readonly settings: Pick<PluginSettings, "enableJsExecution">;
+  private readonly now: (() => Date) | undefined;
 
-  constructor(app: App, settings: Pick<PluginSettings, "enableJsExecution">) {
+  constructor(
+    app: App,
+    settings: Pick<PluginSettings, "enableJsExecution">,
+    options: EngineOptions = {}
+  ) {
     this.app = app;
     this.settings = settings;
+    this.now = options.now;
   }
 
   async validate(
@@ -26,16 +53,65 @@ export class ValidationEngine {
     schema: ResolvedSchema
   ): Promise<ValidationResult[]> {
     const results: ValidationResult[] = [];
+    const fields = Object.entries(schema.fields);
+    const fixInfo = new Map<string, FieldFixInfo>();
 
-    for (const [fieldName, fieldDef] of Object.entries(schema.fields)) {
-      const fieldResults = await this.validateField(
-        fieldName,
-        fieldDef,
-        frontmatter,
-        file,
-        schema.manifestPath
+    // Phase 1: field auto-fix
+    for (const [fieldName, field] of fields) {
+      const pre = frontmatter[fieldName];
+      const isEmpty =
+        pre === undefined ||
+        pre === null ||
+        pre === "" ||
+        (Array.isArray(pre) && pre.length === 0);
+      const wasFixed = applyAutoFix(fieldName, field, frontmatter);
+      fixInfo.set(fieldName, { wasFixed, isEmpty });
+      if (wasFixed) {
+        results.push(
+          this.autoFixResult(
+            fieldName,
+            field.fixed !== undefined ? "fixed" : field.default !== undefined ? "default" : "sort",
+            schema.manifestPath
+          )
+        );
+      }
+    }
+
+    // Phase 2: rules
+    if (schema.rules.length > 0) {
+      results.push(
+        ...(await runRules({
+          rules: schema.rules,
+          app: this.app,
+          file,
+          frontmatter,
+          fields: schema.fields,
+          enableJs: this.settings.enableJsExecution,
+          manifestPath: schema.manifestPath,
+          now: this.now,
+        }))
       );
-      results.push(...fieldResults);
+    }
+
+    // Phase 3: normalisation and fixed re-asserted (rules cannot override fixed)
+    if (schema.rules.length > 0) {
+      for (const [fieldName, field] of fields) {
+        if (field.fixed !== undefined && frontmatter[fieldName] !== field.fixed) {
+          frontmatter[fieldName] = field.fixed;
+          results.push(this.autoFixResult(fieldName, "fixed", schema.manifestPath));
+        }
+        if (normalizeField(fieldName, field, frontmatter)) {
+          results.push(this.autoFixResult(fieldName, "sort", schema.manifestPath));
+        }
+      }
+    }
+
+    // Phase 4: checks on the final state
+    for (const [fieldName, field] of fields) {
+      const info = fixInfo.get(fieldName) ?? { wasFixed: false, isEmpty: false };
+      results.push(
+        ...(await this.checkField(fieldName, field, frontmatter, file, schema.manifestPath, info))
+      );
     }
 
     // Apply ordering: explicit property_order wins; fall back to schema field definition order
@@ -59,37 +135,26 @@ export class ValidationEngine {
     return results;
   }
 
-  private async validateField(
+  private autoFixResult(fieldName: string, rule: string, manifestPath: string): ValidationResult {
+    return {
+      field: fieldName,
+      severity: "info",
+      message: `"${fieldName}" was auto-corrected.`,
+      rule,
+      manifestPath,
+      autoFixed: true,
+    };
+  }
+
+  private async checkField(
     fieldName: string,
     field: ManifestField,
     frontmatter: Record<string, unknown>,
     file: TFile,
-    manifestPath: string
+    manifestPath: string,
+    info: FieldFixInfo
   ): Promise<ValidationResult[]> {
     const results: ValidationResult[] = [];
-
-    // Capture the value before auto-fix so we can skip options validation when a
-    // default was inserted into an empty field (user never chose that value).
-    const preFixValue = frontmatter[fieldName];
-    const isEmpty =
-      preFixValue === undefined ||
-      preFixValue === null ||
-      preFixValue === "" ||
-      (Array.isArray(preFixValue) && preFixValue.length === 0);
-
-    const wasFixed = applyAutoFix(fieldName, field, frontmatter);
-    if (wasFixed) {
-      results.push({
-        field: fieldName,
-        severity: "info",
-        message: `"${fieldName}" was auto-corrected.`,
-        rule:
-          field.fixed !== undefined ? "fixed" : field.default !== undefined ? "default" : "sort",
-        manifestPath,
-        autoFixed: true,
-      });
-    }
-
     const value = frontmatter[fieldName];
 
     if (field.required) {
@@ -98,9 +163,11 @@ export class ValidationEngine {
     }
 
     if (field.options) {
-      const skipOptions = wasFixed && isEmpty;
+      // Skip options validation when a default was inserted into an empty field
+      // (the user never chose that value).
+      const skipOptions = info.wasFixed && info.isEmpty;
       if (!skipOptions) {
-        let resolvedOptions: import("../types").FieldOption[] | null = null;
+        let resolvedOptions: FieldOption[] | null = null;
         if (Array.isArray(field.options)) {
           resolvedOptions = field.options;
         } else if (field.strict !== false) {
