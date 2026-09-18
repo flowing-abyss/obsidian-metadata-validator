@@ -19,9 +19,10 @@ import {
   type VaultScanReport,
 } from "./ui/sidebar-panel";
 import { applyVaultAutoFixes } from "./validation/batch-auto-fix";
+import { ChangeScheduler } from "./validation/change-scheduler";
 import { ValidationEngine } from "./validation/engine";
 import { sanitizeFrontmatter } from "./validation/frontmatter";
-import { checkFolderLocation } from "./validation/rules/folder-location";
+import { appendLegacyEnforceFolderWarning, validateNote } from "./validation/validate-note";
 
 export default class MetadataValidatorPlugin extends Plugin {
   settings: PluginSettings = { ...DEFAULT_SETTINGS };
@@ -38,6 +39,8 @@ export default class MetadataValidatorPlugin extends Plugin {
   /** True when the right-click came from an internal-link inside an embedded Bases view */
   private _contextMenuFromBases = false;
   private basesValidator: BasesValidatorType | null = null;
+  /** Coalesces file-change bursts so each note is validated once after it settles */
+  private changeScheduler!: ChangeScheduler;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -49,6 +52,18 @@ export default class MetadataValidatorPlugin extends Plugin {
     this.cssInjector = new CssInjector(this.settings);
     this.decorator = new PropertyDecorator(this.app, this.resolver, this.engine, this.settings);
     this.badges = new ExplorerBadges();
+    this.changeScheduler = new ChangeScheduler(
+      (file) => {
+        // The setting may have been turned off, or the note deleted, while pending
+        if (!this.settings.enableOnSave) return;
+        if (this.app.vault.getAbstractFileByPath(file.path) !== file) return;
+        this.validateAndUpdate(file).catch((error: unknown) => {
+          console.error(`[MetadataValidator] Failed to validate "${file.path}"`, error);
+        });
+      },
+      () => this.settings.onSaveDelaySeconds * 1000
+    );
+    this.register(() => this.changeScheduler.dispose());
 
     // Apply CSS overrides immediately (no vault needed)
     this.cssInjector.update();
@@ -92,6 +107,16 @@ export default class MetadataValidatorPlugin extends Plugin {
       id: "open-sidebar-panel",
       name: "Open validation panel",
       callback: () => void this.activateSidebarPanel(),
+    });
+
+    this.addCommand({
+      id: "auto-fix-vault",
+      name: "Auto-fix all notes in vault",
+      callback: () =>
+        void this.applyAutoFixesAcrossVault().catch((error: unknown) => {
+          console.error("[MetadataValidator] Vault auto-fix failed", error);
+          new Notice("Auto-fix failed. Check the developer console for details.");
+        }),
     });
 
     this.addCommand({
@@ -154,13 +179,13 @@ export default class MetadataValidatorPlugin extends Plugin {
       );
 
       this.registerEvent(
-        this.app.metadataCache.on("changed", async (file: TFile) => {
+        this.app.metadataCache.on("changed", (file: TFile) => {
           if (file.path.startsWith(this.settings.schemasRoot + "/")) return;
           // Invalidate the decorator's result cache so stale icons don't linger
           this.decorator.invalidate(file.path);
-          if (this.settings.enableOnSave) {
-            await this.validateAndUpdate(file);
-          }
+          // Deferred: lets a burst of writes (the user's, or another plugin's
+          // multi-step transaction) finish before we validate and auto-fix.
+          if (this.settings.enableOnSave) this.changeScheduler.schedule(file);
           // Re-decorate so validator icons reflect the updated value immediately.
           // MutationObserver alone is not reliable here: Obsidian sometimes updates
           // property values in-place (no childList mutation) rather than removing and
@@ -455,8 +480,11 @@ export default class MetadataValidatorPlugin extends Plugin {
   }
 
   private async validateAndUpdate(file: TFile): Promise<void> {
-    const frontmatter = sanitizeFrontmatter(this.app.metadataCache.getFileCache(file)?.frontmatter);
-    const schema = this.resolver.resolveForNote(file, frontmatter);
+    const previousPath = file.path;
+    const { schema, results, moved } = await validateNote(
+      { app: this.app, resolver: this.resolver, engine: this.engine },
+      file
+    );
 
     if (!schema) {
       this.badges.setStatus(file.path, "none");
@@ -464,91 +492,9 @@ export default class MetadataValidatorPlugin extends Plugin {
       return;
     }
 
-    // enforce_folder: only a string path is actionable now (true alone has no effect)
-    const enforcePath =
-      typeof schema.enforce_folder === "string" ? schema.enforce_folder : undefined;
-
-    // enforce_folder: auto-move if needed
-    if (enforcePath) {
-      const moveResult = checkFolderLocation(file.path, enforcePath, schema.manifestPath);
-      if (moveResult) {
-        await this.app.fileManager.renameFile(file, moveResult.targetPath);
-        new Notice(`Moved "${file.basename}" → ${moveResult.targetPath}`);
-        return;
-      }
-    }
-
-    // Snapshot before engine mutates frontmatter in place (via applyAutoFix / applyPropertyOrder)
-    const preEngineFrontmatter: Record<string, unknown> = { ...frontmatter };
-
-    const results = await this.engine.validate(file, frontmatter, schema);
-
-    this.appendLegacyEnforceFolderWarning(results, schema.enforce_folder, schema.manifestPath);
-
-    const hasAutoFix = results.some((r) => r.autoFixed);
-    if (hasAutoFix) {
-      // Compute which keys the engine actually changed (value-level diff).
-      // This is critical: we must NOT write the full stale `frontmatter` snapshot because a
-      // concurrent picker save (via processFrontMatter) may have already updated the file
-      // between when we read the cache and now. Writing the whole snapshot would overwrite the
-      // user's new value with the old one (TOCTOU race condition).
-      const engineValueChanges: Record<string, unknown> = {};
-      for (const k of Object.keys(frontmatter)) {
-        if (!(k in preEngineFrontmatter) || preEngineFrontmatter[k] !== frontmatter[k]) {
-          engineValueChanges[k] = frontmatter[k];
-        }
-      }
-      const hasValueChanges = Object.keys(engineValueChanges).length > 0;
-      const hasOrderChange = results.some((r) => r.rule === "property-order");
-
-      if (hasValueChanges) {
-        // Apply only the engine-computed value changes onto the LATEST frontmatter.
-        // processFrontMatter reads the current file state inside its callback, so it is
-        // atomic with respect to other processFrontMatter calls and never races with the picker.
-        const effectiveOrder = schema.formatting.property_order?.length
-          ? schema.formatting.property_order
-          : Object.keys(schema.fields);
-        await this.app.fileManager.processFrontMatter(file, (latestFm) => {
-          const latestFrontmatter = latestFm as Record<string, unknown>;
-          for (const [k, v] of Object.entries(engineValueChanges)) {
-            latestFrontmatter[k] = v;
-          }
-          // Re-apply property ordering to the latest frontmatter in the same atomic write
-          if (hasOrderChange && effectiveOrder.length) {
-            const keys = Object.keys(latestFrontmatter);
-            const orderedKeys = [
-              ...effectiveOrder.filter((ok) => keys.includes(ok)),
-              ...keys.filter((k) => !effectiveOrder.includes(k)),
-            ];
-            if (!orderedKeys.every((k, i) => k === keys[i])) {
-              const copy: Record<string, unknown> = { ...latestFrontmatter };
-              for (const k of keys) Reflect.deleteProperty(latestFrontmatter, k);
-              for (const k of orderedKeys) latestFrontmatter[k] = copy[k];
-            }
-          }
-        });
-      } else if (hasOrderChange) {
-        // Ordering-only change: use processFrontMatter so we read the latest file state.
-        // Writing the stale `frontmatter` snapshot here would overwrite a concurrent picker save.
-        const effectiveOrder2 = schema.formatting.property_order?.length
-          ? schema.formatting.property_order
-          : Object.keys(schema.fields);
-        if (effectiveOrder2.length) {
-          await this.app.fileManager.processFrontMatter(file, (latestFm) => {
-            const latestFrontmatter = latestFm as Record<string, unknown>;
-            const keys = Object.keys(latestFrontmatter);
-            const orderedKeys = [
-              ...effectiveOrder2.filter((ok) => keys.includes(ok)),
-              ...keys.filter((k) => !effectiveOrder2.includes(k)),
-            ];
-            if (!orderedKeys.every((k, i) => k === keys[i])) {
-              const copy: Record<string, unknown> = { ...latestFrontmatter };
-              for (const k of keys) Reflect.deleteProperty(latestFrontmatter, k);
-              for (const k of orderedKeys) latestFrontmatter[k] = copy[k];
-            }
-          });
-        }
-      }
+    if (moved) {
+      new Notice(`Moved "${file.basename}" → ${file.path}`);
+      this.badges.setStatus(previousPath, "none");
     }
 
     const errors = results.filter((r) => !r.autoFixed && r.severity === "error");
@@ -588,24 +534,6 @@ export default class MetadataValidatorPlugin extends Plugin {
     await this.app.vault.modify(file, `---\n${newYaml}---\n${afterFrontmatter}`);
   }
 
-  private appendLegacyEnforceFolderWarning(
-    results: ValidationResult[],
-    enforceFolder: boolean | string | undefined,
-    manifestPath: string
-  ): void {
-    if (enforceFolder !== true) return;
-
-    results.push({
-      field: "__location__",
-      severity: "warning",
-      message:
-        "enforce_folder: true has no effect on its own. Set enforce_folder to a folder path string.",
-      rule: "enforce_folder",
-      manifestPath,
-      autoFixed: false,
-    });
-  }
-
   private async validateForVaultScan(file: TFile): Promise<{
     manifestPath: string;
     manifestName: string;
@@ -618,7 +546,7 @@ export default class MetadataValidatorPlugin extends Plugin {
     if (!schema) return null;
 
     const results = await this.engine.validate(file, frontmatter, schema);
-    this.appendLegacyEnforceFolderWarning(results, schema.enforce_folder, schema.manifestPath);
+    appendLegacyEnforceFolderWarning(results, schema.enforce_folder, schema.manifestPath);
 
     const issues = results.filter((r) => !r.autoFixed);
 
@@ -736,8 +664,9 @@ export default class MetadataValidatorPlugin extends Plugin {
 
   /** Return the live SidebarPanel instance, or undefined if none is open. */
   private getSidebarPanel(): SidebarPanel | undefined {
-    const leaves = this.app.workspace.getLeavesOfType(SIDEBAR_PANEL_TYPE);
-    return leaves[0]?.view as SidebarPanel | undefined;
+    // After a plugin reload the leaf may still hold Obsidian's placeholder view
+    const view = this.app.workspace.getLeavesOfType(SIDEBAR_PANEL_TYPE)[0]?.view;
+    return view instanceof SidebarPanel ? view : undefined;
   }
 
   private async activateSidebarPanel(): Promise<void> {

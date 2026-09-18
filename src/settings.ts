@@ -5,6 +5,8 @@ import type { SchemaTreeView as SchemaTreeViewType } from "./ui/schema-tree";
 export interface PluginSettings {
   schemasRoot: string;
   enableOnSave: boolean;
+  /** Quiet period after a note changes before it is validated and auto-fixed */
+  onSaveDelaySeconds: number;
   enableOnOpen: boolean;
   hideObsidianTypeIcon: boolean;
   hideObsidianValidator: boolean;
@@ -19,6 +21,7 @@ export interface PluginSettings {
 export const DEFAULT_SETTINGS: PluginSettings = {
   schemasRoot: "schemas",
   enableOnSave: true,
+  onSaveDelaySeconds: 1,
   enableOnOpen: true,
   hideObsidianTypeIcon: true,
   hideObsidianValidator: true,
@@ -68,12 +71,33 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName("Validation timing").setHeading();
 
-    new Setting(containerEl).setName("Validate on save").addToggle((t) =>
-      t.setValue(this.plugin.settings.enableOnSave).onChange(async (v) => {
-        this.plugin.settings.enableOnSave = v;
-        await this.plugin.saveSettings();
-      })
-    );
+    new Setting(containerEl)
+      .setName("Validate on save")
+      .setDesc(
+        "Validate and auto-fix a note whenever its file changes on disk — from the editor or from other plugins."
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.enableOnSave).onChange(async (v) => {
+          this.plugin.settings.enableOnSave = v;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Delay after change")
+      .setDesc(
+        "Seconds to wait after a note changes before validating it. A burst of edits — yours or another plugin's — is validated once, after it settles."
+      )
+      .addSlider((s) =>
+        s
+          .setLimits(0, 10, 0.5)
+          .setValue(this.plugin.settings.onSaveDelaySeconds)
+          .setDynamicTooltip()
+          .onChange(async (v) => {
+            this.plugin.settings.onSaveDelaySeconds = v;
+            await this.plugin.saveSettings();
+          })
+      );
 
     new Setting(containerEl).setName("Validate on open").addToggle((t) =>
       t.setValue(this.plugin.settings.enableOnOpen).onChange(async (v) => {
