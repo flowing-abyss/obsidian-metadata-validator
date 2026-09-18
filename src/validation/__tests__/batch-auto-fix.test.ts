@@ -122,6 +122,27 @@ describe("applyVaultAutoFixes", () => {
     expect(latestByPath.get(note.path)).toEqual({ title: "Clean Code", status: "reading" });
   });
 
+  it("reports progress before the first note and after each note", async () => {
+    const files = [makeFile("books/a.md"), makeFile("books/b.md")];
+    const frontmatterByPath = new Map<string, Record<string, unknown>>([
+      ["books/a.md", {}],
+      ["books/b.md", {}],
+    ]);
+    const onProgress = vi.fn(async () => undefined);
+    await applyVaultAutoFixes({
+      app: makeApp(files, frontmatterByPath),
+      schemasRoot: "schemas",
+      resolver: { resolveForNote: vi.fn(() => null) },
+      engine: { validate: vi.fn(async () => []) },
+      onProgress,
+    });
+    expect(onProgress.mock.calls.map((c) => c[0])).toEqual([
+      { processed: 0, total: 2 },
+      { processed: 1, total: 2 },
+      { processed: 2, total: 2 },
+    ]);
+  });
+
   it("writes only the engine's changes, never the cached object as a whole", async () => {
     // Longform empties `longform.scenes` inside Obsidian's cached frontmatter object;
     // the file on disk still has the scenes. A full rewrite from the cache would lose them.

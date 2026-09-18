@@ -10,6 +10,7 @@ import { CssInjector } from "./ui/css-injector";
 import { PropertyDecorator } from "./ui/decorator";
 import { ExplorerBadges } from "./ui/explorer-badges";
 import { registerKeyboardPropertiesCommand } from "./commands/keyboard-properties";
+import { ProgressNotice } from "./ui/progress-notice";
 
 import {
   SIDEBAR_PANEL_TYPE,
@@ -664,38 +665,50 @@ export default class MetadataValidatorPlugin extends Plugin {
 
   private async applyAutoFixesAcrossVault(): Promise<void> {
     await this.reloadSchemas();
+    const progress = new ProgressNotice("Applying auto-fix");
 
-    const summary = await applyVaultAutoFixes({
-      app: this.app,
-      schemasRoot: this.settings.schemasRoot,
-      resolver: this.resolver,
-      engine: this.engine,
-      onFileProcessed: ({ previousPath, filePath, status }) => {
-        if (previousPath !== filePath) this.badges.setStatus(previousPath, "none");
-        this.badges.setStatus(filePath, status);
-      },
-    });
+    try {
+      const summary = await applyVaultAutoFixes({
+        app: this.app,
+        schemasRoot: this.settings.schemasRoot,
+        resolver: this.resolver,
+        engine: this.engine,
+        onFileProcessed: ({ previousPath, filePath, status }) => {
+          if (previousPath !== filePath) this.badges.setStatus(previousPath, "none");
+          this.badges.setStatus(filePath, status);
+        },
+        onProgress: async ({ processed, total }) => {
+          progress.update({ processed, total });
+          // Let the notice repaint and keep the editor responsive during a long run
+          if (processed % 20 === 0 || processed === total) await this.yieldScanProgressUi();
+        },
+      });
 
-    if (this.settings.showFileExplorerBadges) this.badges.render();
-    this.decorator.invalidateAll();
-    this.decorator.clearIcons();
-    this.decorator.decorateNow();
+      if (this.settings.showFileExplorerBadges) this.badges.render();
+      this.decorator.invalidateAll();
+      this.decorator.clearIcons();
+      this.decorator.decorateNow();
 
-    const activeFile = this.app.workspace.getActiveFile();
-    if (activeFile) await this.validateAndUpdate(activeFile);
+      const activeFile = this.app.workspace.getActiveFile();
+      if (activeFile) await this.validateAndUpdate(activeFile);
 
-    new Notice(
-      [
-        `Auto-fix complete: ${summary.changed} note(s) changed`,
-        `${summary.autoFixed} fix(es) applied`,
-        `${summary.moved} moved`,
-        `${summary.errors} error(s) remain`,
-        `${summary.warnings} warning(s) remain`,
-        summary.failed > 0 ? `${summary.failed} failed` : null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    );
+      progress.finish(
+        [
+          `Auto-fix complete: ${summary.changed} note(s) changed`,
+          `${summary.autoFixed} fix(es) applied`,
+          `${summary.moved} moved`,
+          `${summary.errors} error(s) remain`,
+          `${summary.warnings} warning(s) remain`,
+          summary.failed > 0 ? `${summary.failed} failed` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        6000
+      );
+    } catch (error) {
+      progress.finish("Auto-fix failed. Check the developer console for details.", 2400);
+      throw error;
+    }
   }
 
   /** Return the live SidebarPanel instance, or undefined if none is open. */

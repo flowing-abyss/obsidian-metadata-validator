@@ -1,4 +1,5 @@
 import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
+import { ProgressNotice } from "./progress-notice";
 import type { ValidationResult } from "../types";
 
 export const SIDEBAR_PANEL_TYPE = "mv-sidebar-panel";
@@ -396,46 +397,19 @@ export class SidebarPanel extends ItemView {
     this.vaultScan = null;
     this.isScanningVault = true;
     this.render();
-    const progressNotice = new Notice(this.formatScanNotice({ processed: 0, total: 0 }), 0);
+    const progressNotice = new ProgressNotice("Scanning vault");
 
     try {
       await this.nextPaint();
-      await this.onScanVault((progress) => {
-        progressNotice.setMessage(this.formatScanNotice(progress));
-      });
-      progressNotice.setMessage("Vault scan completed.");
-      window.setTimeout(() => progressNotice.hide(), 1200);
+      await this.onScanVault((progress) => progressNotice.update(progress));
+      progressNotice.finish("Vault scan completed.");
     } catch (error) {
       console.error("[MetadataValidator] Vault scan failed", error);
-      progressNotice.setMessage("Vault scan failed. Check developer console.");
-      window.setTimeout(() => progressNotice.hide(), 2400);
+      progressNotice.finish("Vault scan failed. Check developer console.", 2400);
     } finally {
       this.isScanningVault = false;
       this.render();
     }
-  }
-
-  private formatScanNotice(progress: VaultScanProgress): string {
-    const total = Math.max(0, progress.total);
-    const processed = Math.max(
-      0,
-      total > 0 ? Math.min(progress.processed, total) : progress.processed
-    );
-    const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
-    const bar = this.renderProgressBar(processed, total, 14);
-    const totalText = total > 0 ? String(total) : "?";
-    return `Scanning vault ${bar} ${processed}/${totalText} (${percent}%)`;
-  }
-
-  private renderProgressBar(processed: number, total: number, width: number): string {
-    const safeWidth = Math.max(1, width);
-    if (total <= 0) {
-      return `[${".".repeat(safeWidth)}]`;
-    }
-
-    const ratio = Math.max(0, Math.min(1, processed / total));
-    const filled = Math.round(ratio * safeWidth);
-    return `[${"#".repeat(filled)}${".".repeat(safeWidth - filled)}]`;
   }
 
   private async nextPaint(): Promise<void> {

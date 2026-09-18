@@ -35,6 +35,8 @@ interface BatchAutoFixDependencies {
   resolver: Pick<SchemaResolver, "resolveForNote">;
   engine: Pick<ValidationEngine, "validate">;
   onFileProcessed?: (result: BatchAutoFixFileResult) => void;
+  /** Awaited after each note so the caller can update a progress bar and yield to the UI */
+  onProgress?: (progress: { processed: number; total: number }) => void | Promise<void>;
 }
 
 export async function applyVaultAutoFixes(
@@ -56,6 +58,9 @@ export async function applyVaultAutoFixes(
     noSchema: 0,
     failed: 0,
   };
+
+  await deps.onProgress?.({ processed: 0, total: files.length });
+  let processed = 0;
 
   for (const originalFile of files) {
     const previousPath = originalFile.path;
@@ -135,6 +140,9 @@ export async function applyVaultAutoFixes(
     } catch (error) {
       summary.failed++;
       console.error(`[MetadataValidator] Failed to auto-fix "${previousPath}"`, error);
+    } finally {
+      processed++;
+      await deps.onProgress?.({ processed, total: files.length });
     }
   }
 

@@ -1525,10 +1525,6 @@ body.mv-hide-validator .metadata-content .metadata-property-warning-icon {
   overflow-wrap: anywhere;
 }
 
-.mv-footer-rule.mv-has-description {
-  cursor: help;
-  border-bottom: 1px dotted var(--text-faint);
-}
 
 /* ── Context menu: dense layout ───────────────────────────── */
 /* Higher specificity (.modal-content.mv-context-modal) overrides Obsidian's
