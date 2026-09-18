@@ -66,7 +66,12 @@ export function normalizeField(
 
   // list: if the current value is a non-null scalar, wrap it in an array
   const current = frontmatter[fieldName];
-  if (field.type === "list" && current !== undefined && current !== null && !Array.isArray(current)) {
+  if (
+    field.type === "list" &&
+    current !== undefined &&
+    current !== null &&
+    !Array.isArray(current)
+  ) {
     frontmatter[fieldName] = [current];
     changed = true;
   }

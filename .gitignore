@@ -36,3 +36,6 @@ test-vault/.obsidian/workspace.json
 test-vault/.obsidian/plugins/metadata-validator/main.js
 test-vault/.obsidian/plugins/metadata-validator/styles.css
 coverage/
+
+# Dev vault for live checks via the Obsidian CLI (plugin folder symlinks to the repo root)
+dev-vault-manifests/

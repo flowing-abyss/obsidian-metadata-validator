@@ -106,7 +106,8 @@ export async function runRules(input: RunRulesInput): Promise<ValidationResult[]
             input.enableJs
           );
           for (const key of new Set([...Object.keys(snapshot), ...Object.keys(working)])) {
-            if (!jsonEqual(snapshot[key], working[key])) results.push(changed(key, "changed", label));
+            if (!jsonEqual(snapshot[key], working[key]))
+              results.push(changed(key, "changed", label));
           }
           continue;
         }

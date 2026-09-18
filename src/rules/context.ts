@@ -22,7 +22,7 @@ export interface RuleEnv {
 }
 
 /** Frontmatter tags as bare names, whatever shape the user wrote them in. */
-export function tagsOf(frontmatter: Record<string, unknown>): string[] {
+function tagsOf(frontmatter: Record<string, unknown>): string[] {
   const raw = frontmatter["tags"];
   const list = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
   return list

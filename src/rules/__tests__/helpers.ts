@@ -3,7 +3,7 @@ import { contextFromFrontmatter, type RuleEnv } from "../context";
 
 export type VaultFiles = Record<string, Record<string, unknown>>;
 
-export function makeFile(path: string): TFile {
+function makeFile(path: string): TFile {
   return {
     path,
     basename: (path.split("/").pop() ?? path).replace(/\.md$/, ""),
@@ -12,7 +12,7 @@ export function makeFile(path: string): TFile {
 }
 
 /** In-memory vault: `files` maps path → frontmatter. Links resolve by basename or path. */
-export function makeApp(files: VaultFiles = {}): App {
+function makeApp(files: VaultFiles = {}): App {
   const tfiles = Object.keys(files).map(makeFile);
   return {
     metadataCache: {

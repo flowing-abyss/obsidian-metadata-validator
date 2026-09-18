@@ -90,35 +90,26 @@ describe("mergeRules", () => {
 
   it("replaces a parent rule with the same name in place", () => {
     const merged = mergeRules(
-      [
-        { name: "x", then: { set: { a: 1 } } },
-        { then: { set: { c: 3 } } },
-      ],
+      [{ name: "x", then: { set: { a: 1 } } }, { then: { set: { c: 3 } } }],
       [{ name: "x", then: { set: { a: 9 } } }]
     );
-    expect(merged).toEqual([
-      { name: "x", then: { set: { a: 9 } } },
-      { then: { set: { c: 3 } } },
-    ]);
+    expect(merged).toEqual([{ name: "x", then: { set: { a: 9 } } }, { then: { set: { c: 3 } } }]);
   });
 
   it("drops excluded names and keeps unnamed rules", () => {
     expect(
-      mergeRules(
-        [
-          { name: "x", then: {} },
-          { name: "y", then: {} },
-          { then: {} },
-        ],
-        [],
-        ["x"]
-      )
+      mergeRules([{ name: "x", then: {} }, { name: "y", then: {} }, { then: {} }], [], ["x"])
     ).toEqual([{ name: "y", then: {} }, { then: {} }]);
   });
 
   it("mergeSchemas merges rules and honours exclude", () => {
     const merged = mergeSchemas(
-      { rules: [{ name: "p", then: {} }, { name: "gone", then: {} }] },
+      {
+        rules: [
+          { name: "p", then: {} },
+          { name: "gone", then: {} },
+        ],
+      },
       { rules: [{ name: "c", then: {} }], exclude: ["gone"] }
     );
     expect(merged.rules?.map((r) => r.name)).toEqual(["p", "c"]);

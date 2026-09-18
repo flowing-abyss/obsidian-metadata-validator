@@ -52,11 +52,14 @@ describe("runRules", () => {
   });
 
   it("drop clears end and lowers priority", async () => {
-    const { fm } = await run([{ when: "status=⬛", then: { set: { end: null, priority: "⏬" } } }], {
-      status: "⬛",
-      end: "2026-01-01",
-      priority: "◽",
-    });
+    const { fm } = await run(
+      [{ when: "status=⬛", then: { set: { end: null, priority: "⏬" } } }],
+      {
+        status: "⬛",
+        end: "2026-01-01",
+        priority: "◽",
+      }
+    );
     expect(fm.end).toBeNull();
     expect(fm.priority).toBe("⏬");
   });
@@ -115,7 +118,11 @@ describe("runRules", () => {
 
   it("set with a bare filter keeps only the matching links", async () => {
     const files = { "m/a.md": { tags: ["keep"] }, "m/b.md": { tags: ["drop"] } };
-    const { fm } = await run([{ then: { set: { meta: { when: "#keep" } } } }], { meta: ["[[a]]", "[[b]]"] }, files);
+    const { fm } = await run(
+      [{ then: { set: { meta: { when: "#keep" } } } }],
+      { meta: ["[[a]]", "[[b]]"] },
+      files
+    );
     expect(fm.meta).toEqual(["[[a]]"]);
   });
 
@@ -161,9 +168,15 @@ describe("runRules", () => {
   });
 
   it("add on a scalar field is a config warning and not applied", async () => {
-    const { fm, results } = await run([{ then: { add: { status: "x" } } }], { status: "a" }, {}, false, {
-      status: { type: "select" },
-    });
+    const { fm, results } = await run(
+      [{ then: { add: { status: "x" } } }],
+      { status: "a" },
+      {},
+      false,
+      {
+        status: { type: "select" },
+      }
+    );
     expect(fm.status).toBe("a");
     expect(results[0]).toEqual(
       expect.objectContaining({ rule: "rule-config", severity: "warning", field: "__rules__" })
@@ -172,9 +185,15 @@ describe("runRules", () => {
   });
 
   it("set on a fixed field is a config warning", async () => {
-    const { fm, results } = await run([{ then: { set: { icon: "x" } } }], { icon: "📚" }, {}, false, {
-      icon: { type: "text", fixed: "📚" },
-    });
+    const { fm, results } = await run(
+      [{ then: { set: { icon: "x" } } }],
+      { icon: "📚" },
+      {},
+      false,
+      {
+        icon: { type: "text", fixed: "📚" },
+      }
+    );
     expect(fm.icon).toBe("📚");
     expect(results[0]?.rule).toBe("rule-config");
   });
@@ -287,7 +306,11 @@ describe("runRules", () => {
         },
       },
     };
-    const { fm } = await run([rule], { todo: ["[[a]]", "[[b]]", "[[c]]"], wip: [], done: [] }, files);
+    const { fm } = await run(
+      [rule],
+      { todo: ["[[a]]", "[[b]]", "[[c]]"], wip: [], done: [] },
+      files
+    );
     expect(fm.todo).toEqual(["[[c]]"]);
     expect(fm.wip).toEqual(["[[b]]"]);
     expect(fm.done).toEqual(["[[a]]"]);

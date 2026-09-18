@@ -641,7 +641,13 @@ describe("SchemaResolver rules", () => {
 
   it("manifest without rules resolves to an empty list", () => {
     const cache = makeCacheWithRules(
-      [{ path: "schemas/a/manifest.md", folderPath: "schemas/a", data: { target: { query: "#a" } } }],
+      [
+        {
+          path: "schemas/a/manifest.md",
+          folderPath: "schemas/a",
+          data: { target: { query: "#a" } },
+        },
+      ],
       []
     );
     const resolver = new SchemaResolver(cache);

@@ -127,8 +127,10 @@ describe("ManifestCache", () => {
 });
 
 describe("ManifestCache rules.md", () => {
-  const RULES_ROOT = "---\nname: Root rules\nrules:\n  - when: \"created=\"\n    then:\n      set:\n        created: \"{{now}}\"\n---";
-  const RULES_PROJECTS = "---\nrules:\n  - then:\n      set:\n        a: 1\n  - then:\n      set:\n        b: 2\n---";
+  const RULES_ROOT =
+    '---\nname: Root rules\nrules:\n  - when: "created="\n    then:\n      set:\n        created: "{{now}}"\n---';
+  const RULES_PROJECTS =
+    "---\nrules:\n  - then:\n      set:\n        a: 1\n  - then:\n      set:\n        b: 2\n---";
 
   it("loads rules.md files under the schemas root and ignores others", async () => {
     const app = makeApp({

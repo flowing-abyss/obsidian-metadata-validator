@@ -513,12 +513,17 @@ describe("ValidationEngine rules", () => {
   function makeVaultApp(files: Record<string, Record<string, unknown>>): App {
     const tfiles = Object.keys(files).map(
       (p) =>
-        ({ path: p, basename: (p.split("/").pop() ?? p).replace(/\.md$/, ""), extension: "md" }) as TFile
+        ({
+          path: p,
+          basename: (p.split("/").pop() ?? p).replace(/\.md$/, ""),
+          extension: "md",
+        }) as TFile
     );
     return {
       vault: { getMarkdownFiles: () => tfiles },
       metadataCache: {
-        getFileCache: (f: TFile) => (files[f.path] ? { frontmatter: files[f.path], tags: [] } : null),
+        getFileCache: (f: TFile) =>
+          files[f.path] ? { frontmatter: files[f.path], tags: [] } : null,
         getFirstLinkpathDest: (name: string) => tfiles.find((f) => f.basename === name) ?? null,
       },
       fileManager: { processFrontMatter: vi.fn().mockResolvedValue(undefined) },
@@ -554,7 +559,10 @@ describe("ValidationEngine rules", () => {
     const results = await engine.validate(file, fm, schema);
     expect(fm.end).toBe("2026-09-18");
     expect(results.find((r) => r.rule === "required")).toBeUndefined();
-    expect(results.find((r) => r.rule === "rules")).toMatchObject({ field: "end", autoFixed: true });
+    expect(results.find((r) => r.rule === "rules")).toMatchObject({
+      field: "end",
+      autoFixed: true,
+    });
   });
 
   it("default is visible to rules and rules can change it", async () => {

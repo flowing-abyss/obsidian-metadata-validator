@@ -12,10 +12,11 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       exclude: [
-        "src/ui/**",      // UI layer — manual testing only
-        "src/main.ts",    // lifecycle wiring — manual testing only
+        "src/ui/**", // UI layer — manual testing only
+        "src/main.ts", // lifecycle wiring — manual testing only
         "src/settings.ts",
         "**/*.test.ts",
+        "**/__tests__/**",
         "**/__mocks__/**",
       ],
       thresholds: {

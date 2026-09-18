@@ -60,10 +60,7 @@ export class ValidationEngine {
     for (const [fieldName, field] of fields) {
       const pre = frontmatter[fieldName];
       const isEmpty =
-        pre === undefined ||
-        pre === null ||
-        pre === "" ||
-        (Array.isArray(pre) && pre.length === 0);
+        pre === undefined || pre === null || pre === "" || (Array.isArray(pre) && pre.length === 0);
       const wasFixed = applyAutoFix(fieldName, field, frontmatter);
       fixInfo.set(fieldName, { wasFixed, isEmpty });
       if (wasFixed) {

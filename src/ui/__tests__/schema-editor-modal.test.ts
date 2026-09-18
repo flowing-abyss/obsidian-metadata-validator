@@ -162,7 +162,12 @@ describe("SchemaEditorModal inherited fields", () => {
 
 describe("SchemaEditorModal rules", () => {
   function modalWith(data: ManifestData) {
-    const modal = new SchemaEditorModal({} as App, "schemas/manifest.md", data, async () => undefined);
+    const modal = new SchemaEditorModal(
+      {} as App,
+      "schemas/manifest.md",
+      data,
+      async () => undefined
+    );
     return modal as unknown as {
       data: ManifestData;
       applyRulesYaml: (text: string) => string | null;

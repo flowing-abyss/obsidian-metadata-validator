@@ -24,12 +24,12 @@ describe("resolveSelection", () => {
       { meta: ["[[a]]", "[[ghost]]", "plain", "[[b]]"] },
       { "m/a.md": { tags: ["system/high/problem"] }, "m/b.md": { tags: ["system/high/meta"] } }
     );
-    expect(await resolveSelection({ meta: { when: "#system/high/problem" } }, env.self, env)).toEqual(
-      ["[[a]]"]
-    );
-    expect(await resolveSelection({ meta: { when: "-#system/high/problem" } }, env.self, env)).toEqual(
-      ["[[b]]"]
-    );
+    expect(
+      await resolveSelection({ meta: { when: "#system/high/problem" } }, env.self, env)
+    ).toEqual(["[[a]]"]);
+    expect(
+      await resolveSelection({ meta: { when: "-#system/high/problem" } }, env.self, env)
+    ).toEqual(["[[b]]"]);
   });
 
   it("without a filter selects all values including strings", async () => {
