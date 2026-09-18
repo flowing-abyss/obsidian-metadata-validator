@@ -86,3 +86,46 @@ export async function executeJsValidator(
 
   return Promise.race([fn(app, dv, currentFile, currentPage, value), timeoutPromise]);
 }
+
+/** Generic executor for rule code: named params become function arguments. */
+export async function executeJs(
+  code: string,
+  params: Record<string, unknown>,
+  enableJs: boolean,
+  timeoutMs = JS_VALIDATOR_TIMEOUT_MS
+): Promise<unknown> {
+  if (!enableJs) {
+    throw new JsDisabledError();
+  }
+
+  const names = Object.keys(params);
+  const fn = getCachedFn(code, names);
+
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    window.setTimeout(() => reject(new Error("JS rule timed out")), timeoutMs)
+  );
+
+  return Promise.race([fn(...names.map((n) => params[n])), timeoutPromise]);
+}
+
+/** Dataview API and the current page, when the Dataview plugin is present. */
+export function dataviewContext(
+  app: App,
+  file: TFile | null
+): { dv: unknown; currentPage: unknown } {
+  const appRecord = app as unknown as Record<string, unknown>;
+  const pluginManager = appRecord["plugins"] as Record<string, unknown> | undefined;
+  const pluginsMap = pluginManager?.["plugins"] as Record<string, unknown> | undefined;
+  const dataview = pluginsMap?.["dataview"] as Record<string, unknown> | undefined;
+  const dv = dataview?.["api"];
+  let currentPage: unknown = null;
+  const page = (dv as { page?: unknown } | undefined)?.page;
+  if (file && typeof page === "function") {
+    try {
+      currentPage = (page as (path: string) => unknown).call(dv, file.path);
+    } catch {
+      currentPage = null;
+    }
+  }
+  return { dv, currentPage };
+}
