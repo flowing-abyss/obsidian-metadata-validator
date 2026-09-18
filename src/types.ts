@@ -94,6 +94,8 @@ export interface RuleThen {
 
 export interface ManifestRule {
   name?: string;
+  /** Shown as help where the rule is listed (properties modal footer) */
+  description?: string;
   when?: RuleCondition;
   then: RuleThen;
 }

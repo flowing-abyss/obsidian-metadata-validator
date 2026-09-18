@@ -71,4 +71,47 @@ describe("ContextMenuModal", () => {
       expect(m.fieldOrigin("title")).toBe("own");
     });
   });
+
+  describe("renderFooter rules line", () => {
+    function footerOf(schema: Partial<ResolvedSchema>): HTMLElement {
+      const m = makeModal(schema);
+      const container = document.createElement("div");
+      (
+        m as unknown as {
+          renderFooter: (el: HTMLElement, map: Map<string, unknown[]>) => void;
+        }
+      ).renderFooter(container, new Map());
+      return container;
+    }
+
+    it("lists rules under the schema, named or by their when text", () => {
+      const footer = footerOf({
+        rules: [
+          { name: "end on done", description: "Sets end when done.", then: {} },
+          { when: "status=🟦 AND start=", then: {} },
+          { then: {} },
+        ],
+      });
+      const line = footer.querySelector(".mv-footer-rules")!;
+      expect(line.textContent).toBe("Rules: end on done • status=🟦 AND start= • #3");
+      expect(footer.querySelector(".mv-footer-filepath")).not.toBeNull();
+    });
+
+    it("renders nothing when the schema has no rules", () => {
+      expect(footerOf({ rules: [] }).querySelector(".mv-footer-rules")).toBeNull();
+      expect(
+        footerOf({ rules: [], inheritanceChain: ["schemas/book/manifest.md"] }).querySelector(
+          ".mv-footer-rules"
+        )
+      ).toBeNull();
+    });
+
+    it("lists rules in the single-schema footer too", () => {
+      const footer = footerOf({
+        inheritanceChain: ["schemas/book/manifest.md"],
+        rules: [{ name: "only", then: {} }],
+      });
+      expect(footer.querySelector(".mv-footer-rules")?.textContent).toBe("Rules: only");
+    });
+  });
 });

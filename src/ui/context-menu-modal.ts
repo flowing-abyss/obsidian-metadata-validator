@@ -1,6 +1,7 @@
 import type { Component, EventRef, TFile } from "obsidian";
 import { App, Modal, setIcon } from "obsidian";
 import type { FieldType, ManifestField, ResolvedSchema, ValidationResult } from "../types";
+import { ruleLabel } from "../rules/runner";
 import { ValidationEngine } from "../validation/engine";
 import { PickerModal } from "./picker-modal";
 import { DescriptionHelp } from "./description-help";
@@ -800,6 +801,7 @@ export class ContextMenuModal extends Modal {
           this.openSchemaEditor!(manifestPath);
         });
       }
+      this.renderRulesLine(footer);
       footer.createSpan({
         text: this.file.path,
         cls: "mv-footer-filepath",
@@ -867,10 +869,26 @@ export class ContextMenuModal extends Modal {
       });
     }
 
+    this.renderRulesLine(footer);
+
     // File path at the very end of the footer
     footer.createSpan({
       text: this.file.path,
       cls: "mv-footer-filepath",
+    });
+  }
+
+  /** Rules in effect for this note, one line under the schema; hover shows a rule's description. */
+  private renderRulesLine(footer: HTMLElement): void {
+    const rules = this.schema.rules;
+    if (rules.length === 0) return;
+    const line = footer.createDiv("mv-footer-rules");
+    line.createSpan({ text: "Rules: ", cls: "mv-footer-label" });
+    rules.forEach((rule, i) => {
+      if (i > 0) line.createSpan({ text: " \u2022 ", cls: "mv-footer-arrow" });
+      const label = ruleLabel(rule, i);
+      const span = line.createSpan({ text: label, cls: "mv-footer-rule" });
+      this.descriptions.bind(span, rule.description, label);
     });
   }
 

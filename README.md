@@ -28,6 +28,7 @@ already correct, a rule does nothing.
 ```yaml
 rules:
   - name: end on done            # optional, needed only to override or exclude in a child
+    description: Done work gets its end date.   # optional, shown on hover in the properties modal
     when: "status=🟩 AND end="   # optional; absent = always
     then:                        # verbs run in written order
       set: { end: "{{today}}" }

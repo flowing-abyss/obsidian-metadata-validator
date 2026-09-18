@@ -26,7 +26,8 @@ function deepClone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v ?? null)) as T;
 }
 
-function ruleLabel(rule: ManifestRule, index: number): string {
+/** Display label of a rule: its name, else its `when` text, else its position. */
+export function ruleLabel(rule: ManifestRule, index: number): string {
   if (rule.name) return rule.name;
   if (typeof rule.when === "string") return rule.when;
   return `#${index + 1}`;
