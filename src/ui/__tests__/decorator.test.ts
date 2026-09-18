@@ -20,6 +20,7 @@ function makeSchema(manifestPath: string): ResolvedSchema {
   return {
     manifestPath,
     rules: [],
+    parseErrors: [],
     inheritanceChain: [manifestPath],
     name: manifestPath.split("/").at(-2) ?? "schema",
     priority: 0,

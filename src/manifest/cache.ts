@@ -78,6 +78,7 @@ export class ManifestCache {
         folderPath: file.path.replace(/\/rules\.md$/, ""),
         name: typeof data.name === "string" ? data.name : undefined,
         rules: Array.isArray(data.rules) ? data.rules : [],
+        parseError: data.parseError,
       });
     }
   }

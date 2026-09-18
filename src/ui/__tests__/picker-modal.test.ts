@@ -9,6 +9,7 @@ function makeModal(field: Partial<ManifestField>, currentValue: unknown, enableJ
   const schema = {
     manifestPath: "schemas/test/manifest.md",
     rules: [],
+    parseErrors: [],
     inheritanceChain: ["schemas/test/manifest.md"],
     name: "test",
     priority: 0,

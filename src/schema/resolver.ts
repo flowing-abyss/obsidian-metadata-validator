@@ -92,9 +92,23 @@ export class SchemaResolver {
       target: data.target ?? {},
       fields: data.fields ?? {},
       rules: this.collectRules(manifest, chain),
+      parseErrors: this.collectParseErrors(manifest, chain),
       formatting: data.formatting ?? {},
       inheritanceChain: chain,
     };
+  }
+
+  /** "path: message" for every manifest.md or rules.md in the chain whose YAML failed to parse. */
+  private collectParseErrors(manifest: Manifest, chain: string[]): string[] {
+    const errors: string[] = [];
+    for (const rf of this.cache.getRulesFilesForFolder(manifest.folderPath)) {
+      if (rf.parseError) errors.push(`${rf.path}: ${rf.parseError}`);
+    }
+    for (const path of chain) {
+      const m = this.cache.getByPath(path);
+      if (m?.data.parseError) errors.push(`${m.path}: ${m.data.parseError}`);
+    }
+    return errors;
   }
 
   /**

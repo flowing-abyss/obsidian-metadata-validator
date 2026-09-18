@@ -47,6 +47,7 @@ describe("BasesDecorator", () => {
     const schema: ResolvedSchema = {
       manifestPath: "schemas/daily/manifest.md",
       rules: [],
+      parseErrors: [],
       inheritanceChain: ["schemas/daily/manifest.md"],
       name: "daily",
       priority: 0,
@@ -100,6 +101,7 @@ describe("BasesDecorator", () => {
     const schema: ResolvedSchema = {
       manifestPath: "schemas/daily/manifest.md",
       rules: [],
+      parseErrors: [],
       inheritanceChain: ["schemas/daily/manifest.md"],
       name: "daily",
       priority: 0,

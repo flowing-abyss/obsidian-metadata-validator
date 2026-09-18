@@ -118,3 +118,26 @@ other: 1
     expect(result.other).toBe(1);
   });
 });
+
+describe("parseManifest with invalid YAML", () => {
+  it("keeps fields via the fallback, drops rules and records the error", () => {
+    const content = [
+      "---",
+      "name: broken",
+      "fields:",
+      "  status:",
+      "    type: select",
+      "rules:",
+      "  - then:",
+      "      set: { a: 1 }",
+      "      set: { b: 2 }",
+      "---",
+    ].join("\n");
+    const data = parseManifest(content);
+    expect(data.name).toBe("broken");
+    expect(data.fields?.status?.type).toBe("select");
+    expect(data.rules).toBeUndefined();
+    expect(typeof data.parseError).toBe("string");
+    expect(data.parseError).not.toBe("");
+  });
+});

@@ -19,6 +19,7 @@ function makeSchema(overrides: Partial<ResolvedSchema> = {}): ResolvedSchema {
     fields: { color: { type: "text", fixed: "#d0b040" } },
     formatting: {},
     rules: [],
+    parseErrors: [],
     inheritanceChain: ["schemas/problems/manifest.md"],
     ...overrides,
   };

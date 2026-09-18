@@ -5,6 +5,12 @@ import type { ManifestData } from "../types";
  * Parse raw markdown file content into ManifestData.
  * Extracts YAML frontmatter only; ignores the file body.
  * Returns {} if no valid frontmatter is found.
+ *
+ * When Obsidian's YAML parser rejects the file (for example a duplicated key),
+ * fields are recovered with the minimal fallback parser so validation keeps
+ * working, but `rules` are dropped: the fallback turns flow mappings into
+ * strings, and a rule with a string where a map belongs could write junk.
+ * The error is kept in `parseError` so it can be shown to the user.
  */
 export function parseManifest(fileContent: string): ManifestData {
   const match = fileContent.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -16,8 +22,11 @@ export function parseManifest(fileContent: string): ManifestData {
   try {
     const result = obsidianParseYaml(yaml) as ManifestData | null;
     return result ?? {};
-  } catch {
-    return parseMinimal(yaml) as ManifestData;
+  } catch (error) {
+    const data = parseMinimal(yaml) as ManifestData;
+    delete data.rules;
+    data.parseError = error instanceof Error ? error.message : String(error);
+    return data;
   }
 }
 

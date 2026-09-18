@@ -29,6 +29,7 @@ const SCHEMA: ResolvedSchema = {
   },
   formatting: {},
   rules: [],
+  parseErrors: [],
   inheritanceChain: ["schemas/book/manifest.md"],
 };
 
@@ -56,6 +57,7 @@ const DATE_SCHEMA: ResolvedSchema = {
   },
   formatting: {},
   rules: [],
+  parseErrors: [],
   inheritanceChain: ["schemas/event/manifest.md"],
 };
 
@@ -73,6 +75,7 @@ const LINK_SCHEMA: ResolvedSchema = {
   },
   formatting: {},
   rules: [],
+  parseErrors: [],
   inheritanceChain: ["schemas/book/manifest.md"],
 };
 
@@ -89,6 +92,7 @@ const JS_SCHEMA: ResolvedSchema = {
   },
   formatting: {},
   rules: [],
+  parseErrors: [],
   inheritanceChain: ["schemas/custom/manifest.md"],
 };
 
@@ -163,6 +167,7 @@ describe("ValidationEngine", () => {
       },
       formatting: {},
       rules: [],
+      parseErrors: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -249,6 +254,7 @@ describe("ValidationEngine", () => {
       },
       formatting: {},
       rules: [],
+      parseErrors: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -275,6 +281,7 @@ describe("ValidationEngine", () => {
       },
       formatting: {},
       rules: [],
+      parseErrors: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -306,6 +313,7 @@ describe("ValidationEngine", () => {
       },
       formatting: {},
       rules: [],
+      parseErrors: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -335,6 +343,7 @@ describe("ValidationEngine", () => {
       },
       formatting: {},
       rules: [],
+      parseErrors: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -359,6 +368,7 @@ describe("ValidationEngine", () => {
       },
       formatting: { property_order: ["a", "z"] },
       rules: [],
+      parseErrors: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -385,6 +395,7 @@ describe("ValidationEngine", () => {
       },
       formatting: { property_order: ["a", "z"] },
       rules: [],
+      parseErrors: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -406,6 +417,7 @@ describe("ValidationEngine", () => {
       fields: {},
       formatting: {},
       rules: [],
+      parseErrors: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -433,6 +445,7 @@ describe("ValidationEngine", () => {
       },
       formatting: {},
       rules: [],
+      parseErrors: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -458,6 +471,7 @@ describe("ValidationEngine", () => {
       },
       formatting: {},
       rules: [],
+      parseErrors: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -542,6 +556,7 @@ describe("ValidationEngine rules", () => {
       target: { query: "#project" },
       fields,
       rules,
+      parseErrors: [],
       formatting,
       inheritanceChain: ["schemas/project/manifest.md"],
     };
@@ -673,6 +688,23 @@ describe("ValidationEngine rules", () => {
     const results = await engine.validate(file, fm, schema, { skipRules: true });
     expect(fm.end).toBeUndefined();
     expect(results.find((r) => r.rule === "rules")).toBeUndefined();
+  });
+
+  it("warns once per schema file with invalid YAML", async () => {
+    const engine = new ValidationEngine(makeApp(), { enableJsExecution: false }, { now: NOW });
+    const schema = {
+      ...schemaWith({}, []),
+      parseErrors: ["schemas/x/manifest.md: duplicated key"],
+    };
+    const results = await engine.validate(file, {}, schema);
+    expect(results).toEqual([
+      expect.objectContaining({
+        rule: "manifest-config",
+        severity: "warning",
+        field: "__manifest__",
+        message: expect.stringContaining("schemas/x/manifest.md: duplicated key"),
+      }),
+    ]);
   });
 
   it("a schema without rules skips phases 2 and 3", async () => {

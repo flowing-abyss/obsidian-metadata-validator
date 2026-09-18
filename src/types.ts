@@ -106,6 +106,7 @@ export interface RulesFile {
   folderPath: string;
   name?: string;
   rules: ManifestRule[];
+  parseError?: string;
 }
 
 /** Raw parsed content of a manifest.md frontmatter */
@@ -125,6 +126,8 @@ export interface ManifestData {
   exclude?: string[];
   /** State-based rules applied after field auto-fixes */
   rules?: ManifestRule[];
+  /** Set when the YAML could not be parsed by Obsidian; rules are dropped in that case */
+  parseError?: string;
   formatting?: {
     property_order?: string[];
   };
@@ -156,6 +159,8 @@ export interface ResolvedSchema {
   fields: Record<string, ManifestField>;
   /** Rules from rules.md files and the manifest chain, in execution order */
   rules: ManifestRule[];
+  /** YAML errors of any manifest.md or rules.md in this schema's chain, as "path: message" */
+  parseErrors: string[];
   formatting: { property_order?: string[] };
   /** vault paths from root ancestor to this manifest */
   inheritanceChain: string[];

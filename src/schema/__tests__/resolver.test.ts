@@ -701,3 +701,34 @@ describe("SchemaResolver rules", () => {
     expect(resolver.resolveForNote(makeFile("x.md"), { tags: ["a"] })?.rules).toEqual([]);
   });
 });
+
+describe("SchemaResolver parse errors", () => {
+  it("collects YAML errors from the chain and from rules.md files", () => {
+    const manifests: Manifest[] = [
+      {
+        path: "schemas/manifest.md",
+        folderPath: "schemas",
+        data: { parseError: "duplicated mapping key" },
+      },
+      {
+        path: "schemas/a/manifest.md",
+        folderPath: "schemas/a",
+        data: { target: { query: "#a" } },
+      },
+    ];
+    const cache = makeCache(manifests);
+    vi.spyOn(cache, "getByPath").mockImplementation((p: string) =>
+      manifests.find((m) => m.path === p)
+    );
+    vi.spyOn(cache, "getRulesFilesForFolder").mockReturnValue([
+      { path: "schemas/rules.md", folderPath: "schemas", rules: [], parseError: "bad indent" },
+    ]);
+    const resolver = new SchemaResolver(cache);
+    resolver.rebuild();
+    const schema = resolver.resolveForNote(makeFile("n.md"), { tags: ["a"] });
+    expect(schema?.parseErrors).toEqual([
+      "schemas/rules.md: bad indent",
+      "schemas/manifest.md: duplicated mapping key",
+    ]);
+  });
+});

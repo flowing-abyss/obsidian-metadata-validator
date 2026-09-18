@@ -60,6 +60,7 @@ function makeSchema(overrides: Partial<ResolvedSchema> = {}): ResolvedSchema {
     fields: {},
     formatting: {},
     rules: [],
+    parseErrors: [],
     inheritanceChain: ["schemas/books/manifest.md"],
     ...overrides,
   };

@@ -67,6 +67,17 @@ export class ValidationEngine {
     const fixInfo = new Map<string, FieldFixInfo>();
     const runRulesPhase = !options.skipRules && schema.rules.length > 0;
 
+    for (const error of schema.parseErrors) {
+      results.push({
+        field: "__manifest__",
+        severity: "warning",
+        message: `Schema file has invalid YAML, its rules are ignored: ${error}`,
+        rule: "manifest-config",
+        manifestPath: schema.manifestPath,
+        autoFixed: false,
+      });
+    }
+
     // Phase 1: field auto-fix
     for (const [fieldName, field] of fields) {
       const pre = frontmatter[fieldName];
