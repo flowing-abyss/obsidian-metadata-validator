@@ -2,7 +2,7 @@
   "id": "metadata-validator",
   "name": "Metadata Validator",
   "minAppVersion": "1.7.2",
-  "description": "Manifest-driven metadata validation, auto-fix, and field picker for notes.",
+  "description": "Manifest-driven metadata validation, auto-fix, rules, and field picker for notes.",
   "author": "flowing-abyss",
   "authorUrl": "https://github.com/flowing-abyss",
   "isDesktopOnly": false,
