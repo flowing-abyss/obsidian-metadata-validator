@@ -2,6 +2,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    // The dev vault symlinks its plugin folder back to the repo root; never follow it
+    exclude: ["**/node_modules/**", "**/dist/**", "dev-vault-manifests/**", "test-vault/**"],
     globals: true,
     environment: "jsdom",
     alias: {

@@ -40,6 +40,7 @@ export default tseslint.config(
       "node_modules",
       "coverage/**",
       "test-vault/**",
+      "dev-vault-manifests/**",
       "dist",
       "esbuild.config.mjs",
       "eslint.config.js",
