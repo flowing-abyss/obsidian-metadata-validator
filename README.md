@@ -4,135 +4,247 @@
 [![Release](https://github.com/flowing-abyss/obsidian-metadata-validator/actions/workflows/release.yml/badge.svg)](https://github.com/flowing-abyss/obsidian-metadata-validator/actions/workflows/release.yml)
 [![Downloads](https://img.shields.io/github/downloads/flowing-abyss/obsidian-metadata-validator/total?style=flat-square&label=downloads&color=blue)](https://github.com/flowing-abyss/obsidian-metadata-validator/releases)
 
-Manifest-driven metadata validation for Obsidian. Put `manifest.md` files in a `schemes/` folder — they inherit down the tree. Notes get the schema of the closest manifest above them.
+Describe what a note's properties should look like in a `manifest.md`, and the plugin checks every matching note, fills in what it can, and keeps the properties in order. Rules add the conditional part, for example "when the status is done, set the end date".
+
+## Where manifests live
+
+Manifests sit in a schemas folder (set in the plugin settings) and inherit down the tree. A note gets the closest manifest whose `target` matches it.
 
 ```
 vault/
-└── schemes/
-    ├── manifest.md          ← base schema
+└── schemas/
+    ├── manifest.md            base schema
+    ├── rules.md               rules for every manifest below
     ├── sources/
-    │   ├── manifest.md      ← extends base
+    │   ├── manifest.md        extends base
     │   └── books/
-    │       └── manifest.md  ← extends sources
-    └── people/
-        └── manifest.md      ← extends base
+    │       └── manifest.md    extends sources
+    └── projects/
+        └── manifest.md        extends base
 ```
 
-## Rules
+## A complete example
 
-Rules fix state that fields cannot describe on their own: conditional values, derived tags, and
-links that belong in another property. A rule is a function of the note's current frontmatter and
-the vault, so it runs identically on save, on open, and in the vault auto-fix. When the note is
-already correct, a rule does nothing.
+One manifest for project notes. It matches notes tagged `#project`, describes their properties, keeps them in a fixed order, and has three rules.
 
 ```yaml
+---
+name: Project
+description: A finite piece of work with one result.
+target:
+  query: "#project"
+enforce_folder: projects
+fields:
+  tags:
+    type: multiselect
+    required: true
+    sort: alphabetical
+  status:
+    type: select
+    required: true
+    default: inbox
+    options:
+      - { value: inbox, label: Inbox }
+      - { value: wip, label: In progress }
+      - { value: done, label: Done }
+  priority:
+    type: select
+    default: normal
+    options: [{ value: high }, { value: normal }, { value: low }]
+  category:
+    type: multilink
+    source:
+      query: "#category"
+  start:
+    type: date
+  end:
+    type: date
+  icon:
+    type: text
+    hidden: true
+    fixed: 🗂️
 rules:
-  - name: end on done            # optional, needed only to override or exclude in a child
-    description: Done work gets its end date.   # optional, shown on hover in the properties modal
-    when: "status=🟩 AND end="   # optional; absent = always
-    then:                        # verbs run in written order
+  - name: start on wip
+    when: "status=wip AND start="
+    then:
+      set: { start: "{{today}}" }
+  - name: end on done
+    when: "status=done AND end="
+    then:
       set: { end: "{{today}}" }
-```
-
-### Vocabulary
-
-| Word | Meaning |
-|---|---|
-| `when` | condition on a note's metadata: a query string, a selection, `and` / `or` / `not`, or `{ js }` |
-| `then` | verbs, in written order |
-| `set` | write a value; `null` clears; a list replaces the list |
-| `add` | add to a list without duplicates |
-| `remove` | remove matching items from a list; `*` is a wildcard |
-| `js` | escape hatch, gated by "Allow JavaScript execution" |
-
-Query strings are the `target.query` language plus: `key=` means empty, `key=value` on a list
-means contains, links compare by note name, and `<` `>` `<=` `>=` compare numbers, dates, or
-strings. `{{…}}` on the right-hand side renders from the rule's own note.
-
-A **selection** `{ property: { when: "…" } }` means "the values of `property` whose linked note
-passes the condition"; `{ property: {} }` means all of its values. In `when` it is true when it
-selects at least one value; in a value slot it yields the selected values. Under `add`, a
-selection on another property names the source.
-
-**Templates** use the Web Clipper syntax `{{value|filter|filter:arg}}`. Values: `today`, `now`,
-`file.name`, `file.path`, `file.folder`, any property. Filters: `name` (link → note name),
-`snake`, `kebab`, `lower`, `upper`, `trim`, `replace:"a","b"`, `join:", "`,
-`date:"YYYY-MM-DD"`. A list value inside text expands into one string per element.
-
-### Contract
-
-- Each rule reads the note as it was when the rule started and writes sequentially, so a
-  transfer (`add` from `meta`, `remove` from `meta`) works in either order.
-- Order: `rules.md` files from the schemas root down, then manifests from the root ancestor down.
-  A rule with the same `name` replaces the earlier one; a manifest's `exclude` drops rules by name.
-- In a validation pass: field `fixed` / `default` → rules → `sort` and list shape → field checks →
-  one write. `required` sees what a rule set; a rule cannot override `fixed`.
-- `add` / `remove` need list fields (`list`, `multiselect`, `multilink`).
-- Unresolved links never pass a selection. Unchanged notes are never written.
-
-### Examples
-
-```yaml
-rules:
-  # dates by stage, reset on drop
-  - when: "status=🟦 AND start="
-    then: { set: { start: "{{today}}" } }
-  - when: "status=⬛"
-    then: { set: { end: null, priority: ⏬ } }
-
-  # property → tag mirror (namespace ownership)
-  - when: "-#mark/no_sync"
-    then: { remove: { tags: "status/*" } }
-  - when: "status=🟩 AND -#mark/no_sync"
-    then: { add: { tags: status/done } }
-
-  # link → tag mirror
-  - when: "-#mark/no_sync"
+  - name: category tags
     then:
       remove: { tags: "category/*" }
       add: { tags: "category/{{category|name|snake}}" }
+formatting:
+  property_order: [tags, status, priority, category, start, end, icon]
+---
+```
 
-  # links to problem notes belong in `problem`, not `meta`
+This runs on save, on open, and when you start the vault auto-fix from the sidebar. Missing properties get their `default`, `icon` is always the fixed value, the two date rules fill in empty dates, the tag rule keeps `category/*` tags equal to the category links, and the properties are reordered. Anything the plugin cannot fix shows up in the sidebar and as an icon next to the property.
+
+## Manifest keys
+
+| Key | Meaning |
+|---|---|
+| `name`, `description` | shown in the sidebar and in the properties modal |
+| `target.query` | which notes this manifest applies to, see the query language below |
+| `enforce_folder` | notes matching this manifest are moved into this folder |
+| `extends` | path of the parent manifest, when it is not the parent folder |
+| `exclude` | names of inherited fields or rules to drop |
+| `priority` | when several manifests match, the higher priority wins |
+| `fields` | the properties, see below |
+| `rules` | the rules, see below |
+| `formatting.property_order` | order of properties in the note |
+
+## Field keys
+
+Types are `text`, `number`, `select`, `multiselect`, `list`, `date`, `link`, `multilink`, `boolean` and `url`.
+
+| Key | Meaning |
+|---|---|
+| `required` | the property must be present |
+| `default` | inserted when the property is empty |
+| `fixed` | always this value |
+| `options` | allowed values, a list of `{ value, label, description }`, or `{ source: ... }` for a computed list |
+| `strict: false` | values outside `options` are left alone |
+| `source` | for links, which notes are allowed. `query`, `folder`, `tag` or `js` |
+| `validate_exists: false` | do not require the linked note to exist |
+| `sort` | `alphabetical` or `alphabetical-desc` for lists |
+| `min`, `max` | range for numbers |
+| `format` | date format, for example `YYYY-MM-DD` |
+| `label`, `description`, `hidden` | how the property appears in the editing modal |
+| `validate.js` | custom check, return `true` or an error message |
+
+## Query language
+
+Used in `target.query`, in `source.query` and in rule conditions.
+
+| Term | Matches when |
+|---|---|
+| `#project` | the note has this tag or a child tag |
+| `projects/` | the note is in this folder |
+| `status=done` | the property equals the value, or a list contains it |
+| `end=` | the property is empty |
+| `rating>=8`, `end<2026-01-01` | numbers and dates compare as such |
+| `-term`, `AND`, `OR`, `( )` | negation, both, either, grouping |
+
+## Rules
+
+A rule says what the properties should look like when a condition holds. It runs on the note's current state, so it behaves the same on save, on open and in the vault auto-fix, and it does nothing when the note is already correct.
+
+```yaml
+rules:
+  - name: end on done
+    description: Done work gets its end date.
+    when: "status=done AND end="
+    then:
+      set: { end: "{{today}}" }
+```
+
+`name` and `description` are optional. The properties modal lists the rules under the schema and shows the description on hover.
+
+`when` is a query string, or one of these forms, and can be nested.
+
+```yaml
+when: { project: { when: "status=done" } }       # a linked note in `project` matches
+when: { tasks: {} }                               # `tasks` has at least one value
+when: { and: ["status=done", { not: ["end="] }] } # also `or`
+when: { js: "return fm.status === 'done'" }
+```
+
+`then` holds verbs that run in the order written.
+
+| Verb | Does |
+|---|---|
+| `set: { end: value }` | write the value, `null` clears |
+| `add: { tags: value }` | add to a list, no duplicates |
+| `remove: { tags: value }` | remove from a list, `*` is a wildcard |
+| `js: "..."` | run code with the note's `fm` |
+
+A value is a literal, a template or a selection. A selection `{ meta: { when: "#problem" } }` means the links in `meta` whose note matches, and `{ meta: {} }` means all of them.
+
+Templates use `{{today}}`, `{{now}}`, `{{file.name}}` or any property, with optional filters: `name` (link to note name), `snake`, `kebab`, `lower`, `upper`, `trim`, `replace:"a","b"`, `join:", "`, `date:"YYYY-MM-DD"`.
+
+### Common rules
+
+Dates that follow the status.
+
+```yaml
+  - when: "status=wip AND start="
+    then:
+      set: { start: "{{today}}" }
+  - when: "status=dropped"
+    then:
+      set: { end: null, priority: low }
+```
+
+Tags that mirror a property. The first rule removes every `status/*` tag, the others add the right one.
+
+```yaml
+  - then:
+      remove: { tags: "status/*" }
+  - when: "status=wip"
+    then:
+      add: { tags: status/wip }
+  - when: "status=done"
+    then:
+      add: { tags: status/done }
+```
+
+Links that belong in another property. When a note in `meta` has become a problem, its link moves to `problem`, and the other way round.
+
+```yaml
   - then:
       add:
-        problem: { meta: { when: "#system/high/problem" } }
-        meta: { problem: { when: "#system/high/meta" } }
+        problem: { meta: { when: "#problem" } }
+        meta: { problem: { when: "#meta" } }
       remove:
-        meta: { when: "#system/high/problem" }
-        problem: { when: "#system/high/meta" }
+        meta: { when: "#problem" }
+        problem: { when: "#meta" }
+```
 
-  # kanban inside properties
+A kanban in properties. Tasks move between `todo`, `wip` and `done` by their own status.
+
+```yaml
   - then:
       add:
-        done: { todo: { when: "status=🟩" }, wip: { when: "status=🟩" } }
+        wip: { todo: { when: "status=wip" }, done: { when: "status=wip" } }
+        done: { todo: { when: "status=done" }, wip: { when: "status=done" } }
       remove:
-        todo: { when: "-status=🟥" }
+        todo: { when: "-status=todo" }
+        wip: { when: "-status=wip" }
+        done: { when: "-status=done" }
+```
 
-  # state from neighbours
-  - when: { project: { when: "status=🟩" } }
-    then: { set: { status: 🟩 } }
+State taken from a linked note. A task closes when its project closes, and a project closes when all its tasks are closed.
+
+```yaml
+  - when: { project: { when: "status=done" } }
+    then:
+      set: { status: done }
   - when:
       and:
         - tasks: {}
         - not:
-            - tasks: { when: "-status=🟩" }
-    then: { set: { status: 🟩 } }
-
-  # anything else
-  - then:
-      js: |
-        const map = { "🔺": "highest", "◽": "normal", "⏬": "lowest" };
-        fm.tags = [].concat(fm.tags || []).filter(t => !String(t).startsWith("priority/"));
-        if (map[fm.priority]) fm.tags.push("priority/" + map[fm.priority]);
+            - tasks: { when: "-status=done" }
+    then:
+      set: { status: done }
 ```
 
-### `rules.md`
+Overdue work.
 
-Rules can also live in `rules.md` files anywhere under the schemas folder. A `rules.md` applies
-to every manifest in its folder and below, so one at the schemas root applies to the whole vault.
+```yaml
+  - when: "end<{{today}} AND -status=done"
+    then:
+      add: { tags: overdue }
+  - when: { or: ["end>={{today}}", "status=done", "end="] }
+    then:
+      remove: { tags: overdue }
+```
 
-### Neighbours
+### Where rules live
 
-When a note changes type (its manifest changes, or `enforce_folder` moves it), the notes linking
-to it are re-validated so their rules can move the link to the right property. Toggle this in
-settings: "Revalidate linking notes when a note changes type".
+Rules go in a manifest, or in a `rules.md` file anywhere in the schemas folder. A `rules.md` applies to every manifest in its folder and below. Rules from `rules.md` files run first, then the manifest chain from the root ancestor down. A rule with the same `name` replaces the earlier one.
+
+When a note changes type, the notes linking to it are checked again so rules like the link transfer above run right away. This can be turned off in the settings.
