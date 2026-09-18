@@ -111,9 +111,23 @@ describe("runRules", () => {
     expect(results.map((r) => r.message)).toEqual([
       '"problem" extended by rule "#1".',
       '"meta" extended by rule "#1".',
-      '"meta" trimmed by rule "#1".',
-      '"problem" trimmed by rule "#1".',
     ]);
+  });
+
+  it("reports nothing when remove and add cancel out", async () => {
+    const { fm, results } = await run(
+      [
+        {
+          then: {
+            remove: { tags: "category/*" },
+            add: { tags: "category/{{category|name|snake}}" },
+          },
+        },
+      ],
+      { category: ["[[Data Science]]"], tags: ["note", "category/data_science"] }
+    );
+    expect(fm.tags).toEqual(["note", "category/data_science"]);
+    expect(results).toEqual([]);
   });
 
   it("a verb that fails leaves the note untouched (rules are atomic)", async () => {

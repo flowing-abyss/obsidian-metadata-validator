@@ -164,7 +164,13 @@ export async function runRules(input: RunRulesInput): Promise<ValidationResult[]
       }
 
       commit(working, scratch);
-      results.push(...ruleResults);
+      // Report only net changes: a remove-then-add of the same items is a no-op
+      const seen = new Set<string>();
+      for (const r of ruleResults) {
+        if (seen.has(r.field) || jsonEqual(snapshot[r.field], scratch[r.field])) continue;
+        seen.add(r.field);
+        results.push(r);
+      }
     } catch (e) {
       if (e instanceof JsDisabledError) {
         results.push({
