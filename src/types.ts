@@ -70,6 +70,42 @@ export interface ManifestTarget {
   query?: string;
 }
 
+/** A condition in a rule: string query, selection, composition, or JS. */
+export type RuleCondition =
+  | string
+  | { js: string }
+  | { and: RuleCondition[] }
+  | { or: RuleCondition[] }
+  | { not: RuleCondition[] }
+  | RuleSelection;
+
+/** `{ property: { when?: RuleCondition } }` — values of a property, filtered by the note behind each link. */
+export type RuleSelection = Record<string, { when?: RuleCondition }>;
+
+/** Literal, template string, selection, `{ js }`, or an array of those. */
+export type RuleValue = unknown;
+
+export interface RuleThen {
+  set?: Record<string, RuleValue>;
+  add?: Record<string, RuleValue>;
+  remove?: Record<string, RuleValue>;
+  js?: string;
+}
+
+export interface ManifestRule {
+  name?: string;
+  when?: RuleCondition;
+  then: RuleThen;
+}
+
+/** rules.md file: folder-scoped rules applying to every manifest in its folder and below */
+export interface RulesFile {
+  path: string;
+  folderPath: string;
+  name?: string;
+  rules: ManifestRule[];
+}
+
 /** Raw parsed content of a manifest.md frontmatter */
 export interface ManifestData {
   name?: string;
@@ -85,6 +121,8 @@ export interface ManifestData {
   fields?: Record<string, ManifestField>;
   /** Field keys inherited from a parent manifest to exclude in this manifest */
   exclude?: string[];
+  /** State-based rules applied after field auto-fixes */
+  rules?: ManifestRule[];
   formatting?: {
     property_order?: string[];
   };
@@ -114,6 +152,8 @@ export interface ResolvedSchema {
   enforce_folder?: boolean | string;
   target: ManifestTarget;
   fields: Record<string, ManifestField>;
+  /** Rules from rules.md files and the manifest chain, in execution order */
+  rules: ManifestRule[];
   formatting: { property_order?: string[] };
   /** vault paths from root ancestor to this manifest */
   inheritanceChain: string[];
