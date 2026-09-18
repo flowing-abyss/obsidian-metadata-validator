@@ -61,6 +61,7 @@ function makeSchema(overrides: Partial<ResolvedSchema> = {}): ResolvedSchema {
     formatting: {},
     rules: [],
     parseErrors: [],
+    linkDependencies: [],
     inheritanceChain: ["schemas/books/manifest.md"],
     ...overrides,
   };

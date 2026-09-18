@@ -167,7 +167,7 @@ when: { js: "return fm.status === 'done'" }
 
 A value is a literal, a template or a selection. A selection `{ team: { when: "status=left" } }` means the links in `team` whose note matches, and `{ team: {} }` means all of them.
 
-Templates use `{{today}}`, `{{now}}`, `{{file.name}}` or any property. Filters are `name` (link to note name), `snake`, `kebab`, `lower`, `upper`, `trim`, `replace:"a","b"`, `join:", "` and `date:"YYYY-MM-DD"`.
+Templates use `{{today}}`, `{{now}}`, `{{file.name}}` or any property. `{{project>category}}` reads `category` from the notes linked in `project`. Filters are `name` (link to note name), `snake`, `kebab`, `lower`, `upper`, `trim`, `replace:"a","b"`, `join:", "` and `date:"YYYY-MM-DD"`.
 
 ### Common rules
 
@@ -218,6 +218,13 @@ A reading list that sorts itself. Books move between `to_read`, `reading` and `f
         finished: { when: "-status=done" }
 ```
 
+A task that follows its project. The values are copied in both directions, so a category removed from the project leaves the task too. A task without a project keeps its own.
+
+```yaml
+  - then:
+      set: { category: "{{project>category}}", area: "{{project>area}}" }
+```
+
 State taken from a linked note. A task closes when its project closes, and a project closes when all its tasks are closed.
 
 ```yaml
@@ -248,4 +255,4 @@ Overdue work.
 
 Rules go in a manifest, or in a `rules.md` file anywhere in the schemas folder. A `rules.md` applies to every manifest in its folder and below. Rules from `rules.md` files run first, then the manifest chain from the root ancestor down. A rule with the same `name` replaces the earlier one.
 
-When a note changes type, the notes linking to it are checked again so rules like the team transfer above run right away. This can be turned off in the settings.
+When a note changes, the notes whose rules read it through a link are checked again, so a task follows its project right away. This can be turned off in the settings.

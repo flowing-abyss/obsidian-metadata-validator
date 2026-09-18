@@ -18,6 +18,7 @@ function makeSchema(): ResolvedSchema {
     manifestPath: "schemas/proj/manifest.md",
     rules: [],
     parseErrors: [],
+    linkDependencies: [],
     inheritanceChain: ["schemas/proj/manifest.md"],
     name: "proj",
     priority: 0,

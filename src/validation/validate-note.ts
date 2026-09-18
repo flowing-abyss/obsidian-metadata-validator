@@ -22,6 +22,8 @@ interface ValidateNoteOutcome {
   results: ValidationResult[];
   /** True when the note was moved into its schema's enforce_folder */
   moved: boolean;
+  /** True when auto-fixes or rules were written to the note */
+  written: boolean;
 }
 
 /**
@@ -39,7 +41,7 @@ export async function validateNote(
   const frontmatter = sanitizeFrontmatter(app.metadataCache.getFileCache(file)?.frontmatter);
   let schema = resolver.resolveForNote(file, frontmatter);
 
-  if (!schema) return { schema: null, results: [], moved: false };
+  if (!schema) return { schema: null, results: [], moved: false, written: false };
 
   // enforce_folder: only a string path is actionable now (true alone has no effect)
   const enforcePath = typeof schema.enforce_folder === "string" ? schema.enforce_folder : undefined;
@@ -63,7 +65,7 @@ export async function validateNote(
 
   appendLegacyEnforceFolderWarning(results, schema.enforce_folder, schema.manifestPath);
 
-  await persistEngineChanges({
+  const written = await persistEngineChanges({
     app,
     file,
     schema,
@@ -74,7 +76,7 @@ export async function validateNote(
     selfWrites: deps.selfWrites,
   });
 
-  return { schema, results, moved };
+  return { schema, results, moved, written };
 }
 
 export function appendLegacyEnforceFolderWarning(

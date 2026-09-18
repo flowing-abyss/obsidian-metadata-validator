@@ -173,6 +173,79 @@ describe("runRules", () => {
     expect(fm.aliases).toEqual([]);
   });
 
+  it("taxonomy follows the project in both directions", async () => {
+    const rule: ManifestRule = {
+      then: { set: { category: "{{project>category}}", meta: "{{project>meta}}" } },
+    };
+    const added = await run(
+      [rule],
+      { project: "[[P]]", category: ["[[old]]"], meta: [] },
+      { "p/P.md": { category: ["[[dev]]", "[[public]]"], meta: ["[[obsidian]]"] } }
+    );
+    expect(added.fm.category).toEqual(["[[dev]]", "[[public]]"]);
+    expect(added.fm.meta).toEqual(["[[obsidian]]"]);
+
+    const removed = await run(
+      [rule],
+      { project: "[[P]]", category: ["[[dev]]", "[[public]]"], meta: ["[[obsidian]]"] },
+      { "p/P.md": { category: ["[[dev]]"], meta: [] } }
+    );
+    expect(removed.fm.category).toEqual(["[[dev]]"]);
+    expect(removed.fm.meta).toBeNull();
+  });
+
+  it("a note with nothing to follow keeps its own values", async () => {
+    const rule: ManifestRule = {
+      then: {
+        set: { category: "{{project>category}}" },
+        add: { tags: "area/{{project>area}}" },
+        remove: { tags: "{{project>tags}}" },
+      },
+    };
+    const noProject = await run([rule], { project: null, category: ["[[mine]]"], tags: ["a"] });
+    expect(noProject.fm.category).toEqual(["[[mine]]"]);
+    expect(noProject.fm.tags).toEqual(["a"]);
+    expect(noProject.results).toEqual([]);
+
+    const brokenLink = await run([rule], { project: "[[ghost]]", category: ["[[mine]]"] });
+    expect(brokenLink.fm.category).toEqual(["[[mine]]"]);
+  });
+
+  it("a list value with a part that cannot be followed is skipped as a whole", async () => {
+    const { fm } = await run(
+      [{ then: { set: { category: ["[[own]]", "{{project>category}}"] } } }],
+      { project: null, category: ["[[mine]]"] }
+    );
+    expect(fm.category).toEqual(["[[mine]]"]);
+  });
+
+  it("does not rewrite one empty value as another", async () => {
+    const { fm, results } = await run(
+      [{ then: { set: { problem: "{{project>problem}}" } } }],
+      { project: "[[P]]", problem: [] },
+      { "p/P.md": { problem: null } }
+    );
+    expect(fm.problem).toEqual([]);
+    expect(results).toEqual([]);
+  });
+
+  it("compares with a value taken from the linked note", async () => {
+    const files = { "p/P.md": { end: "2026-03-01" } };
+    const rule: ManifestRule = {
+      when: "end>{{project>end}}",
+      then: { add: { tags: "late" } },
+    };
+    expect(
+      (await run([rule], { project: "[[P]]", end: "2026-04-01", tags: [] }, files)).fm.tags
+    ).toEqual(["late"]);
+    expect(
+      (await run([rule], { project: "[[P]]", end: "2026-02-01", tags: [] }, files)).fm.tags
+    ).toEqual([]);
+    expect(
+      (await run([rule], { project: null, end: "2026-04-01", tags: [] }, files)).fm.tags
+    ).toEqual([]);
+  });
+
   it("set with a bare filter keeps only the matching links", async () => {
     const files = { "m/a.md": { tags: ["keep"] }, "m/b.md": { tags: ["drop"] } };
     const { fm } = await run(

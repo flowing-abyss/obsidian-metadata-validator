@@ -1,7 +1,7 @@
 import type { App, TFile } from "obsidian";
 import type { ManifestField } from "../types";
 import { sanitizeFrontmatter } from "../validation/frontmatter";
-import { valueText } from "./link-text";
+import { isWikiLink, linkTarget, valueText } from "./link-text";
 import type { TemplateContext } from "./template";
 
 /** What a condition sees: the note's path, tags and frontmatter. */
@@ -58,5 +58,15 @@ export function templateContextOf(env: RuleEnv): TemplateContext {
       folder: slash === -1 ? "" : path.slice(0, slash),
     },
     now: env.now,
+    follow: (property) => {
+      const raw = env.self.frontmatter[property];
+      const linked: Array<Record<string, unknown>> = [];
+      for (const value of Array.isArray(raw) ? raw : [raw]) {
+        if (!isWikiLink(value)) continue;
+        const file = env.app.metadataCache.getFirstLinkpathDest(linkTarget(value), env.file.path);
+        if (file) linked.push(contextForFile(file, env.app).frontmatter);
+      }
+      return linked.length > 0 ? linked : null;
+    },
   };
 }

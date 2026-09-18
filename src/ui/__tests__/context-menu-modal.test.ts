@@ -21,6 +21,7 @@ function makeModal(
     formatting: {},
     rules: [],
     parseErrors: [],
+    linkDependencies: [],
     inheritanceChain: ["schemas/base/manifest.md", "schemas/book/manifest.md"],
     ...schema,
   };

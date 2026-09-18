@@ -4,7 +4,7 @@ import type { RuleEnv } from "./context";
 import { templateContextOf } from "./context";
 import { isWikiLink, linkName, valuesEqual, valueText } from "./link-text";
 import { isSelection, resolveSelection } from "./selection";
-import { hasTemplate, renderValue } from "./template";
+import { hasTemplate, NO_VALUE, renderValue } from "./template";
 
 const LIST_TYPES = new Set(["list", "multiselect", "multilink"]);
 
@@ -33,6 +33,8 @@ export async function resolveRuleValue(value: RuleValue, env: RuleEnv): Promise<
     const out: unknown[] = [];
     for (const item of value) {
       const r = await resolveRuleValue(item, env);
+      // One part that could not be followed makes the whole value unknown
+      if (r === NO_VALUE) return NO_VALUE;
       if (Array.isArray(r)) out.push(...(r as unknown[]));
       else if (!isEmpty(r)) out.push(r);
     }
@@ -76,10 +78,15 @@ export function applySet(
   }
   if (next === undefined) next = null;
   const current = working[prop];
-  if (next === null && (current === null || current === undefined)) return false;
+  // null, "", [] and a missing key are the same empty state: never rewrite one as another
+  if (isBlank(next) && isBlank(current)) return false;
   if (sameValue(current, next)) return false;
   working[prop] = next;
   return true;
+}
+
+function isBlank(v: unknown): boolean {
+  return isEmpty(v) || (Array.isArray(v) && v.length === 0);
 }
 
 function toList(v: unknown): unknown[] {

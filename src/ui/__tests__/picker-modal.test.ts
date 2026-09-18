@@ -10,6 +10,7 @@ function makeModal(field: Partial<ManifestField>, currentValue: unknown, enableJ
     manifestPath: "schemas/test/manifest.md",
     rules: [],
     parseErrors: [],
+    linkDependencies: [],
     inheritanceChain: ["schemas/test/manifest.md"],
     name: "test",
     priority: 0,

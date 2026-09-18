@@ -2,6 +2,7 @@ import type { TFile } from "obsidian";
 import type { ManifestCache } from "../manifest/cache";
 import type { Manifest, ManifestData, ManifestRule, ResolvedSchema } from "../types";
 import { mergeRules, mergeSchemas } from "./merger";
+import { collectLinkDependencies } from "../rules/dependencies";
 import { evaluateQuery } from "./query";
 
 interface ResolvedNode {
@@ -75,6 +76,7 @@ export class SchemaResolver {
   }
 
   private toResolved(manifest: Manifest, data: ManifestData, chain: string[]): ResolvedSchema {
+    const rules = this.collectRules(manifest, chain);
     return {
       manifestPath: manifest.path,
       name: data.name ?? manifest.folderPath.split("/").pop() ?? "unknown",
@@ -91,8 +93,9 @@ export class SchemaResolver {
       enforce_folder: data.enforce_folder,
       target: data.target ?? {},
       fields: data.fields ?? {},
-      rules: this.collectRules(manifest, chain),
+      rules,
       parseErrors: this.collectParseErrors(manifest, chain),
+      linkDependencies: collectLinkDependencies(rules),
       formatting: data.formatting ?? {},
       inheritanceChain: chain,
     };

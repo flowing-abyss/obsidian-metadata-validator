@@ -11,6 +11,7 @@ const schema: ResolvedSchema = {
   fields: {},
   rules: [],
   parseErrors: [],
+  linkDependencies: [],
   formatting: {},
   inheritanceChain: ["s/manifest.md"],
 };

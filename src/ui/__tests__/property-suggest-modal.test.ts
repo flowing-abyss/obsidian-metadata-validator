@@ -11,6 +11,7 @@ const schema: ResolvedSchema = {
   manifestPath: "schemas/book/manifest.md",
   rules: [],
   parseErrors: [],
+  linkDependencies: [],
   inheritanceChain: [],
   priority: 0,
   target: {},

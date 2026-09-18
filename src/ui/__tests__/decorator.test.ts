@@ -21,6 +21,7 @@ function makeSchema(manifestPath: string): ResolvedSchema {
     manifestPath,
     rules: [],
     parseErrors: [],
+    linkDependencies: [],
     inheritanceChain: [manifestPath],
     name: manifestPath.split("/").at(-2) ?? "schema",
     priority: 0,

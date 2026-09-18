@@ -161,6 +161,8 @@ export interface ResolvedSchema {
   rules: ManifestRule[];
   /** YAML errors of any manifest.md or rules.md in this schema's chain, as "path: message" */
   parseErrors: string[];
+  /** Properties through which this schema's rules read linked notes (selections, `{{a>b}}`) */
+  linkDependencies: string[];
   formatting: { property_order?: string[] };
   /** vault paths from root ancestor to this manifest */
   inheritanceChain: string[];

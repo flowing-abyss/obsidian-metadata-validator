@@ -27,6 +27,7 @@ import { appendLegacyEnforceFolderWarning, validateNote } from "./validation/val
 import { WriteBudget } from "./validation/write-budget";
 import { SelfWrites } from "./validation/self-writes";
 import { bumpSourceRevision } from "./schema/source-resolver";
+import { linksThrough } from "./rules/dependencies";
 
 export default class MetadataValidatorPlugin extends Plugin {
   settings: PluginSettings = { ...DEFAULT_SETTINGS };
@@ -549,7 +550,7 @@ export default class MetadataValidatorPlugin extends Plugin {
   private async validateAndUpdate(file: TFile): Promise<void> {
     const previousPath = file.path;
     const hashBefore = this.frontmatterHash(file);
-    const { schema, results, moved } = await validateNote(
+    const { schema, results, moved, written } = await validateNote(
       {
         app: this.app,
         resolver: this.resolver,
@@ -559,6 +560,7 @@ export default class MetadataValidatorPlugin extends Plugin {
       },
       file
     );
+    const previousHash = this.lastValidatedHash.get(previousPath);
     this.lastValidatedHash.delete(previousPath);
     this.lastValidatedHash.set(file.path, hashBefore);
     // Icons must reflect the post-fix state; the display cache is keyed by frontmatter only
@@ -576,14 +578,19 @@ export default class MetadataValidatorPlugin extends Plugin {
       this.badges.setStatus(previousPath, "none");
     }
 
-    // A note that changed type (different manifest, or moved by enforce_folder) may now
-    // belong in a different link property of the notes pointing at it: let their rules run.
+    // Notes whose rules read this one (a task following its project, a link that belongs in
+    // another property once this note changed type) run their rules again when it changed:
+    // a different manifest, a move, different frontmatter since the last validation, or a fix
+    // we just wrote. The first validation in a session is not a change.
     const previousManifest = this.lastManifestByPath.get(previousPath);
     this.lastManifestByPath.delete(previousPath);
     this.lastManifestByPath.set(file.path, schema.manifestPath);
     const changedType =
       moved || (previousManifest !== undefined && previousManifest !== schema.manifestPath);
-    if (changedType && this.settings.revalidateBacklinks) this.scheduleBacklinks(file);
+    const changedContent = previousHash !== undefined && previousHash !== hashBefore;
+    if ((changedType || changedContent || written) && this.settings.revalidateBacklinks) {
+      this.scheduleDependents(file);
+    }
 
     const errors = results.filter((r) => !r.autoFixed && r.severity === "error");
     const warnings = results.filter((r) => !r.autoFixed && r.severity === "warning");
@@ -597,8 +604,11 @@ export default class MetadataValidatorPlugin extends Plugin {
     this.updateSidebarPanel(file.basename, results);
   }
 
-  /** Queue every note that links to `file` for validation. */
-  private scheduleBacklinks(file: TFile): void {
+  /**
+   * Queue the notes that link to `file` through a property their rules read.
+   * Notes that merely mention it, or whose schema has no such rules, are left alone.
+   */
+  private scheduleDependents(file: TFile): void {
     const cache = this.app.metadataCache as unknown as {
       getBacklinksForFile?: (f: TFile) => { data?: unknown } | null;
     };
@@ -611,7 +621,14 @@ export default class MetadataValidatorPlugin extends Plugin {
           : [];
     for (const path of paths) {
       const target = this.app.vault.getAbstractFileByPath(path);
-      if (target instanceof TFile && target.extension === "md") {
+      if (!(target instanceof TFile) || target.extension !== "md" || target === file) continue;
+      const frontmatter = sanitizeFrontmatter(
+        this.app.metadataCache.getFileCache(target)?.frontmatter
+      );
+      const dependencies =
+        this.resolver.resolveForNote(target, frontmatter)?.linkDependencies ?? [];
+      if (dependencies.length === 0) continue;
+      if (linksThrough(frontmatter, dependencies, file.basename)) {
         this.backlinkScheduler.schedule(target);
       }
     }

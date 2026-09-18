@@ -3,7 +3,7 @@ import type { ManifestField, ManifestRule, RuleThen, ValidationResult } from "..
 import { dataviewContext, executeJs, JsDisabledError } from "../utils/js-exec";
 import { evaluateCondition, RuleConfigError } from "./condition";
 import { contextFromFrontmatter, type RuleEnv } from "./context";
-import { TemplateError } from "./template";
+import { NO_VALUE, TemplateError } from "./template";
 import { applyAdd, applyRemove, applySet, isListField, resolveRuleValue } from "./verbs";
 
 export interface RunRulesInput {
@@ -147,6 +147,7 @@ export async function runRules(input: RunRulesInput): Promise<ValidationResult[]
               throw new RuleConfigError(`cannot set "${prop}", the field is fixed.`);
             }
             const value = await resolveRuleValue(rawValue, env);
+            if (value === NO_VALUE) continue;
             if (applySet(scratch, prop, value, field))
               ruleResults.push(changed(prop, "set", label));
             continue;
@@ -157,6 +158,7 @@ export async function runRules(input: RunRulesInput): Promise<ValidationResult[]
             );
           }
           const resolved = await resolveRuleValue(rawValue, env);
+          if (resolved === NO_VALUE) continue;
           const values = Array.isArray(resolved) ? resolved : [resolved];
           const didChange =
             verb === "add" ? applyAdd(scratch, prop, values) : applyRemove(scratch, prop, values);

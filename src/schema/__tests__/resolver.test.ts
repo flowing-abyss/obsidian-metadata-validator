@@ -685,6 +685,29 @@ describe("SchemaResolver rules", () => {
     expect(schema?.rules).toEqual([{ name: "keep", then: { set: { replaced: true } } }]);
   });
 
+  it("exposes the properties through which its rules read linked notes", () => {
+    const cache = makeCacheWithRules(
+      [
+        {
+          path: "schemas/t/manifest.md",
+          folderPath: "schemas/t",
+          data: {
+            target: { query: "#task" },
+            rules: [
+              { then: { set: { category: "{{project>category}}" } } },
+              { when: { milestone: { when: "status=done" } }, then: { set: { status: "done" } } },
+            ],
+          },
+        },
+      ],
+      []
+    );
+    const resolver = new SchemaResolver(cache);
+    resolver.rebuild();
+    const schema = resolver.resolveForNote(makeFile("n.md"), { tags: ["task"] });
+    expect(schema?.linkDependencies.sort()).toEqual(["milestone", "project"]);
+  });
+
   it("manifest without rules resolves to an empty list", () => {
     const cache = makeCacheWithRules(
       [

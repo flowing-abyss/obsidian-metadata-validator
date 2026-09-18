@@ -20,6 +20,7 @@ function makeSchema(overrides: Partial<ResolvedSchema> = {}): ResolvedSchema {
     formatting: {},
     rules: [],
     parseErrors: [],
+    linkDependencies: [],
     inheritanceChain: ["schemas/problems/manifest.md"],
     ...overrides,
   };
@@ -79,7 +80,7 @@ describe("validateNote", () => {
 
     const outcome = await validateNote({ app, resolver, engine }, file);
 
-    expect(outcome).toEqual({ schema: null, results: [], moved: false });
+    expect(outcome).toEqual({ schema: null, results: [], moved: false, written: false });
     expect(engine.validate).not.toHaveBeenCalled();
     expect(processFrontMatter).not.toHaveBeenCalled();
   });

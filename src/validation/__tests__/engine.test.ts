@@ -30,6 +30,7 @@ const SCHEMA: ResolvedSchema = {
   formatting: {},
   rules: [],
   parseErrors: [],
+  linkDependencies: [],
   inheritanceChain: ["schemas/book/manifest.md"],
 };
 
@@ -58,6 +59,7 @@ const DATE_SCHEMA: ResolvedSchema = {
   formatting: {},
   rules: [],
   parseErrors: [],
+  linkDependencies: [],
   inheritanceChain: ["schemas/event/manifest.md"],
 };
 
@@ -76,6 +78,7 @@ const LINK_SCHEMA: ResolvedSchema = {
   formatting: {},
   rules: [],
   parseErrors: [],
+  linkDependencies: [],
   inheritanceChain: ["schemas/book/manifest.md"],
 };
 
@@ -93,6 +96,7 @@ const JS_SCHEMA: ResolvedSchema = {
   formatting: {},
   rules: [],
   parseErrors: [],
+  linkDependencies: [],
   inheritanceChain: ["schemas/custom/manifest.md"],
 };
 
@@ -168,6 +172,7 @@ describe("ValidationEngine", () => {
       formatting: {},
       rules: [],
       parseErrors: [],
+      linkDependencies: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -255,6 +260,7 @@ describe("ValidationEngine", () => {
       formatting: {},
       rules: [],
       parseErrors: [],
+      linkDependencies: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -282,6 +288,7 @@ describe("ValidationEngine", () => {
       formatting: {},
       rules: [],
       parseErrors: [],
+      linkDependencies: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -314,6 +321,7 @@ describe("ValidationEngine", () => {
       formatting: {},
       rules: [],
       parseErrors: [],
+      linkDependencies: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -344,6 +352,7 @@ describe("ValidationEngine", () => {
       formatting: {},
       rules: [],
       parseErrors: [],
+      linkDependencies: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -369,6 +378,7 @@ describe("ValidationEngine", () => {
       formatting: { property_order: ["a", "z"] },
       rules: [],
       parseErrors: [],
+      linkDependencies: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -396,6 +406,7 @@ describe("ValidationEngine", () => {
       formatting: { property_order: ["a", "z"] },
       rules: [],
       parseErrors: [],
+      linkDependencies: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -418,6 +429,7 @@ describe("ValidationEngine", () => {
       formatting: {},
       rules: [],
       parseErrors: [],
+      linkDependencies: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -446,6 +458,7 @@ describe("ValidationEngine", () => {
       formatting: {},
       rules: [],
       parseErrors: [],
+      linkDependencies: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -472,6 +485,7 @@ describe("ValidationEngine", () => {
       formatting: {},
       rules: [],
       parseErrors: [],
+      linkDependencies: [],
       inheritanceChain: ["schemas/book/manifest.md"],
     };
     const app = makeApp();
@@ -557,6 +571,7 @@ describe("ValidationEngine rules", () => {
       fields,
       rules,
       parseErrors: [],
+      linkDependencies: [],
       formatting,
       inheritanceChain: ["schemas/project/manifest.md"],
     };

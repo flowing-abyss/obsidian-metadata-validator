@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   expandTemplatesInQuery,
   hasTemplate,
+  NO_VALUE,
   renderText,
   renderValue,
   TemplateError,
@@ -106,5 +107,68 @@ describe("template", () => {
     );
     expect(expandTemplatesInQuery("x={{category|name}}", ctx)).toBe('x="data science,Plans"');
     expect(expandTemplatesInQuery("plain", ctx)).toBe("plain");
+  });
+});
+
+describe("template link traversal", () => {
+  const linked: Record<string, Array<Record<string, unknown>>> = {
+    project: [
+      { category: ["[[dev]]", "[[public]]"], end: "2026-05-01", status: "wip" },
+      { category: ["[[public]]", "[[health]]"], end: "2026-06-01" },
+    ],
+    single: [{ end: "2026-05-01", category: [] }],
+  };
+  const tctx: TemplateContext = {
+    ...ctx,
+    follow: (property) => linked[property] ?? null,
+  };
+
+  it("collects the target property of every linked note without duplicates", () => {
+    expect(renderValue("{{project>category}}", tctx)).toEqual([
+      "[[dev]]",
+      "[[public]]",
+      "[[health]]",
+    ]);
+    expect(renderValue("{{project>end}}", tctx)).toEqual(["2026-05-01", "2026-06-01"]);
+  });
+
+  it("returns a scalar for one linked note with a scalar value", () => {
+    expect(renderValue("{{single>end}}", tctx)).toBe("2026-05-01");
+    expect(renderValue("{{ project > status }}", tctx)).toBe("wip");
+  });
+
+  it("followed but empty is a real empty value", () => {
+    expect(renderValue("{{single>category}}", tctx)).toBeNull();
+    expect(renderValue("{{single>missing}}", tctx)).toBeNull();
+  });
+
+  it("nothing to follow is NO_VALUE, also through filters and inside text", () => {
+    expect(renderValue("{{nowhere>category}}", tctx)).toBe(NO_VALUE);
+    expect(renderValue("{{nowhere>category|name|snake}}", tctx)).toBe(NO_VALUE);
+    expect(renderText("category/{{nowhere>category|name}}", tctx)).toBe(NO_VALUE);
+    expect(renderValue("{{nowhere>category}}", ctx)).toBe(NO_VALUE);
+  });
+
+  it("applies filters after the hop", () => {
+    expect(renderText("category/{{project>category|name|upper}}", tctx)).toEqual([
+      "category/DEV",
+      "category/PUBLIC",
+      "category/HEALTH",
+    ]);
+  });
+
+  it("renders nothing to follow as empty in a query", () => {
+    expect(expandTemplatesInQuery("end>{{nowhere>end}}", tctx)).toBe("end>");
+    expect(expandTemplatesInQuery("end>{{single>end}}", tctx)).toBe("end>2026-05-01");
+  });
+
+  it("rejects more than one hop and empty sides", () => {
+    expect(() => renderValue("{{project>meta>category}}", tctx)).toThrow(TemplateError);
+    expect(() => renderValue("{{>category}}", tctx)).toThrow(TemplateError);
+    expect(() => renderValue("{{project>}}", tctx)).toThrow(TemplateError);
+  });
+
+  it("an unknown filter still throws when there is nothing to follow", () => {
+    expect(() => renderValue("{{nowhere>category|bogus}}", tctx)).toThrow(TemplateError);
   });
 });

@@ -110,9 +110,9 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
     );
 
     new Setting(containerEl)
-      .setName("Revalidate linking notes when a note changes type")
+      .setName("Revalidate notes that depend on a changed note")
       .setDesc(
-        "When a note's schema changes (for example a meta note becomes a problem), notes that link to it are re-validated so rules can move the link to the right property."
+        "When a note changes, the notes whose rules read it through a link are validated again, for example a task that follows its project, or a link that belongs in another property once the note changed type."
       )
       .addToggle((t) =>
         t.setValue(this.plugin.settings.revalidateBacklinks).onChange(async (v) => {
