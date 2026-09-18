@@ -59,6 +59,9 @@ fields:
     type: date
   end:
     type: date
+  created:
+    type: date
+    hidden: true
   icon:
     type: text
     hidden: true
@@ -72,16 +75,16 @@ rules:
     when: "status=done AND end="
     then:
       set: { end: "{{today}}" }
-  - name: category tags
+  - name: created stamp
+    when: "created="
     then:
-      remove: { tags: "category/*" }
-      add: { tags: "category/{{category|name|snake}}" }
+      set: { created: "{{now}}" }
 formatting:
-  property_order: [tags, status, priority, category, start, end, icon]
+  property_order: [tags, status, priority, category, start, end, created, icon]
 ---
 ```
 
-This runs on save, on open, and when you start the vault auto-fix from the sidebar. Missing properties get their `default`, `icon` is always the fixed value, the two date rules fill in empty dates, the tag rule keeps `category/*` tags equal to the category links, and the properties are reordered. Anything the plugin cannot fix shows up in the sidebar and as an icon next to the property.
+This runs on save, on open, and when you start the vault auto-fix from the sidebar. Missing properties get their `default`, `icon` is always the fixed value, the rules fill in the empty dates and the creation time, and the properties are reordered. Anything the plugin cannot fix shows up in the sidebar and as an icon next to the property.
 
 ## Manifest keys
 
@@ -162,7 +165,7 @@ when: { js: "return fm.status === 'done'" }
 | `remove: { tags: value }` | remove from a list, `*` is a wildcard |
 | `js: "..."` | run code with the note's `fm` |
 
-A value is a literal, a template or a selection. A selection `{ meta: { when: "#problem" } }` means the links in `meta` whose note matches, and `{ meta: {} }` means all of them.
+A value is a literal, a template or a selection. A selection `{ team: { when: "status=left" } }` means the links in `team` whose note matches, and `{ team: {} }` means all of them.
 
 Templates use `{{today}}`, `{{now}}`, `{{file.name}}` or any property, with optional filters: `name` (link to note name), `snake`, `kebab`, `lower`, `upper`, `trim`, `replace:"a","b"`, `join:", "`, `date:"YYYY-MM-DD"`.
 
@@ -192,29 +195,27 @@ Tags that mirror a property. The first rule removes every `status/*` tag, the ot
       add: { tags: status/done }
 ```
 
-Links that belong in another property. When a note in `meta` has become a problem, its link moves to `problem`, and the other way round.
+Links that belong in another property. When a person in `team` has left, their link moves to `former_team`.
 
 ```yaml
   - then:
       add:
-        problem: { meta: { when: "#problem" } }
-        meta: { problem: { when: "#meta" } }
+        former_team: { team: { when: "status=left" } }
       remove:
-        meta: { when: "#problem" }
-        problem: { when: "#meta" }
+        team: { when: "status=left" }
 ```
 
-A kanban in properties. Tasks move between `todo`, `wip` and `done` by their own status.
+A reading list that sorts itself. Books move between `to_read`, `reading` and `finished` by their own status.
 
 ```yaml
   - then:
       add:
-        wip: { todo: { when: "status=wip" }, done: { when: "status=wip" } }
-        done: { todo: { when: "status=done" }, wip: { when: "status=done" } }
+        reading: { to_read: { when: "status=reading" }, finished: { when: "status=reading" } }
+        finished: { to_read: { when: "status=done" }, reading: { when: "status=done" } }
       remove:
-        todo: { when: "-status=todo" }
-        wip: { when: "-status=wip" }
-        done: { when: "-status=done" }
+        to_read: { when: "-status=to_read" }
+        reading: { when: "-status=reading" }
+        finished: { when: "-status=done" }
 ```
 
 State taken from a linked note. A task closes when its project closes, and a project closes when all its tasks are closed.
@@ -247,4 +248,4 @@ Overdue work.
 
 Rules go in a manifest, or in a `rules.md` file anywhere in the schemas folder. A `rules.md` applies to every manifest in its folder and below. Rules from `rules.md` files run first, then the manifest chain from the root ancestor down. A rule with the same `name` replaces the earlier one.
 
-When a note changes type, the notes linking to it are checked again so rules like the link transfer above run right away. This can be turned off in the settings.
+When a note changes type, the notes linking to it are checked again so rules like the team transfer above run right away. This can be turned off in the settings.
