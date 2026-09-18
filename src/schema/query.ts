@@ -1,3 +1,5 @@
+import { valuesEqual, valueText } from "../rules/link-text";
+
 /**
  * Evaluate a target expression against a note.
  *
@@ -11,7 +13,10 @@
  * Terms:
  *   "folder/"   or  folder/   →  note path starts with this prefix
  *   #tag                      →  note has this tag (or a child tag)
- *   key=value                 →  frontmatter[key] === value
+ *   key=value                 →  frontmatter[key] equals value (a list: contains value)
+ *   key=                      →  frontmatter[key] is empty (null, "", [] or absent)
+ *   key<value, key>value, key<=value, key>=value → typed comparison (number, date, string)
+ *   {{...}} on the right-hand side is expanded by the rules engine before evaluation
  *
  * Example:  "Sources/" AND #book
  */
@@ -117,19 +122,13 @@ function evaluateBaseTerm(
     });
   }
 
-  // Property: key=value
-  const eqIdx = term.indexOf("=");
-  if (eqIdx !== -1 && !term.startsWith('"') && !term.startsWith("'")) {
-    const key = term.slice(0, eqIdx).trim();
-    const val = term
-      .slice(eqIdx + 1)
-      .trim()
-      .replace(/^["']|["']$/g, "");
-    const fmVal = frontmatter[key];
-    return (
-      (fmVal === null || fmVal === undefined ? "" : String(fmVal)) === // eslint-disable-line @typescript-eslint/no-base-to-string -- frontmatter values are primitives or stringifiable
-      val
-    );
+  // Property term: key<op>value  (op: =, <, >, <=, >=). An empty value means "is empty".
+  const termMatch = /^([^<>=#"'][^<>=]*?)\s*(<=|>=|<|>|=)\s*([\s\S]*)$/.exec(term);
+  if (termMatch) {
+    const key = (termMatch[1] ?? "").trim();
+    const op = termMatch[2] ?? "=";
+    const val = unquote((termMatch[3] ?? "").trim());
+    return evaluatePropertyTerm(frontmatter[key], op, val);
   }
 
   // Folder: ends with / (with or without quotes)
@@ -139,4 +138,64 @@ function evaluateBaseTerm(
   }
 
   return false;
+}
+
+function unquote(raw: string): string {
+  const quoted = /^"((?:[^"\\]|\\.)*)"$|^'((?:[^'\\]|\\.)*)'$/.exec(raw);
+  if (!quoted) return raw;
+  return (quoted[1] ?? quoted[2] ?? "").replace(/\\(["'])/g, "$1");
+}
+
+function isEmptyValue(v: unknown): boolean {
+  return v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+}
+
+function evaluatePropertyTerm(fmVal: unknown, op: string, val: string): boolean {
+  if (op === "=") {
+    if (val === "") return isEmptyValue(fmVal);
+    if (isEmptyValue(fmVal)) return false;
+    const values = Array.isArray(fmVal) ? fmVal : [fmVal];
+    return values.some((v) => valuesEqual(v, val));
+  }
+  if (isEmptyValue(fmVal) || val === "") return false;
+  const values = Array.isArray(fmVal) ? fmVal : [fmVal];
+  return values.some((v) => {
+    const cmp = compareValues(v, val);
+    if (cmp === null) return false;
+    switch (op) {
+      case "<":
+        return cmp < 0;
+      case ">":
+        return cmp > 0;
+      case "<=":
+        return cmp <= 0;
+      default:
+        return cmp >= 0;
+    }
+  });
+}
+
+const DATE_RE =
+  /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
+/** Numeric if both numeric, date if both ISO dates (coarser precision wins), else string. */
+function compareValues(a: unknown, b: string): number | null {
+  const sa = valueText(a).trim();
+  const sb = b.trim();
+  if (sa === "" || sb === "") return null;
+  const na = Number(sa);
+  const nb = Number(sb);
+  if (!Number.isNaN(na) && !Number.isNaN(nb)) return na === nb ? 0 : na < nb ? -1 : 1;
+  if (DATE_RE.test(sa) && DATE_RE.test(sb)) {
+    if (sa.length === 10 || sb.length === 10) {
+      const da = sa.slice(0, 10);
+      const db = sb.slice(0, 10);
+      return da === db ? 0 : da < db ? -1 : 1;
+    }
+    const ta = Date.parse(sa);
+    const tb = Date.parse(sb);
+    if (Number.isNaN(ta) || Number.isNaN(tb)) return null;
+    return ta === tb ? 0 : ta < tb ? -1 : 1;
+  }
+  return sa.localeCompare(sb);
 }

@@ -91,3 +91,79 @@ describe("evaluateQuery", () => {
     expect(evaluateQuery("", "Notes/n.md", [], fm)).toBe(false);
   });
 });
+
+describe("evaluateQuery extensions", () => {
+  const fm: Record<string, unknown> = {
+    status: "🟩",
+    end: null,
+    tags: ["status/done", "category/x"],
+    meta: ["[[base/information processing|IP]]"],
+    rating: 8,
+    start: "2026-01-05",
+    created: "2026-01-05T10:00:00+07:00",
+    updated: "2026-01-05T10:00:00+07:00",
+    title: "My Note",
+  };
+
+  it("key= matches empty values", () => {
+    expect(evaluateQuery("end=", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("missing=", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("status=", "n.md", [], fm)).toBe(false);
+    expect(evaluateQuery("-end=", "n.md", [], fm)).toBe(false);
+    expect(evaluateQuery("tags=", "n.md", [], { tags: [] })).toBe(true);
+    expect(evaluateQuery("tags=x", "n.md", [], { tags: [] })).toBe(false);
+  });
+
+  it("= on a list means contains", () => {
+    expect(evaluateQuery("tags=status/done", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("tags=status", "n.md", [], fm)).toBe(false);
+  });
+
+  it("= compares links by note name", () => {
+    expect(evaluateQuery("meta=[[information processing]]", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("meta=[[other]]", "n.md", [], fm)).toBe(false);
+  });
+
+  it("numeric comparisons", () => {
+    expect(evaluateQuery("rating>=8", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("rating>8", "n.md", [], fm)).toBe(false);
+    expect(evaluateQuery("rating<10", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("rating<=7", "n.md", [], fm)).toBe(false);
+    expect(evaluateQuery("rating <= 8", "n.md", [], fm)).toBe(true);
+  });
+
+  it("date comparisons at the coarser precision", () => {
+    expect(evaluateQuery("start<2026-02-01", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("created<2026-01-06", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("created<2026-01-05", "n.md", [], fm)).toBe(false);
+    expect(evaluateQuery("created>=2026-01-05", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("created<2026-01-05T11:00:00+07:00", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("created>2026-01-05T11:00:00+07:00", "n.md", [], fm)).toBe(false);
+    expect(evaluateQuery("created=2026-01-05T10:00:00+07:00", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("created>=2026-01-05T10:00:00+07:00", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("created<=2026-01-05T10:00:00+07:00", "n.md", [], fm)).toBe(true);
+  });
+
+  it("string comparisons fall back to locale order", () => {
+    expect(evaluateQuery("status>a", "n.md", [], { status: "b" })).toBe(true);
+    expect(evaluateQuery("status<a", "n.md", [], { status: "b" })).toBe(false);
+  });
+
+  it("comparison with empty is false, negation flips it", () => {
+    expect(evaluateQuery("end<2026-01-01", "n.md", [], fm)).toBe(false);
+    expect(evaluateQuery("-end<2026-01-01", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("rating<", "n.md", [], fm)).toBe(false);
+    expect(evaluateQuery("tags<2", "n.md", [], { tags: [""] })).toBe(false);
+  });
+
+  it("quoted values with spaces and escaped quotes", () => {
+    expect(evaluateQuery('title="My Note"', "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery("title='My Note'", "n.md", [], fm)).toBe(true);
+    expect(evaluateQuery('title="My \\"Note\\""', "n.md", [], { title: 'My "Note"' })).toBe(true);
+  });
+
+  it("comparison on a list matches any element", () => {
+    expect(evaluateQuery("scores>5", "n.md", [], { scores: [1, 9] })).toBe(true);
+    expect(evaluateQuery("scores>10", "n.md", [], { scores: [1, 9] })).toBe(false);
+  });
+});
