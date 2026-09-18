@@ -167,7 +167,7 @@ when: { js: "return fm.status === 'done'" }
 
 A value is a literal, a template or a selection. A selection `{ team: { when: "status=left" } }` means the links in `team` whose note matches, and `{ team: {} }` means all of them.
 
-Templates use `{{today}}`, `{{now}}`, `{{file.name}}` or any property, with optional filters: `name` (link to note name), `snake`, `kebab`, `lower`, `upper`, `trim`, `replace:"a","b"`, `join:", "`, `date:"YYYY-MM-DD"`.
+Templates use `{{today}}`, `{{now}}`, `{{file.name}}` or any property. Filters are `name` (link to note name), `snake`, `kebab`, `lower`, `upper`, `trim`, `replace:"a","b"`, `join:", "` and `date:"YYYY-MM-DD"`.
 
 ### Common rules
 
