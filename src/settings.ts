@@ -1,4 +1,5 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
+import type { SettingDefinitionItem } from "obsidian";
 import type MetadataValidatorPlugin from "./main";
 import type { SchemaTreeView as SchemaTreeViewType } from "./ui/schema-tree";
 
@@ -36,6 +37,21 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   enableJsExecution: false,
 };
 
+type ToggleKey = {
+  [K in keyof PluginSettings]: PluginSettings[K] extends boolean ? K : never;
+}[keyof PluginSettings];
+
+interface SettingRow {
+  name: string;
+  desc?: string;
+  build: (setting: Setting) => unknown;
+}
+
+interface SettingSection {
+  heading: string;
+  rows: SettingRow[];
+}
+
 export class MetadataValidatorSettingTab extends PluginSettingTab {
   plugin: MetadataValidatorPlugin;
   private treeContainer: HTMLElement | null = null;
@@ -52,175 +68,192 @@ export class MetadataValidatorSettingTab extends PluginSettingTab {
     }
   }
 
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    return this.sections().map(({ heading, rows }) => ({
+      type: "group" as const,
+      heading,
+      items: rows.map(({ name, desc, build }) => ({
+        name,
+        desc,
+        searchable: name !== "",
+        render: (setting: Setting) => {
+          this.describe(setting, name, desc);
+          build(setting);
+        },
+      })),
+    }));
+  }
+
+  /** Fallback for Obsidian before 1.13.0, which renders the tab imperatively. */
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
 
-    new Setting(containerEl).setName("Schemas").setHeading();
+    for (const { heading, rows } of this.sections()) {
+      new Setting(containerEl).setName(heading).setHeading();
+      for (const { name, desc, build } of rows) {
+        build(this.describe(new Setting(containerEl), name, desc));
+      }
+    }
+  }
 
-    new Setting(containerEl)
-      .setName("Schemas folder")
-      .setDesc("Vault path to the folder containing all manifest.md files.")
-      .addText((text) =>
-        text
-          .setPlaceholder("Schemas")
-          .setValue(this.plugin.settings.schemasRoot)
-          .onChange(async (value) => {
-            this.plugin.settings.schemasRoot = value.trim();
+  private describe(setting: Setting, name: string, desc?: string): Setting {
+    if (name) setting.setName(name);
+    if (desc) setting.setDesc(desc);
+    return setting;
+  }
+
+  private toggle(
+    key: ToggleKey,
+    name: string,
+    desc?: string,
+    after?: (value: boolean) => void
+  ): SettingRow {
+    return {
+      name,
+      desc,
+      build: (setting) =>
+        setting.addToggle((t) =>
+          t.setValue(this.plugin.settings[key]).onChange(async (v) => {
+            this.plugin.settings[key] = v;
             await this.plugin.saveSettings();
-            await this.plugin.reloadSchemas();
+            after?.(v);
           })
-      );
+        ),
+    };
+  }
 
-    new Setting(containerEl).setName("Validation timing").setHeading();
-
-    new Setting(containerEl)
-      .setName("Validate on save")
-      .setDesc(
-        "Validate and auto-fix a note whenever its file changes on disk — from the editor or from other plugins."
-      )
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.enableOnSave).onChange(async (v) => {
-          this.plugin.settings.enableOnSave = v;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Delay after change")
-      .setDesc(
-        "Seconds to wait after a note changes before validating it. A burst of edits — yours or another plugin's — is validated once, after it settles."
-      )
-      .addSlider((s) =>
-        s
-          .setLimits(0, 10, 0.5)
-          .setValue(this.plugin.settings.onSaveDelaySeconds)
-          .setDynamicTooltip()
-          .onChange(async (v) => {
-            this.plugin.settings.onSaveDelaySeconds = v;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl).setName("Validate on open").addToggle((t) =>
-      t.setValue(this.plugin.settings.enableOnOpen).onChange(async (v) => {
-        this.plugin.settings.enableOnOpen = v;
-        await this.plugin.saveSettings();
-      })
-    );
-
-    new Setting(containerEl)
-      .setName("Revalidate notes that depend on a changed note")
-      .setDesc(
-        "When a note changes, the notes whose rules read it through a link are validated again, for example a task that follows its project, or a link that belongs in another property once the note changed type."
-      )
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.revalidateBacklinks).onChange(async (v) => {
-          this.plugin.settings.revalidateBacklinks = v;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl).setName("UI").setHeading();
-
-    new Setting(containerEl)
-      .setName("Hide Obsidian property type icon")
-      .setDesc("Hides the icons that Obsidian shows to the left of each property name.")
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.hideObsidianTypeIcon).onChange(async (v) => {
-          this.plugin.settings.hideObsidianTypeIcon = v;
-          await this.plugin.saveSettings();
-          this.plugin.cssInjector.update();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Hide Obsidian native validator")
-      .setDesc(
-        "Hides the warning triangle Obsidian adds when a property value has a type mismatch."
-      )
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.hideObsidianValidator).onChange(async (v) => {
-          this.plugin.settings.hideObsidianValidator = v;
-          await this.plugin.saveSettings();
-          this.plugin.cssInjector.update();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Show inline validation icons")
-      .setDesc("Inject picker and validator icons into the properties panel.")
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.showInlineErrors).onChange(async (v) => {
-          this.plugin.settings.showInlineErrors = v;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl).setName("Show sidebar panel").addToggle((t) =>
-      t.setValue(this.plugin.settings.showSidebarPanel).onChange(async (v) => {
-        this.plugin.settings.showSidebarPanel = v;
-        await this.plugin.saveSettings();
-      })
-    );
-
-    new Setting(containerEl)
-      .setName("Show file explorer badges")
-      .setDesc("Color dots on file names: red = errors, yellow = warnings, green = valid.")
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.showFileExplorerBadges).onChange(async (v) => {
-          this.plugin.settings.showFileExplorerBadges = v;
-          await this.plugin.saveSettings();
-          if (v) this.plugin.badges.render();
-          else this.plugin.badges.clearAll();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Intercept Bases clicks")
-      .setDesc("Open picker / quick-edit when clicking a schema field in a Bases table.")
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.interceptBases).onChange(async (v) => {
-          this.plugin.settings.interceptBases = v;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Show validation errors in Bases")
-      .setDesc("Highlight invalid cells with a subtle border and hover tooltip.")
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.showBasesErrors).onChange(async (v) => {
-          this.plugin.settings.showBasesErrors = v;
-          await this.plugin.saveSettings();
-          (
-            this.plugin as unknown as { toggleBasesValidator?: (v: boolean) => void }
-          ).toggleBasesValidator?.(v);
-        })
-      );
-
-    new Setting(containerEl).setName("Security").setHeading();
-
-    new Setting(containerEl)
-      .setName("Allow JavaScript execution")
-      .setDesc(
-        "Enables custom JavaScript sources and validators in schemas. Warning: this executes JavaScript code written in your schema files. Only enable if you trust the code in your vault."
-      )
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.enableJsExecution).onChange(async (v) => {
-          this.plugin.settings.enableJsExecution = v;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl).setName("Schema hierarchy").setHeading();
-
-    this.treeContainer = containerEl.createDiv("mv-schema-tree");
-    this.renderTree(this.treeContainer);
-
-    new Setting(containerEl).addButton((btn) =>
-      btn.setButtonText("New schema").onClick(() => void this.plugin.openSchemaEditor(null))
-    );
+  private sections(): SettingSection[] {
+    return [
+      {
+        heading: "Schemas",
+        rows: [
+          {
+            name: "Schemas folder",
+            desc: "Vault path to the folder containing all manifest.md files.",
+            build: (setting) =>
+              setting.addText((text) =>
+                text
+                  .setPlaceholder("Schemas")
+                  .setValue(this.plugin.settings.schemasRoot)
+                  .onChange(async (value) => {
+                    this.plugin.settings.schemasRoot = value.trim();
+                    await this.plugin.saveSettings();
+                    await this.plugin.reloadSchemas();
+                  })
+              ),
+          },
+        ],
+      },
+      {
+        heading: "Validation timing",
+        rows: [
+          this.toggle(
+            "enableOnSave",
+            "Validate on save",
+            "Validate and auto-fix a note whenever its file changes on disk — from the editor or from other plugins."
+          ),
+          {
+            name: "Delay after change",
+            desc: "Seconds to wait after a note changes before validating it. A burst of edits — yours or another plugin's — is validated once, after it settles.",
+            build: (setting) =>
+              setting.addSlider((s) =>
+                s
+                  .setLimits(0, 10, 0.5)
+                  .setValue(this.plugin.settings.onSaveDelaySeconds)
+                  .onChange(async (v) => {
+                    this.plugin.settings.onSaveDelaySeconds = v;
+                    await this.plugin.saveSettings();
+                  })
+              ),
+          },
+          this.toggle("enableOnOpen", "Validate on open"),
+          this.toggle(
+            "revalidateBacklinks",
+            "Revalidate notes that depend on a changed note",
+            "When a note changes, the notes whose rules read it through a link are validated again, for example a task that follows its project, or a link that belongs in another property once the note changed type."
+          ),
+        ],
+      },
+      {
+        heading: "UI",
+        rows: [
+          this.toggle(
+            "hideObsidianTypeIcon",
+            "Hide Obsidian property type icon",
+            "Hides the icons that Obsidian shows to the left of each property name.",
+            () => this.plugin.cssInjector.update()
+          ),
+          this.toggle(
+            "hideObsidianValidator",
+            "Hide Obsidian native validator",
+            "Hides the warning triangle Obsidian adds when a property value has a type mismatch.",
+            () => this.plugin.cssInjector.update()
+          ),
+          this.toggle(
+            "showInlineErrors",
+            "Show inline validation icons",
+            "Inject picker and validator icons into the properties panel."
+          ),
+          this.toggle("showSidebarPanel", "Show sidebar panel"),
+          this.toggle(
+            "showFileExplorerBadges",
+            "Show file explorer badges",
+            "Color dots on file names: red = errors, yellow = warnings, green = valid.",
+            (v) => {
+              if (v) this.plugin.badges.render();
+              else this.plugin.badges.clearAll();
+            }
+          ),
+          this.toggle(
+            "interceptBases",
+            "Intercept Bases clicks",
+            "Open picker / quick-edit when clicking a schema field in a Bases table."
+          ),
+          this.toggle(
+            "showBasesErrors",
+            "Show validation errors in Bases",
+            "Highlight invalid cells with a subtle border and hover tooltip.",
+            (v) =>
+              (
+                this.plugin as unknown as { toggleBasesValidator?: (v: boolean) => void }
+              ).toggleBasesValidator?.(v)
+          ),
+        ],
+      },
+      {
+        heading: "Security",
+        rows: [
+          this.toggle(
+            "enableJsExecution",
+            "Allow JavaScript execution",
+            "Enables custom JavaScript sources and validators in schemas. Warning: this executes JavaScript code written in your schema files. Only enable if you trust the code in your vault."
+          ),
+        ],
+      },
+      {
+        heading: "Schema hierarchy",
+        rows: [
+          {
+            name: "",
+            build: (setting) => {
+              setting.settingEl.empty();
+              this.treeContainer = setting.settingEl.createDiv("mv-schema-tree");
+              this.renderTree(this.treeContainer);
+            },
+          },
+          {
+            name: "",
+            build: (setting) =>
+              setting.addButton((btn) =>
+                btn
+                  .setButtonText("New schema")
+                  .onClick(() => void this.plugin.openSchemaEditor(null))
+              ),
+          },
+        ],
+      },
+    ];
   }
 
   private renderTree(container: HTMLElement): void {

@@ -24,10 +24,7 @@ export class DescriptionHelp extends Component {
     this.retainDocument(target.ownerDocument);
     const id = `mv-description-${++nextDescriptionId}`;
     const original = target.getAttribute("aria-describedby");
-    const accessibleText = target.ownerDocument.createElement("span");
-    accessibleText.id = id;
-    accessibleText.className = "mv-description-sr";
-    accessibleText.textContent = text;
+    const accessibleText = target.createSpan({ cls: "mv-description-sr", text, attr: { id } });
     target.after(accessibleText);
     target.setAttribute("aria-describedby", [original, id].filter(Boolean).join(" "));
     target.addClass("mv-has-description");
