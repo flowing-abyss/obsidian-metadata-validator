@@ -878,7 +878,10 @@ export class ContextMenuModal extends Modal {
     });
   }
 
-  /** Rules in effect for this note, one line under the schema; hover shows a rule's description. */
+  /**
+   * Rules in effect for this note, under the schema; hover shows a rule's description.
+   * Clamped to two lines, with a toggle when there is more to show.
+   */
   private renderRulesLine(footer: HTMLElement): void {
     const rules = this.schema.rules;
     if (rules.length === 0) return;
@@ -889,6 +892,21 @@ export class ContextMenuModal extends Modal {
       const label = ruleLabel(rule, i);
       const span = line.createSpan({ text: label, cls: "mv-footer-rule" });
       this.descriptions.bind(span, rule.description, label);
+    });
+
+    line.addClass("mv-footer-rules-clamped");
+    const toggle = footer.createSpan({
+      text: "Show more",
+      cls: "mv-footer-rules-toggle mv-hidden",
+    });
+    toggle.addEventListener("click", () => {
+      const clamped = line.hasClass("mv-footer-rules-clamped");
+      line.toggleClass("mv-footer-rules-clamped", !clamped);
+      toggle.setText(clamped ? "Show less" : "Show more");
+    });
+    // Overflow is only measurable once the footer is laid out.
+    window.requestAnimationFrame(() => {
+      toggle.toggleClass("mv-hidden", line.scrollHeight <= line.clientHeight);
     });
   }
 

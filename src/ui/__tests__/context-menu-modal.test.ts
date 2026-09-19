@@ -115,5 +115,32 @@ describe("ContextMenuModal", () => {
       });
       expect(footer.querySelector(".mv-footer-rules")?.textContent).toBe("Rules: only");
     });
+
+    it("clamps the rules line and hides the toggle while everything fits", () => {
+      const footer = footerOf({ rules: [{ name: "only", then: {} }] });
+      const line = footer.querySelector(".mv-footer-rules")!;
+      const toggle = footer.querySelector(".mv-footer-rules-toggle")!;
+      expect(line.classList.contains("mv-footer-rules-clamped")).toBe(true);
+      expect(toggle.classList.contains("mv-hidden")).toBe(true);
+    });
+
+    it("shows a toggle when the rules overflow two lines and expands on click", async () => {
+      const footer = footerOf({ rules: [{ name: "a", then: {} }] });
+      const line = footer.querySelector<HTMLElement>(".mv-footer-rules")!;
+      const toggle = footer.querySelector<HTMLElement>(".mv-footer-rules-toggle")!;
+      Object.defineProperty(line, "scrollHeight", { configurable: true, value: 90 });
+      Object.defineProperty(line, "clientHeight", { configurable: true, value: 40 });
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+      expect(toggle.classList.contains("mv-hidden")).toBe(false);
+      expect(toggle.textContent).toBe("Show more");
+
+      toggle.click();
+      expect(line.classList.contains("mv-footer-rules-clamped")).toBe(false);
+      expect(toggle.textContent).toBe("Show less");
+
+      toggle.click();
+      expect(line.classList.contains("mv-footer-rules-clamped")).toBe(true);
+      expect(toggle.textContent).toBe("Show more");
+    });
   });
 });
