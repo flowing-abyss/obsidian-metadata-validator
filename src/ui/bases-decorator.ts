@@ -2,10 +2,10 @@
  * BasesDecorator — intercepts clicks on Bases table cells and opens
  * PickerModal / QuickEditModal for fields that have a schema definition.
  *
- * Uses pure event delegation: a single capture listener on document.body.
+ * Uses delegated capture listeners; native inline editors keep their left-clicks.
  * PickerModal and QuickEditModal are lazily imported on first click.
  */
-import { App, TFile, type EventRef } from "obsidian";
+import { App, Component, TFile, type EventRef } from "obsidian";
 import type { SchemaResolver } from "../schema/resolver";
 import type { PluginSettings } from "../settings";
 import type { PickerModal as PickerModalType } from "./picker-modal";
@@ -13,12 +13,15 @@ import type { QuickEditModal as QuickEditModalType } from "./quick-edit-modal";
 
 const PICKER_TYPES = new Set(["select", "multiselect", "link", "multilink"]);
 const CHECKBOX_SELECTOR = "input[type='checkbox'], [role='checkbox']";
+const NATIVE_EDITOR_SELECTOR = "input, textarea, select, [contenteditable]";
+const CONTAINERS = new Set(["DIV", "TD", "TR", "TABLE", "TBODY", "THEAD"]);
 
 export class BasesDecorator {
   private readonly app: App;
   private readonly resolver: SchemaResolver;
   private readonly settings: PluginSettings;
-  private boundHandler: ((e: MouseEvent) => void) | null = null;
+  private component: Component | null = null;
+  private readonly pendingCleanups = new Set<() => void>();
 
   constructor(app: App, resolver: SchemaResolver, settings: PluginSettings) {
     this.app = app;
@@ -26,15 +29,14 @@ export class BasesDecorator {
     this.settings = settings;
   }
 
-  private boundContextHandler: ((e: MouseEvent) => void) | null = null;
-  private boundMouseDownHandler: ((e: MouseEvent) => void) | null = null;
-
   attach(): void {
-    this.boundHandler = (e: MouseEvent) => this.onClick(e);
-    activeDocument.body.addEventListener("click", this.boundHandler, { capture: true });
-
-    this.boundContextHandler = (e: MouseEvent) => this.onContextMenu(e);
-    activeDocument.body.addEventListener("contextmenu", this.boundContextHandler, {
+    if (this.component) return;
+    const component = new Component();
+    this.component = component;
+    component.load();
+    const body = activeDocument.body;
+    component.registerDomEvent(body, "click", (e) => this.onClick(e), { capture: true });
+    component.registerDomEvent(body, "contextmenu", (e) => this.onContextMenu(e), {
       capture: true,
     });
 
@@ -44,60 +46,46 @@ export class BasesDecorator {
     // to fire before any document-level handler — stopPropagation here prevents Bases from
     // ever seeing the mousedown and starting a "pending edit" that would later commit the old
     // value and race with our picker's save.
-    this.boundMouseDownHandler = (e: MouseEvent) => this.onMouseDown(e);
-    window.addEventListener("mousedown", this.boundMouseDownHandler, { capture: true });
+    component.registerDomEvent(body.win, "mousedown", (e) => this.onMouseDown(e), {
+      capture: true,
+    });
+    component.register(() => {
+      for (const cleanup of this.pendingCleanups) cleanup();
+      this.pendingCleanups.clear();
+    });
   }
 
   detach(): void {
-    if (this.boundHandler) {
-      activeDocument.body.removeEventListener("click", this.boundHandler, { capture: true });
-      this.boundHandler = null;
-    }
-    if (this.boundContextHandler) {
-      activeDocument.body.removeEventListener("contextmenu", this.boundContextHandler, {
-        capture: true,
-      });
-      this.boundContextHandler = null;
-    }
-    if (this.boundMouseDownHandler) {
-      window.removeEventListener("mousedown", this.boundMouseDownHandler, { capture: true });
-      this.boundMouseDownHandler = null;
-    }
+    const component = this.component;
+    this.component = null;
+    component?.unload();
+  }
+
+  private isNativeEditor(target: HTMLElement, cell: HTMLElement): boolean {
+    // Live Preview embeds live inside CodeMirror's contenteditable root. Only
+    // editors within this cell count, and contenteditable=false stops the search.
+    const editor = target.closest(NATIVE_EDITOR_SELECTOR);
+    return (
+      editor !== null &&
+      cell.contains(editor) &&
+      (editor.matches("input, textarea, select") || !editor.matches("[contenteditable='false']"))
+    );
   }
 
   /**
-   * Intercepts right-click (button=2) mousedown on Bases cells we own, at the document
-   * capture phase — BEFORE any document.body-level handlers that Bases may have registered.
-   * Stopping propagation here prevents Bases from starting a "pending edit" on right-click
-   * that would later commit the old value and race with our picker's save.
+   * Stop right-clicks we handle at window capture, before Bases starts an inline edit.
+   * Prevent the input's default focus action too: opening two editors for the same
+   * cell lets Bases commit its old value after our modal saves.
    */
   private onMouseDown(e: MouseEvent): void {
     if (e.button !== 2) return;
-    if (!this.settings.interceptBases) return;
+    if (!this.resolveContextMenu(e)) return;
 
-    const target = e.target as HTMLElement | null;
-    if (!target) return;
-    if (!target.closest(".bases-view")) return;
-
-    // Skip links — Obsidian handles their right-click natively.
-    if (target.closest("a") ?? target.closest("[data-href]")) return;
-
-    const cell = target.closest<HTMLElement>(".bases-td[data-property]");
-    if (!cell) return;
-
-    const CONTAINERS = new Set(["DIV", "TD", "TR", "TABLE", "TBODY", "THEAD"]);
-    if (!CONTAINERS.has(target.tagName)) return;
-
-    const rawProp = cell.getAttribute("data-property") ?? "";
-    if (!rawProp.startsWith("note.")) return;
-
-    // We will handle this right-click via contextmenu — stop ALL handlers below window
-    // (including Bases' document-level capture handlers registered before us) from seeing
-    // this mousedown. stopImmediatePropagation also blocks any other window-level handlers.
+    e.preventDefault();
     e.stopImmediatePropagation();
   }
 
-  private onContextMenu(e: MouseEvent): void {
+  private resolveContextMenu(e: MouseEvent) {
     if (!this.settings.interceptBases) return;
 
     const target = e.target as HTMLElement | null;
@@ -106,14 +94,14 @@ export class BasesDecorator {
 
     // Skip right-clicks on links — let Obsidian handle the file context menu
     if (target.closest("a") ?? target.closest("[data-href]")) return;
+    if (target.closest(CHECKBOX_SELECTOR)) return;
 
     const cell = target.closest<HTMLElement>(".bases-td[data-property]");
     if (!cell) return;
 
-    // Only intercept right-click on empty space (container elements like div/td).
-    // Right-click on a value chip (span, etc.) should show the native context menu.
-    const CONTAINERS = new Set(["DIV", "TD", "TR", "TABLE", "TBODY", "THEAD"]);
-    if (!CONTAINERS.has(target.tagName)) return;
+    // Native editors (including number inputs) and cell padding open our modal.
+    // Value chips keep their native context menu.
+    if (!CONTAINERS.has(target.tagName) && !this.isNativeEditor(target, cell)) return;
 
     const rawProp = cell.getAttribute("data-property") ?? "";
     if (!rawProp.startsWith("note.")) return;
@@ -138,13 +126,24 @@ export class BasesDecorator {
     const fieldDef = schema.fields[fieldKey];
     if (!fieldDef) return;
 
+    return { file, fieldKey, fieldDef, schema, cell };
+  }
+
+  private onContextMenu(e: MouseEvent): void {
+    const component = this.component;
+    if (!component) return;
+    const context = this.resolveContextMenu(e);
+    if (!context) return;
+    const { file, fieldKey, fieldDef, schema, cell } = context;
+    const viewWindow = cell.win;
+
     e.preventDefault();
     e.stopImmediatePropagation();
 
     // Bases may have started an inline edit session on mousedown (before contextmenu fired).
     // Dispatching Escape to any focused element inside the Bases view cancels that session
     // without committing the old value — exactly as if the user pressed Escape themselves.
-    const focused = activeDocument.activeElement as HTMLElement | null;
+    const focused = cell.doc.activeElement as HTMLElement | null;
     if (focused?.closest(".bases-view")) {
       focused.dispatchEvent(
         new KeyboardEvent("keydown", {
@@ -166,7 +165,12 @@ export class BasesDecorator {
 
     // Delay by one animation frame so the Escape above finishes processing
     // synchronously before our modal steals focus.
-    window.requestAnimationFrame(() => {
+    let frame = 0;
+    const cancelFrame = () => viewWindow.cancelAnimationFrame(frame);
+    this.pendingCleanups.add(cancelFrame);
+    frame = viewWindow.requestAnimationFrame(() => {
+      this.pendingCleanups.delete(cancelFrame);
+      if (this.component !== component) return;
       // Re-read frontmatter at open time so the picker shows the latest value.
       const freshFm = (app.metadataCache.getFileCache(capturedFile)?.frontmatter ?? {}) as Record<
         string,
@@ -180,19 +184,24 @@ export class BasesDecorator {
       // immediately re-apply.  Array values are skipped (multiselect with unmanaged
       // entries is complex; the path through processFrontMatter handles those correctly).
       const buildOnSaved = (fieldKey: string, file: TFile) => (savedValue: unknown) => {
+        if (this.component !== component) return;
         if (typeof savedValue !== "string" && savedValue !== null) return;
 
         let seenCorrect = false;
         const deadline = Date.now() + 3000;
         let ref: EventRef | null = null;
+        let timer: number | undefined;
 
         const cleanup = () => {
           if (ref) {
             app.metadataCache.offref(ref);
             ref = null;
           }
+          if (timer !== undefined) viewWindow.clearTimeout(timer);
+          this.pendingCleanups.delete(cleanup);
         };
 
+        this.pendingCleanups.add(cleanup);
         ref = app.metadataCache.on("changed", (changedFile: TFile) => {
           if (changedFile.path !== file.path) return;
           if (Date.now() > deadline) {
@@ -218,11 +227,12 @@ export class BasesDecorator {
         });
 
         // Safety net: always unregister after the watch window closes.
-        window.setTimeout(cleanup, 3100);
+        timer = viewWindow.setTimeout(cleanup, 3100);
       };
 
       if (PICKER_TYPES.has(capturedFieldDef.type)) {
         void import("./picker-modal").then((mod: { PickerModal: typeof PickerModalType }) => {
+          if (this.component !== component) return;
           new mod.PickerModal(
             app,
             capturedFieldKey,
@@ -237,6 +247,7 @@ export class BasesDecorator {
       } else {
         void import("./quick-edit-modal").then(
           (mod: { QuickEditModal: typeof QuickEditModalType }) => {
+            if (this.component !== component) return;
             new mod.QuickEditModal(
               app,
               capturedFile,
@@ -251,6 +262,8 @@ export class BasesDecorator {
   }
 
   private onClick(e: MouseEvent): void {
+    const component = this.component;
+    if (!component) return;
     if (!this.settings.interceptBases) return;
 
     const target = e.target as HTMLElement | null;
@@ -262,17 +275,17 @@ export class BasesDecorator {
     // Don't intercept clicks on wikilinks — let Obsidian handle link navigation
     if (target.closest("a") ?? target.closest("[data-href]")) return;
 
-    // Let native Bases checkboxes handle their own clicks. Do not skip other input
-    // controls here: number and text values still need our schema-aware editor.
-    if (target.closest(CHECKBOX_SELECTOR)) return;
-
     // Find the cell with a data-property attribute
     const cell = target.closest<HTMLElement>(".bases-td[data-property]");
     if (!cell) return;
 
+    // Bases starts native edits on mousedown, before this click. Opening a modal
+    // here leaves that edit alive and its stale value can overwrite our save.
+    // Keep left-clicks native; the schema-aware editor is available on right-click.
+    if (this.isNativeEditor(target, cell) || target.closest(CHECKBOX_SELECTOR)) return;
+
     // Only intercept left-clicks on actual value elements (chips, spans, text nodes).
     // Container elements (div, td) mean the user clicked on empty padding — let Bases handle it.
-    const CONTAINERS = new Set(["DIV", "TD", "TR", "TABLE", "TBODY", "THEAD"]);
     if (CONTAINERS.has(target.tagName)) return;
 
     const rawProp = cell.getAttribute("data-property") ?? "";
@@ -308,6 +321,7 @@ export class BasesDecorator {
 
     if (PICKER_TYPES.has(fieldDef.type)) {
       void import("./picker-modal").then((mod: { PickerModal: typeof PickerModalType }) => {
+        if (this.component !== component) return;
         new mod.PickerModal(
           this.app,
           fieldKey,
@@ -322,6 +336,7 @@ export class BasesDecorator {
     } else {
       void import("./quick-edit-modal").then(
         (mod: { QuickEditModal: typeof QuickEditModalType }) => {
+          if (this.component !== component) return;
           new mod.QuickEditModal(this.app, file, fieldKey, fieldDef, frontmatter[fieldKey]).open();
         }
       );
